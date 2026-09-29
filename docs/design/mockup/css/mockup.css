@@ -1966,12 +1966,12 @@ kbd {
 
 /* 彩胶：封面图案压在彩胶里（参考 QQ 音乐实机），悬于右上、顶部微出画，播放时随图案旋转 */
 .immersive.layout-poster .im-cover {
-  width: min(62vh, 44vw);
+  width: min(90vh, 90vw);
   aspect-ratio: 1;
   border-radius: 50%;
   position: absolute;
-  top: -6vh;
-  right: -6vw;
+  top: -27vh;
+  right: -19vw;
   background:
     /* 细纹 */
     repeating-radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 8px),

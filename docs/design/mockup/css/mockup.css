@@ -1392,6 +1392,8 @@ body:not(.paused) .disc {
 .im-right {
   display: flex;
   flex-direction: column;
+  /* 封面+歌词组在列内始终垂直居中（任意视口高度） */
+  justify-content: center;
   min-width: 0;
   height: 100%;
   padding: 1vh 0 0;

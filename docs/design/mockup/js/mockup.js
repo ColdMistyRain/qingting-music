@@ -88,13 +88,12 @@ function cycleMode() {
 }
 
 /* ---------- 主题（VS-08） ---------- */
-const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
-const MOON = '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>';
 function setTheme(t) {
   document.documentElement.dataset.theme = t;
   localStorage.setItem("qt-theme", t);
-  $("#ico-theme").innerHTML = t === "dark" ? MOON : SUN;
-  $("#btn-theme-label").textContent = t === "dark" ? "浅色模式" : "深色模式";
+  const dark = t === "dark";
+  $("#th-dark")?.classList.toggle("active", dark);
+  $("#th-light")?.classList.toggle("active", !dark);
 }
 
 /* ---------- 取色模拟（VS-02）：切换歌曲 → 全站换色 ---------- */
@@ -366,9 +365,10 @@ function setPage(name) {
 
 function applyRole() {
   const guest = state.role === "guest";
-  ["nav-library", "nav-online", "nav-admin", "sb-playlists"].forEach((id) => {
+  ["nav-library", "nav-online", "sb-playlists", "set-admin-card"].forEach((id) => {
     $("#" + id).classList.toggle("hidden", guest);
   });
+  $("#set-role").textContent = guest ? "访客" : "管理员";
   if (guest) closeConsole();
   if (guest && ["library", "online", "playlist", "admin"].includes(state.page)) setPage("local");
 }
@@ -489,8 +489,11 @@ function bind() {
   $$(".sidebar .nav-item[data-page]").forEach((n) =>
     n.addEventListener("click", () => setPage(n.dataset.page)));
 
-  $("#btn-theme").addEventListener("click", () =>
-    setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+  // 主题切换（设置页分段按钮，VS-08）
+  const thDark = $("#th-dark");
+  if (thDark) thDark.addEventListener("click", () => setTheme("dark"));
+  const thLight = $("#th-light");
+  if (thLight) thLight.addEventListener("click", () => setTheme("light"));
 
   $("#btn-logout").addEventListener("click", () => {
     $("#immersive").classList.add("hidden");
@@ -600,8 +603,8 @@ function bind() {
     $("#btn-collapse").title = collapsed ? "展开侧边栏" : "折叠侧边栏";
   });
 
-  // 管理控制台：侧栏入口 + 内部导航（独立系统形态）
-  $("#nav-admin").addEventListener("click", () => openConsole("songs"));
+  // 管理控制台：设置页入口 + 内部导航（独立系统形态）
+  on("#btn-open-console", () => openConsole("songs"));
   $("#cs-back").addEventListener("click", closeConsole);
   $$(".cs-nav").forEach((n) =>
     n.addEventListener("click", () => setConsolePage(n.dataset.cs)));

@@ -47,22 +47,14 @@
         <div id="sb-pl-list"></div>
       </div>
       <div class="sb-sep"></div>
-      <button class="nav-item" data-page="admin" id="nav-admin">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2" fill="var(--bg-base)"/><circle cx="15" cy="12" r="2" fill="var(--bg-base)"/><circle cx="11" cy="17" r="2" fill="var(--bg-base)"/></svg>
-        <span class="lbl">管理台</span><span class="lbl" style="opacity:.5;font-size:11px">仅管理员</span>
-      </button>
       <div class="sb-foot">
+        <button class="nav-item" data-page="settings" id="nav-settings">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h0a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h0a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v0a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+          <span class="lbl">设置</span>
+        </button>
         <button class="nav-item" id="btn-collapse" title="折叠侧边栏">
           <svg class="icon" id="ico-collapse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></svg>
           <span class="lbl">折叠侧边栏</span>
-        </button>
-        <button class="nav-item" id="btn-theme">
-          <svg class="icon" id="ico-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
-          <span class="lbl" id="btn-theme-label">浅色模式</span>
-        </button>
-        <button class="nav-item" id="btn-logout">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M4 12h11M11 8l4 4-4 4"/></svg>
-          <span class="lbl">退出登录</span>
         </button>
       </div>
     </aside>
@@ -122,7 +114,37 @@
         <div id="pl-detail"></div>
       </section>
 
-      <!-- 管理台：独立控制台（3.12），从侧栏进入 -->
+      <!-- 管理台：独立控制台（3.12），从设置页进入 -->
+
+      <!-- 设置 -->
+      <section id="page-settings" class="page hidden">
+        <div class="page-head"><h1>设置</h1></div>
+        <div class="set-grid">
+          <div class="set-card glass">
+            <b>外观</b>
+            <div class="set-row"><span>主题</span>
+              <div class="seg">
+                <button id="th-dark">深色</button>
+                <button id="th-light">浅色</button>
+              </div>
+            </div>
+            <div class="set-note">默认跟随系统，手动切换后记忆选择（VS-08）</div>
+          </div>
+          <div class="set-card glass">
+            <b>账户</b>
+            <div class="set-row"><span>当前身份</span><span class="badge local" id="set-role">管理员</span></div>
+            <button class="btn" id="btn-logout">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M4 12h11M11 8l4 4-4 4"/></svg>
+              退出登录
+            </button>
+          </div>
+          <div class="set-card glass" id="set-admin-card">
+            <b>管理</b>
+            <div class="set-note">上传歌曲、曲库管理、存储统计与索引重建（3.12）</div>
+            <button class="btn btn-primary" id="btn-open-console">打开管理控制台</button>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- 播放条 -->

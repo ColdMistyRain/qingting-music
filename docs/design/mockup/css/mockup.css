@@ -2038,12 +2038,29 @@ body:not(.paused) .immersive.layout-poster .im-cover {
     conic-gradient(
       from 30deg,
       transparent 0deg,
-      color-mix(in srgb, var(--cv2) 85%, transparent) 55deg,
-      transparent 150deg,
-      color-mix(in srgb, var(--cv1) 75%, transparent) 235deg,
-      transparent 320deg
+      color-mix(in srgb, var(--cv2) 18%, transparent) 22deg,
+      color-mix(in srgb, var(--cv2) 52%, transparent) 48deg,
+      color-mix(in srgb, var(--cv2) 85%, transparent) 70deg,
+      color-mix(in srgb, var(--cv2) 62%, transparent) 95deg,
+      color-mix(in srgb, var(--cv2) 26%, transparent) 125deg,
+      transparent 155deg,
+      transparent 185deg,
+      color-mix(in srgb, var(--cv1) 16%, transparent) 208deg,
+      color-mix(in srgb, var(--cv1) 48%, transparent) 228deg,
+      color-mix(in srgb, var(--cv1) 75%, transparent) 248deg,
+      color-mix(in srgb, var(--cv1) 46%, transparent) 275deg,
+      color-mix(in srgb, var(--cv1) 15%, transparent) 300deg,
+      transparent 325deg
     ),
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--cv2) 75%, transparent) 0 58%, transparent 80%);
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--cv2) 72%, transparent) 0 40%,
+      color-mix(in srgb, var(--cv2) 58%, transparent) 52%,
+      color-mix(in srgb, var(--cv2) 38%, transparent) 63%,
+      color-mix(in srgb, var(--cv2) 20%, transparent) 72%,
+      color-mix(in srgb, var(--cv2) 8%, transparent) 79%,
+      transparent 86%
+    );
   filter: blur(34px);
   animation: disc-spin 32s linear infinite;
   animation-play-state: paused;

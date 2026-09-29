@@ -23,16 +23,16 @@
     <mxCell id="PC" value="播放器核心&#xa;（底部播放条）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="FE">
       <mxGeometry x="660" y="120" width="230" height="70" as="geometry"/>
     </mxCell>
-    <mxCell id="fe1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="FE" source="V1" target="PC">
+    <mxCell id="fe1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="FE" source="V1" target="PC">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="fe2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="FE" source="V2" target="PC">
+    <mxCell id="fe2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="FE" source="V2" target="PC">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="fe3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="FE" source="V3" target="PC">
+    <mxCell id="fe3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="FE" source="V3" target="PC">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="fe4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="FE" source="V4" target="PC">
+    <mxCell id="fe4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="FE" source="V4" target="PC">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="BE" value="自建后端服务器（Node.js）" style="swimlane;html=1;startSize=30;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=13;fontStyle=1;" vertex="1" parent="1">
@@ -68,11 +68,16 @@
     <mxCell id="NET" value="第三方音源服务（自部署 NeteaseCloudMusicApi 等）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;" vertex="1" parent="1">
       <mxGeometry x="660" y="590" width="280" height="80" as="geometry"/>
     </mxCell>
-    <mxCell id="x1" value="REST /api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;" edge="1" parent="1" source="FE" target="API">
+    <mxCell id="x1" value="REST /api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;exitX=0.125;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="FE" target="API">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="x2" value="Range 请求 /audio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;" edge="1" parent="1" source="PC" target="ST">
-      <mxGeometry relative="1" as="geometry"/>
+    <mxCell id="x2" value="Range 请求 /audio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="PC" target="ST">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="950" y="195"/>
+          <mxPoint x="950" y="495"/>
+        </Array>
+      </mxGeometry>
     </mxCell>
     <mxCell id="x3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="UP" target="STORE">
       <mxGeometry relative="1" as="geometry"/>
@@ -83,8 +88,14 @@
     <mxCell id="x5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="PX" target="NET">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="x6" value="在线曲目：浏览器直接加载第三方音频 URL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=11;" edge="1" parent="1" source="PC" target="NET">
-      <mxGeometry relative="1" as="geometry"/>
+    <mxCell id="x6" value="在线曲目：浏览器直接加载第三方音频 URL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=11;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="PC" target="NET">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="975" y="216"/>
+          <mxPoint x="975" y="560"/>
+          <mxPoint x="800" y="560"/>
+        </Array>
+      </mxGeometry>
     </mxCell>
     <mxCell id="caption" value="系统架构 · 对应需求 3.1 模块总览 · 轻听音乐 v2.5" style="text;html=1;fontSize=10;fontColor=#999999;align=left;" vertex="1" parent="1">
       <mxGeometry x="40" y="690" width="500" height="20" as="geometry"/>

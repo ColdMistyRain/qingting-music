@@ -1400,7 +1400,7 @@ body:not(.paused) .disc {
 }
 
 .im-tb {
-  margin-bottom: 18px;
+  margin-bottom: 2px;
   /* 与歌词列 8px 内边距对齐 */
   padding-left: 8px;
 }

@@ -1358,3 +1358,182 @@ body:not(.paused) .disc {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================
+   沉浸式播放页改版（2026-09-29 布局参考用户稿）：
+   左方形封面 / 右标题+歌词列 / 底部三段式控制栏
+   ============================================================ */
+.im-body {
+  grid-template-columns: minmax(280px, 400px) 1fr;
+  gap: 52px;
+  padding: 0 16px;
+}
+
+.im-cover-wrap {
+  display: grid;
+  place-items: center;
+}
+
+.im-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  background: radial-gradient(circle at 32% 30%, var(--cv1), var(--cv2) 75%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), 0 0 90px var(--accent-soft);
+}
+
+.im-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  padding: 1vh 0 0;
+}
+
+.im-tb {
+  margin-bottom: 18px;
+}
+
+.im-tb b {
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.im-tb span {
+  display: block;
+  font-size: 15px;
+  color: var(--text-2);
+  margin-top: 8px;
+}
+
+.lyrics {
+  padding: 6px 8px 10px 2px;
+}
+
+/* 当前句：主题色高亮（参考稿），保留轻微放大（LR-04）与逐字填充（LR-05） */
+.lyline.current {
+  color: var(--accent);
+  font-size: 25px;
+  transform: scale(1.02);
+  opacity: 1;
+}
+
+.lyline.current .ch {
+  color: var(--accent);
+  opacity: 0.35;
+}
+
+.lyline.current .ch.done {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.im-ly-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+.ban-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  color: var(--text-2);
+  font-size: 13px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ban-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 底部三段式控制栏 */
+.im-bl {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--text-2);
+  min-width: 0;
+}
+
+.im-bl b {
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+
+.mini-ctl {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  transition: color 0.15s;
+}
+
+.mini-ctl:hover {
+  color: var(--text-1);
+}
+
+.mini-ctl .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.mini-ctl.liked {
+  color: var(--accent);
+}
+
+.mini-ctl.liked svg path {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.hq-badge {
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 5px;
+  padding: 2px 5px;
+}
+
+.circle-word {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--text-2);
+  background: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.circle-word:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.im-bc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(560px, 100%);
+}
+
+.im-br {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}

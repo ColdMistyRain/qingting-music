@@ -97,7 +97,8 @@ function playSong(id, autoplay = true) {
   $("#im-title-b").textContent = song.title;
   $("#im-title-s").textContent = `${song.artist} · ${song.album}`;
   $("#pb-t2").textContent = $("#im-t2").textContent = fmt(song.dur);
-  $("#im-disc").style.background = `radial-gradient(circle at 32% 30%, ${song.c1}, ${song.c2} 70%)`;
+  $("#im-cover").style.background = `radial-gradient(circle at 32% 30%, ${song.c1}, ${song.c2} 75%)`;
+  $("#im-bl-title").textContent = `${song.title} - ${song.artist}`;
   renderLyrics(song);
   markPlayingRows();
   updatePlayIcon();
@@ -415,25 +416,31 @@ function bind() {
     applyRole(); setPage("local");
   });
 
-  [["#c-play", "#i-play"], ["#i-play", "#c-play"]].forEach(([a]) =>
-    $(a).addEventListener("click", togglePlay));
-  $("#c-prev").addEventListener("click", prevSong);
-  $("#i-prev").addEventListener("click", prevSong);
-  $("#c-next").addEventListener("click", nextSong);
-  $("#i-next").addEventListener("click", nextSong);
+  // 防御式绑定：元素可能不存在（如沉浸页无循环按钮）
+  const on = (sel, fn) => { const el = $(sel); if (el) el.addEventListener("click", fn); };
+  on("#c-play", togglePlay);
+  on("#i-play", togglePlay);
+  on("#c-prev", prevSong);
+  on("#i-prev", prevSong);
+  on("#c-next", nextSong);
+  on("#i-next", nextSong);
 
-  [["#c-shuffle", "#i-shuffle"], ["#i-shuffle", "#c-shuffle"]].forEach(([a, b]) =>
-    $(a).addEventListener("click", () => {
-      state.shuffle = !state.shuffle;
-      $(a).classList.toggle("on", state.shuffle);
-      $(b).classList.toggle("on", state.shuffle);
-    }));
-  [["#c-repeat", "#i-repeat"], ["#i-repeat", "#c-repeat"]].forEach(([a, b]) =>
-    $(a).addEventListener("click", () => {
-      state.repeatOn = !state.repeatOn;
-      $(a).classList.toggle("on", state.repeatOn);
-      $(b).classList.toggle("on", state.repeatOn);
-    }));
+  const bindToggle = (sel, key) => {
+    const el = $(sel);
+    if (!el) return;
+    el.addEventListener("click", () => {
+      state[key] = !state[key];
+      $$(".toggle").forEach((x) => {
+        if (x.dataset.toggle === key) x.classList.toggle("on", state[key]);
+      });
+    });
+  };
+  $$('#c-shuffle, #i-shuffle').forEach((el) => (el.dataset.toggle = "shuffle"));
+  $$('#c-repeat, #i-repeat').forEach((el) => (el.dataset.toggle = "repeat"));
+  bindToggle("#c-shuffle", "shuffle");
+  bindToggle("#i-shuffle", "shuffle");
+  bindToggle("#c-repeat", "repeat");
+  bindToggle("#i-repeat", "repeat");
 
   $$(".progress").forEach((p) => p.addEventListener("click", (e) => {
     const r = p.getBoundingClientRect();
@@ -504,6 +511,11 @@ function bind() {
     const collapsed = $("#app").classList.toggle("collapsed");
     localStorage.setItem("qt-sb-collapsed", collapsed ? "1" : "0");
     $("#btn-collapse").title = collapsed ? "展开侧边栏" : "折叠侧边栏";
+  });
+
+  // 沉浸页：喜欢按钮（原型交互）
+  $("#im-heart").addEventListener("click", function () {
+    this.classList.toggle("liked");
   });
 }
 

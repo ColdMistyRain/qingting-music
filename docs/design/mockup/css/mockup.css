@@ -1368,9 +1368,12 @@ body:not(.paused) .disc {
    左方形封面 / 右标题+歌词列 / 底部三段式控制栏
    ============================================================ */
 .im-body {
-  grid-template-columns: minmax(280px, 400px) 1fr;
-  gap: 52px;
-  padding: 0 16px;
+  grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
+  gap: 56px;
+  padding: 0 24px;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
 }
 
 .im-cover-wrap {

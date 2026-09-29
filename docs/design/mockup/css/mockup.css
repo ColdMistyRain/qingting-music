@@ -1146,3 +1146,162 @@ body:not(.paused) .disc {
     animation: none !important;
   }
 }
+
+/* ---------- 歌单：侧栏分区 + 详情页（2026-09-29 原型改版） ---------- */
+.sb-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  font-size: 11.5px;
+  letter-spacing: 2px;
+  color: var(--text-3);
+}
+
+.sb-add {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sb-add:hover {
+  background: var(--hover);
+  color: var(--accent);
+}
+
+.sb-pl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sb-pl:hover {
+  background: var(--hover);
+  color: var(--text-1);
+}
+
+.sb-pl.active {
+  background: var(--accent-soft);
+  color: var(--text-1);
+}
+
+.sb-pl .icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+
+.sb-pl-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-pl-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 歌单详情页头部 */
+.plh {
+  display: flex;
+  gap: 26px;
+  margin-bottom: 26px;
+}
+
+.plh-cover {
+  width: 138px;
+  height: 138px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow);
+  flex: none;
+}
+
+.plh-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.plh-label {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--text-3);
+}
+
+.plh-name {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.plh-name .input {
+  font-size: 22px;
+  font-weight: 700;
+  min-width: 260px;
+  padding: 4px 10px;
+}
+
+.plh-meta {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.plh-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.plh-empty {
+  padding: 80px 0;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+/* 歌单详情曲目列表（编号） */
+.pl-tracks .trow {
+  display: grid;
+  grid-template-columns: 28px 44px 1fr 180px 64px 40px;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pl-tracks .trow:hover {
+  background: var(--hover);
+}
+
+.pl-tracks .trow.playing {
+  background: var(--accent-soft);
+}
+
+.t-num {
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

@@ -41,10 +41,11 @@
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.7 2.3 4 5 4 8s-1.3 5.7-4 8c-2.7-2.3-4-5-4-8s1.3-5.7 4-8z"/></svg>
         在线搜索
       </button>
-      <button class="nav-item" data-page="playlists" id="nav-playlists">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M4 11h10M4 16h6"/><circle cx="17" cy="16" r="3"/><path d="M20 16V6l2 1"/></svg>
-        我的歌单
-      </button>
+      <div class="sb-sep"></div>
+      <div class="sb-section" id="sb-playlists">
+        <div class="sb-section-head"><span>歌 单</span><button class="sb-add" id="pl-add" title="新建歌单">＋</button></div>
+        <div id="sb-pl-list"></div>
+      </div>
       <div class="sb-sep"></div>
       <button class="nav-item" data-page="admin" id="nav-admin">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2" fill="var(--bg-base)"/><circle cx="15" cy="12" r="2" fill="var(--bg-base)"/><circle cx="11" cy="17" r="2" fill="var(--bg-base)"/></svg>
@@ -112,20 +113,9 @@
         <div id="list-online"></div>
       </section>
 
-      <!-- 我的歌单 -->
-      <section id="page-playlists" class="page hidden">
-        <div class="page-head">
-          <h1>我的歌单 <div class="sub">存储在服务器端 · 支持混合来源（PS-01/02）</div></h1>
-          <button class="btn">＋ 新建歌单</button>
-        </div>
-        <div class="pl-grid">
-          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#5b7cfa,#8b5cf6)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">夜间飞行</div><div class="pl-count">24 首 · 上周更新</div></div>
-          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#ff6b3d,#f97316)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">夏日公路</div><div class="pl-count">18 首 · 上月更新</div></div>
-          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#0ea5e9,#22d3ee)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">深海专注</div><div class="pl-count">32 首 · 今天更新</div></div>
-          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#22c55e,#84cc16)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">原野漫步</div><div class="pl-count">9 首 · 三天前</div></div>
-          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#a855f7,#6366f1)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">紫色午夜</div><div class="pl-count">15 首 · 上周更新</div></div>
-          <div class="pl-card glass pl-new">＋<br>新建歌单</div>
-        </div>
+      <!-- 歌单详情（侧栏歌单点击进入） -->
+      <section id="page-playlist" class="page hidden">
+        <div id="pl-detail"></div>
       </section>
 
       <!-- 管理台 -->

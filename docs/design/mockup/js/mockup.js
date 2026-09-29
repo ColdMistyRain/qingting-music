@@ -281,14 +281,109 @@ function setPage(name) {
   $("#page-" + name).classList.remove("hidden");
   $$(".sidebar .nav-item[data-page]").forEach((n) =>
     n.classList.toggle("active", n.dataset.page === name));
+  $$(".sb-pl").forEach((el) => el.classList.remove("active"));
 }
 
 function applyRole() {
   const guest = state.role === "guest";
-  ["nav-library", "nav-online", "nav-playlists", "nav-admin"].forEach((id) => {
-    $( "#" + id).classList.toggle("hidden", guest);
+  ["nav-library", "nav-online", "nav-admin", "sb-playlists"].forEach((id) => {
+    $("#" + id).classList.toggle("hidden", guest);
   });
-  if (guest && ["library", "online", "playlists", "admin"].includes(state.page)) setPage("local");
+  if (guest && ["library", "online", "playlist", "admin"].includes(state.page)) setPage("local");
+}
+
+/* ---------- 歌单：侧栏分区 + 详情页（2026-09-29 原型改版） ---------- */
+const PLAYLISTS = [
+  { id: "p1", name: "夜间飞行", c1: "#5b7cfa", c2: "#8b5cf6", songs: ["s1", "s3", "s6"] },
+  { id: "p2", name: "夏日公路", c1: "#ff6b3d", c2: "#f97316", songs: ["s4", "s2"] },
+  { id: "p3", name: "深海专注", c1: "#0ea5e9", c2: "#22d3ee", songs: ["s3", "s5", "s7"] },
+  { id: "p4", name: "原野漫步", c1: "#22c55e", c2: "#84cc16", songs: ["s5"] },
+  { id: "p5", name: "紫色午夜", c1: "#a855f7", c2: "#6366f1", songs: ["s6", "s1", "s8"] },
+];
+let activePl = "p1";
+
+function renderSidebarPlaylists() {
+  $("#sb-pl-list").innerHTML = PLAYLISTS.map((p) => `
+    <button class="sb-pl${p.id === activePl ? " active" : ""}" data-pl="${p.id}">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h10M4 11h10M4 16h6"/><circle cx="17" cy="16" r="2.6"/><path d="M19.6 16V7l2.4-.8"/></svg>
+      <span class="sb-pl-name">${esc(p.name)}</span>
+      <span class="sb-pl-count">${p.songs.length}</span>
+    </button>`).join("");
+  $$("#sb-pl-list .sb-pl").forEach((el) =>
+    el.addEventListener("click", () => openPlaylist(el.dataset.pl)));
+}
+
+function openPlaylist(id) {
+  const p = PLAYLISTS.find((x) => x.id === id);
+  if (!p) return;
+  activePl = id;
+  setPage("playlist");
+  renderSidebarPlaylists();
+  const songs = p.songs.map(byId);
+  const total = songs.reduce((a, s) => a + s.dur, 0);
+  const totalStr = total >= 3600
+    ? `${Math.floor(total / 3600)} 小时 ${Math.round((total % 3600) / 60)} 分`
+    : `${Math.round(total / 60)} 分钟`;
+  const playIcon = '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>';
+  const renameIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l4 4L8 20H4v-4z"/></svg>';
+  const exportIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8 10l4 4 4-4"/><path d="M5 20h14"/></svg>';
+  const trashIcon = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6.5 7l1 12a1 1 0 0 0 1 .9h7a1 1 0 0 0 1-.9l1-12"/></svg>';
+  $("#pl-detail").innerHTML = `
+    <div class="plh">
+      <div class="plh-cover" style="background:linear-gradient(135deg,${p.c1},${p.c2})"><svg class="icon" style="width:46px;height:46px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div>
+      <div class="plh-info">
+        <div class="plh-label">歌 单</div>
+        <div class="plh-name" id="plh-name">${esc(p.name)}</div>
+        <div class="plh-meta">${p.songs.length} 首 · ${totalStr}</div>
+        <div class="plh-actions">
+          <button class="btn btn-primary" id="plh-play">${playIcon}播放全部</button>
+          <button class="btn" id="plh-rename">${renameIcon}重命名</button>
+          <button class="btn" id="plh-export">${exportIcon}导出</button>
+          <button class="btn btn-danger" id="plh-del">${trashIcon}删除</button>
+        </div>
+      </div>
+    </div>
+    <div class="pl-tracks">
+      ${songs.map((s, i) => `
+      <div class="trow${s.id === state.playingId ? " playing" : ""}" data-id="${s.id}">
+        <span class="t-num">${i + 1}</span>
+        <div class="cover" style="${coverStyle(s)}">${noteSVG}</div>
+        <div class="s-meta"><div class="s-title">${s.title}</div><div class="s-artist">${s.artist}</div></div>
+        <div class="s-album">${s.album}</div>
+        <div class="s-dur">${fmt(s.dur)}</div>
+        <div class="s-act">⋯</div>
+      </div>`).join("")}
+    </div>`;
+  $("#plh-play").addEventListener("click", () => playSong(songs[0].id, true));
+  $("#plh-export").addEventListener("click", function () {
+    const orig = this.innerHTML;
+    this.textContent = "已导出 ✓";
+    setTimeout(() => { this.innerHTML = orig; }, 1200);
+  });
+  $("#plh-rename").addEventListener("click", () => {
+    const nameEl = $("#plh-name");
+    const input = document.createElement("input");
+    input.className = "input";
+    input.value = p.name;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    const commit = () => {
+      p.name = input.value.trim() || p.name;
+      renderSidebarPlaylists();
+      openPlaylist(p.id);
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+  });
+  $("#plh-del").addEventListener("click", () => {
+    const i = PLAYLISTS.findIndex((x) => x.id === id);
+    PLAYLISTS.splice(i, 1);
+    renderSidebarPlaylists();
+    if (PLAYLISTS.length) openPlaylist(PLAYLISTS[Math.max(0, i - 1)].id);
+    else $("#pl-detail").innerHTML = '<div class="plh-empty">还没有歌单，点侧栏「＋」新建一个</div>';
+  });
+  bindSongRows(".pl-tracks");
 }
 
 /* ---------- 事件绑定 ---------- */
@@ -390,6 +485,14 @@ function bind() {
     $$('#list-admin input[type="checkbox"]:checked').forEach((c) => c.closest(".adminrow").remove());
     updateSelCount();
   });
+
+  // 歌单：侧栏「＋」新建并进入重命名（PS-01）
+  $("#pl-add").addEventListener("click", () => {
+    const p = { id: "p" + Date.now(), name: "新建歌单", c1: "#64748b", c2: "#94a3b8", songs: [] };
+    PLAYLISTS.push(p);
+    openPlaylist(p.id);
+    setTimeout(() => $("#plh-rename").click(), 60);
+  });
 }
 
 /* ---------- 启动 ---------- */
@@ -398,6 +501,7 @@ renderLibrary();
 renderLocal();
 renderOnline();
 renderAdmin();
+renderSidebarPlaylists();
 bind();
 playSong("s1", true);
 state.progress = 42;

@@ -1474,3 +1474,12 @@ body:not(.paused) .disc {
 .lyline.current .ch.done {
   text-shadow: 0 0 18px var(--accent-soft), 0 0 6px var(--accent-soft);
 }
+
+/* 播放模式按钮：顺序播放时置灰（PL-05 单按钮四态） */
+.ctl.dim {
+  color: var(--text-3);
+}
+
+.ctl.dim:hover {
+  color: var(--text-2);
+}

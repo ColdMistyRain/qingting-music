@@ -166,13 +166,13 @@
         </div>
       </div>
       <div class="pb-center">
-        <div class="pb-ctrls">
-          <button class="ctl toggle" id="c-shuffle" title="随机播放"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.5c3 0 4.6 4.5 7.5 10 1 2 2.4 0 3.5 0H21"/><path d="M18.5 4.5 21 7l-2.5 2.5"/><path d="M3 17h3.5c1.2 0 2.2-2 3.2-3.5"/><path d="M14.6 9.9c.9-1.6 1.9-2.9 3.4-2.9H21"/><path d="M18.5 14.5 21 17l-2.5 2.5"/></svg></button>
-          <button class="ctl" id="c-prev"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M19 5.5v13L9.5 12z"/><path d="M6 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
-          <button class="ctl play" id="c-play" title="播放/暂停（空格）"><svg class="icon" id="ico-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
-          <button class="ctl" id="c-next"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M5 5.5v13L14.5 12z"/><path d="M18 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
-          <button class="ctl toggle on" id="c-repeat" title="列表循环"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12V9a3 3 0 0 1 3-3h13"/><path d="M17.5 3.5 20 6l-2.5 2.5"/><path d="M20 12v3a3 3 0 0 1-3 3H4"/><path d="M6.5 20.5 4 18l2.5-2.5"/></svg></button>
-        </div>
+      <div class="pb-ctrls">
+        <button class="ctl mode" id="c-mode" title="播放模式：列表循环"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></svg></button>
+        <button class="ctl" id="c-prev"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M19 5.5v13L9.5 12z"/><path d="M6 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
+        <button class="ctl play" id="c-play" title="播放/暂停（空格）"><svg class="icon" id="ico-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+        <button class="ctl" id="c-next"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M5 5.5v13L14.5 12z"/><path d="M18 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
+        <button class="ctl" id="c-vol" title="静音"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l4 4V6l-4 4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg></button>
+      </div>
         <div class="progress-row">
           <span class="time" id="pb-t1">0:00</span>
           <div class="progress" id="pb-prog"><div class="fill"></div><div class="knob"></div></div>
@@ -180,8 +180,6 @@
         </div>
       </div>
       <div class="pb-right">
-        <svg class="icon" style="width:18px;height:18px;color:var(--text-2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l4 4V6l-4 4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>
-        <div class="vol-bar"><div class="vol-fill"></div></div>
         <button class="ctl" id="pb-expand" title="展开沉浸式播放页"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
       </div>
     </footer>
@@ -204,7 +202,7 @@
     <div class="im-bottom">
       <div class="im-bc">
         <div class="im-ctrls">
-          <button class="ctl toggle" id="i-shuffle"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.5c3 0 4.6 4.5 7.5 10 1 2 2.4 0 3.5 0H21"/><path d="M18.5 4.5 21 7l-2.5 2.5"/><path d="M3 17h3.5c1.2 0 2.2-2 3.2-3.5"/><path d="M14.6 9.9c.9-1.6 1.9-2.9 3.4-2.9H21"/><path d="M18.5 14.5 21 17l-2.5 2.5"/></svg></button>
+          <button class="ctl mode" id="i-mode" title="播放模式：列表循环"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></svg></button>
           <button class="ctl" id="i-prev"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M19 5.5v13L9.5 12z"/><path d="M6 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
           <button class="ctl play" id="i-play"><svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
           <button class="ctl" id="i-next"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M5 5.5v13L14.5 12z"/><path d="M18 5.5v13" fill="none" stroke-linecap="round"/></svg></button>

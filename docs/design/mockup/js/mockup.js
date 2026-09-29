@@ -53,9 +53,38 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const state = {
   role: "admin", page: "library",
   playingId: "s1", playing: true, progress: 42,
-  shuffle: false, repeatOn: true,
+  modeIdx: 1,
   lyricIdx: -1, charTimer: null,
 };
+let muted = false;
+
+/* ---------- 播放模式（PL-05：单按钮循环切换四种模式） ---------- */
+const MODE_ICONS = {
+  seq: '<path d="M4 12h13"/><path d="M14 8l4 4-4 4"/><path d="M20 5v14"/>',
+  list: '<path d="M4 12V9a3 3 0 0 1 3-3h13"/><path d="M17.5 3.5 20 6l-2.5 2.5"/><path d="M20 12v3a3 3 0 0 1-3 3H4"/><path d="M6.5 20.5 4 18l2.5-2.5"/>',
+  one: '<path d="M4 12V9a3 3 0 0 1 3-3h13"/><path d="M17.5 3.5 20 6l-2.5 2.5"/><path d="M20 12v3a3 3 0 0 1-3 3H4"/><path d="M6.5 20.5 4 18l2.5-2.5"/><text x="12" y="15.5" font-size="8.5" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">1</text>',
+  random: '<path d="M3 7h3.5c3 0 4.6 4.5 7.5 10 1 2 2.4 0 3.5 0H21"/><path d="M18.5 4.5 21 7l-2.5 2.5"/><path d="M3 17h3.5c1.2 0 2.2-2 3.2-3.5"/><path d="M14.6 9.9c.9-1.6 1.9-2.9 3.4-2.9H21"/><path d="M18.5 14.5 21 17l-2.5 2.5"/>',
+};
+const MODES = [
+  { key: "seq", label: "顺序播放" },
+  { key: "list", label: "列表循环" },
+  { key: "one", label: "单曲循环" },
+  { key: "random", label: "随机播放" },
+];
+
+function setModeUI() {
+  const m = MODES[state.modeIdx];
+  $$("#c-mode, #i-mode").forEach((el) => {
+    el.title = "播放模式：" + m.label;
+    el.classList.toggle("dim", m.key === "seq");
+    el.querySelector("svg").innerHTML = MODE_ICONS[m.key];
+  });
+}
+
+function cycleMode() {
+  state.modeIdx = (state.modeIdx + 1) % MODES.length;
+  setModeUI();
+}
 
 /* ---------- 主题（VS-08） ---------- */
 const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
@@ -121,7 +150,8 @@ function togglePlay() {
 
 function nextSong() {
   const i = SONGS.findIndex((s) => s.id === state.playingId);
-  const n = state.shuffle
+  const m = MODES[state.modeIdx].key;
+  const n = m === "random"
     ? SONGS[Math.floor(Math.random() * SONGS.length)].id
     : SONGS[(i + 1) % SONGS.length].id;
   playSong(n, state.playing);
@@ -206,8 +236,15 @@ setInterval(() => {
   const song = byId(state.playingId);
   state.progress += 0.25;
   if (state.progress >= song.dur) {
-    if (state.repeatOn) nextSong();
-    else { state.progress = song.dur; togglePlay(); }
+    const m = MODES[state.modeIdx].key;
+    if (m === "one") {
+      state.progress = 0; // 单曲循环：重唱
+    } else if (m === "seq" && SONGS.findIndex((x) => x.id === song.id) === SONGS.length - 1) {
+      state.progress = song.dur;
+      togglePlay(); // 顺序播放：末曲停止
+    } else {
+      nextSong();
+    }
   }
   updateProgressUI();
   updateLyrics(byId(state.playingId));
@@ -430,23 +467,14 @@ function bind() {
   on("#i-prev", prevSong);
   on("#c-next", nextSong);
   on("#i-next", nextSong);
-
-  const bindToggle = (sel, key) => {
-    const el = $(sel);
-    if (!el) return;
-    el.addEventListener("click", () => {
-      state[key] = !state[key];
-      $$(".toggle").forEach((x) => {
-        if (x.dataset.toggle === key) x.classList.toggle("on", state[key]);
-      });
-    });
-  };
-  $$('#c-shuffle, #i-shuffle').forEach((el) => (el.dataset.toggle = "shuffle"));
-  $$('#c-repeat, #i-repeat').forEach((el) => (el.dataset.toggle = "repeat"));
-  bindToggle("#c-shuffle", "shuffle");
-  bindToggle("#i-shuffle", "shuffle");
-  bindToggle("#c-repeat", "repeat");
-  bindToggle("#i-repeat", "repeat");
+  on("#c-mode", cycleMode);
+  on("#i-mode", cycleMode);
+  on("#c-vol", function () {
+    muted = !muted;
+    const f = $(".vol-fill");
+    if (f) f.style.width = muted ? "0%" : "65%";
+    this.title = muted ? "取消静音" : "静音";
+  });
 
   $$(".progress").forEach((p) => p.addEventListener("click", (e) => {
     const r = p.getBoundingClientRect();
@@ -528,6 +556,7 @@ renderOnline();
 renderAdmin();
 renderSidebarPlaylists();
 bind();
+setModeUI();
 playSong("s1", true);
 state.progress = 42;
 updateProgressUI();

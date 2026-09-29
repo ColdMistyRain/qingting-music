@@ -1959,10 +1959,7 @@ kbd {
 
 .immersive.layout-poster .im-cover-wrap {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 58%;
+  inset: 0;
   display: block;
   z-index: 0;
 }
@@ -2014,7 +2011,14 @@ body:not(.paused) .immersive.layout-poster .im-cover {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 30%, transparent) 38%, transparent 68%);
+  background: linear-gradient(90deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 32%, transparent) 36%, transparent 60%);
+}
+
+/* 顶栏与底部控制在遮罩层之上 */
+.immersive.layout-poster .im-top,
+.immersive.layout-poster .im-bottom {
+  position: relative;
+  z-index: 2;
 }
 
 .immersive.layout-poster .im-right {

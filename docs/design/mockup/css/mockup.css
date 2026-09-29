@@ -2065,7 +2065,8 @@ body:not(.paused) .immersive.layout-poster .im-cover {
   animation:
     disc-spin 32s linear infinite,
     glow-breathe 6s ease-in-out infinite;
-  animation-play-state: paused;
+  /* 旋转跟随播放状态；呼吸常驻不随暂停停止 */
+  animation-play-state: paused, running;
 }
 
 /* 光晕呼吸：透明度缓起缓落，与旋转叠加 */
@@ -2075,7 +2076,7 @@ body:not(.paused) .immersive.layout-poster .im-cover {
 }
 
 body:not(.paused) .immersive.layout-poster .im-cover-wrap::before {
-  animation-play-state: running;
+  animation-play-state: running, running;
 }
 
 /* 外圈胶环：更饱和的胶色包住封面图案 */

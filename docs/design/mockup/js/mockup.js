@@ -568,6 +568,17 @@ function bindEq() {
   });
 }
 
+/* ---------- 歌词页布局（VS-09：duo | center | poster） ---------- */
+let lyLayout = localStorage.getItem("qt-lylayout") || "duo";
+
+function applyLyLayout() {
+  const im = $("#immersive");
+  im.classList.remove("layout-center", "layout-poster");
+  if (lyLayout !== "duo") im.classList.add("layout-" + lyLayout);
+  $$("#ly-styles .style-pick").forEach((b) =>
+    b.classList.toggle("active", b.dataset.ly === lyLayout));
+}
+
 /* ---------- 管理控制台（独立系统形态，3.12） ---------- */
 function openConsole(page = "songs") {
   if (state.role !== "admin") return; // AD-04：仅管理员
@@ -595,6 +606,14 @@ function bind() {
   if (thDark) thDark.addEventListener("click", () => setTheme("dark"));
   const thLight = $("#th-light");
   if (thLight) thLight.addEventListener("click", () => setTheme("light"));
+
+  // 歌词页布局选择（VS-09）
+  $$("#ly-styles .style-pick").forEach((b) =>
+    b.addEventListener("click", () => {
+      lyLayout = b.dataset.ly;
+      localStorage.setItem("qt-lylayout", lyLayout);
+      applyLyLayout();
+    }));
 
   // 设置页 Tab 切换
   $$("#set-tabs .tab").forEach((t) =>
@@ -736,6 +755,7 @@ renderOnline();
 renderAdmin();
 renderSidebarPlaylists();
 buildEq();
+applyLyLayout();
 bind();
 setModeUI();
 playSong("s1", true);

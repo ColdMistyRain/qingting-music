@@ -120,7 +120,7 @@
       <section id="page-settings" class="page hidden">
         <div class="page-head"><h1>设置</h1></div>
         <div class="tabs" id="set-tabs">
-          <button class="tab active" data-st="general">常规</button>
+          <button class="tab active" data-st="general">外观</button>
           <button class="tab" data-st="account">账户</button>
           <button class="tab" data-st="online">在线音源</button>
           <button class="tab" data-st="keys">快捷键</button>
@@ -129,17 +129,35 @@
           <button class="tab" data-st="about">关于</button>
         </div>
         <div class="set-panels">
-          <!-- 常规 -->
+          <!-- 外观 -->
           <section id="st-general" class="st-panel">
             <div class="set-card glass">
-              <b>外观</b>
-              <div class="set-row"><span>主题</span>
+              <b>主题</b>
+              <div class="set-row"><span>模式</span>
                 <div class="seg">
                   <button id="th-dark">深色</button>
                   <button id="th-light">浅色</button>
                 </div>
               </div>
               <div class="set-note">默认跟随系统，手动切换后记忆选择（VS-08）</div>
+            </div>
+            <div class="set-card glass">
+              <b>歌词页布局</b>
+              <div class="style-picks" id="ly-styles">
+                <button class="style-pick" data-ly="duo">
+                  <span class="sp-thumb"><i class="a"></i><i class="l"></i></span>
+                  <span class="sp-name">经典双栏<small>封面左 · 歌词右</small></span>
+                </button>
+                <button class="style-pick" data-ly="center">
+                  <span class="sp-thumb"><i class="l"></i></span>
+                  <span class="sp-name">沉浸歌词<small>纯歌词居中</small></span>
+                </button>
+                <button class="style-pick" data-ly="poster">
+                  <span class="sp-thumb"><i class="l"></i><i class="a"></i></span>
+                  <span class="sp-name">海报背景<small>歌词左 · 大封面右</small></span>
+                </button>
+              </div>
+              <div class="set-note">选择即时生效并记忆（VS-09）；在播放页点击封面区域外的空白处也可快速切换</div>
             </div>
           </section>
           <!-- 账户 -->

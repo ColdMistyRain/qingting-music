@@ -2069,10 +2069,16 @@ body:not(.paused) .immersive.layout-poster .im-cover {
   animation-play-state: paused, running;
 }
 
-/* 光晕呼吸：透明度缓起缓落，与旋转叠加 */
+/* 光晕呼吸：透明度深呼吸 + 尺寸微缩放（独立 scale 属性，不与 disc-spin 的 rotate 冲突） */
 @keyframes glow-breathe {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
+  0%, 100% {
+    opacity: 0.3;
+    scale: 0.965;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.035;
+  }
 }
 
 body:not(.paused) .immersive.layout-poster .im-cover-wrap::before {

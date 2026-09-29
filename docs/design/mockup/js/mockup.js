@@ -126,7 +126,7 @@ function playSong(id, autoplay = true) {
   $("#im-title-b").textContent = song.title;
   $("#im-title-s").textContent = `${song.artist} · ${song.album}`;
   $("#pb-t2").textContent = $("#im-t2").textContent = fmt(song.dur);
-  $("#im-cover").style.background = `radial-gradient(circle at 32% 30%, ${song.c1}, ${song.c2} 75%)`;
+  // 彩胶颜色由 CSS 变量 --cv1/--cv2 驱动（applyPalette 已注入），不写内联 background
   renderLyrics(song);
   markPlayingRows();
   renderQueue();

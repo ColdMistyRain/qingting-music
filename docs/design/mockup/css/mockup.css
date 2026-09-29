@@ -1725,3 +1725,96 @@ kbd {
   color: var(--text-1);
   margin-left: 4px;
 }
+
+/* ---------- 音效 Tab：均衡器（PL-13） ---------- */
+.fx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.fx-head b {
+  font-size: 14px;
+}
+
+.fx-head .set-note {
+  margin-top: 6px;
+}
+
+.pill {
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  background: var(--fill-track);
+  color: var(--text-2);
+  transition: background 0.2s, color 0.2s;
+  flex: none;
+}
+
+.pill.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+.eq-grid {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 4px;
+}
+
+.eq-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  flex: 1;
+}
+
+.eq-band .v {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.eq-band .track {
+  position: relative;
+  width: 24px;
+  height: 140px;
+}
+
+.eq-band input[type="range"] {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 140px;
+  height: 24px;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.fx-gain {
+  width: 100%;
+}
+
+.fx-gain input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.fx-save {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.fx-save .input {
+  flex: 1;
+  min-width: 0;
+}

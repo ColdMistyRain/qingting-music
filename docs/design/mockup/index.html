@@ -124,6 +124,7 @@
           <button class="tab" data-st="account">账户</button>
           <button class="tab" data-st="online">在线音源</button>
           <button class="tab" data-st="keys">快捷键</button>
+          <button class="tab" data-st="fx">音效</button>
           <button class="tab" data-st="admin" id="tab-admin">管理</button>
           <button class="tab" data-st="about">关于</button>
         </div>
@@ -176,6 +177,27 @@
               <div class="set-row"><span>音量调节</span><span><kbd>↑</kbd><kbd>↓</kbd></span></div>
               <div class="set-row"><span>关闭沉浸式播放页</span><kbd>Esc</kbd></div>
               <div class="set-note">完整定义见 PL-08（M3 交付上下方向键音量）</div>
+            </div>
+          </section>
+          <!-- 音效（均衡器） -->
+          <section id="st-fx" class="st-panel hidden">
+            <div class="set-card glass">
+              <div class="fx-head">
+                <div><b>均衡器与音效</b><div class="set-note">10 段 EQ、整体增益；设置按浏览器本地保存（每设备独立，PL-13）</div></div>
+                <button class="pill on" id="fx-toggle">已开启</button>
+              </div>
+              <select class="input" id="fx-preset" style="width:180px">
+                <option value="平直">平直</option>
+                <option value="流行">流行</option>
+                <option value="摇滚">摇滚</option>
+                <option value="爵士">爵士</option>
+                <option value="古典">古典</option>
+                <option value="自定义">自定义</option>
+              </select>
+              <div class="eq-grid" id="fx-bands"></div>
+              <div class="fx-gain set-row"><span>增益</span><input type="range" id="fx-gain" min="-10" max="10" value="0" step="1"><span id="fx-gain-v" style="min-width:36px;text-align:right">0dB</span></div>
+              <div class="fx-save"><input class="input" id="fx-name" placeholder="保存当前曲线为自定义预设"><button class="btn" id="fx-save">保存</button></div>
+              <div class="set-note">开关用于 A/B 对比（关闭时音频直通）；增益过大时限幅器自动防止爆音</div>
             </div>
           </section>
           <!-- 管理 -->

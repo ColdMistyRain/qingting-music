@@ -478,6 +478,96 @@ function setSettingsTab(name) {
   $("#st-" + name).classList.remove("hidden");
 }
 
+/* ---------- 均衡器（PL-13，原型为视觉模拟；正式实现 = Web Audio BiquadFilterNode 链） ---------- */
+const EQ_FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_PRESETS = {
+  平直: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  流行: [-1, 1, 2, 3, 2, 0, -1, -1, 1, 2],
+  摇滚: [3, 2, -1, -2, 0, 2, 3, 3, 2, 1],
+  爵士: [2, 1, 0, 1, -1, 0, 1, 2, 2, 3],
+  古典: [2, 2, 0, 0, 0, 0, -1, -1, 0, 2],
+};
+let EQ = { on: true, preset: "平直", bands: [...EQ_PRESETS.平直], gain: 0, custom: {} };
+try { EQ = { ...EQ, ...JSON.parse(localStorage.getItem("qt-eq") || "{}") }; } catch {}
+
+function eqPersist() {
+  localStorage.setItem("qt-eq", JSON.stringify(EQ));
+}
+
+function buildEq() {
+  const box = $("#fx-bands");
+  box.innerHTML = EQ_FREQS.map((f, i) => `
+    <div class="eq-band">
+      <span class="v" data-v="${i}">${EQ.bands[i]}</span>
+      <div class="track"><input type="range" min="-12" max="12" step="1" value="${EQ.bands[i]}" data-i="${i}"></div>
+      <span>${f >= 1000 ? f / 1000 + "kHz" : f + "Hz"}</span>
+    </div>`).join("");
+  box.addEventListener("input", (e) => {
+    const i = +e.target.dataset.i;
+    EQ.bands[i] = +e.target.value;
+    box.querySelector(`[data-v="${i}"]`).textContent = e.target.value;
+    markEqCustom();
+  });
+  $("#fx-toggle").classList.toggle("on", EQ.on);
+  $("#fx-toggle").textContent = EQ.on ? "已开启" : "已关闭";
+  $("#fx-preset").value = EQ.preset;
+  $("#fx-gain").value = EQ.gain;
+  $("#fx-gain-v").textContent = EQ.gain + "dB";
+  Object.keys(EQ.custom).forEach((name) => addCustomPreset(name));
+}
+
+function markEqCustom() {
+  EQ.preset = "自定义";
+  $("#fx-preset").value = "自定义";
+  eqPersist();
+}
+
+function addCustomPreset(name) {
+  const sel = $("#fx-preset");
+  if (![...sel.options].some((o) => o.value === name)) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.insertBefore(opt, sel.querySelector('option[value="自定义"]'));
+  }
+}
+
+function bindEq() {
+  $("#fx-toggle").addEventListener("click", function () {
+    EQ.on = !EQ.on;
+    this.classList.toggle("on", EQ.on);
+    this.textContent = EQ.on ? "已开启" : "已关闭";
+    eqPersist();
+  });
+  $("#fx-preset").addEventListener("change", function () {
+    const v = this.value;
+    if (EQ_PRESETS[v]) { EQ.bands = [...EQ_PRESETS[v]]; }
+    else if (EQ.custom[v]) { EQ.bands = [...EQ.custom[v]]; }
+    else return;
+    EQ.preset = v;
+    $$("#fx-bands .eq-band").forEach((band, i) => {
+      band.querySelector("input").value = EQ.bands[i];
+      band.querySelector(".v").textContent = EQ.bands[i];
+    });
+    eqPersist();
+  });
+  $("#fx-gain").addEventListener("input", function () {
+    EQ.gain = +this.value;
+    $("#fx-gain-v").textContent = this.value + "dB";
+    eqPersist();
+  });
+  $("#fx-save").addEventListener("click", function () {
+    const name = $("#fx-name").value.trim();
+    if (!name) return;
+    EQ.custom[name] = [...EQ.bands];
+    addCustomPreset(name);
+    EQ.preset = name;
+    $("#fx-preset").value = name;
+    $("#fx-name").value = "";
+    eqPersist();
+  });
+}
+
 /* ---------- 管理控制台（独立系统形态，3.12） ---------- */
 function openConsole(page = "songs") {
   if (state.role !== "admin") return; // AD-04：仅管理员
@@ -509,6 +599,9 @@ function bind() {
   // 设置页 Tab 切换
   $$("#set-tabs .tab").forEach((t) =>
     t.addEventListener("click", () => setSettingsTab(t.dataset.st)));
+
+  // 均衡器（PL-13）
+  bindEq();
 
   $("#btn-logout").addEventListener("click", () => {
     $("#immersive").classList.add("hidden");
@@ -642,6 +735,7 @@ renderLocal();
 renderOnline();
 renderAdmin();
 renderSidebarPlaylists();
+buildEq();
 bind();
 setModeUI();
 playSong("s1", true);

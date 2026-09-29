@@ -1895,15 +1895,17 @@ kbd {
   display: none;
 }
 
-/* 海报背景：右大图块 + 左歌词线 */
+/* 海报背景：左歌词线 + 右上角探出的彩胶 */
 .style-pick[data-ly="poster"] .sp-thumb .a {
   left: auto;
-  right: -6px;
-  top: -6px;
-  width: 46px;
-  height: 70px;
-  border-radius: 0;
-  opacity: 0.7;
+  right: -14px;
+  top: -14px;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, var(--cv1), var(--cv2) 74%);
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.12);
+  opacity: 0.9;
 }
 
 .style-pick[data-ly="poster"] .sp-thumb .l {

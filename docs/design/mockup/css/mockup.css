@@ -1000,7 +1000,7 @@ body:not(.paused) .disc {
 
 /* Apple Music 风格歌词（3.7 / LR-04） */
 .lyrics {
-  height: min(62vh, 560px);
+  height: min(66vh, 900px);
   overflow-y: auto;
   scrollbar-width: none;
   mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
@@ -1013,7 +1013,7 @@ body:not(.paused) .disc {
 }
 
 .lyline {
-  font-size: 21px;
+  font-size: clamp(17px, 2.5vh, 38px);
   font-weight: 700;
   line-height: 1.45;
   padding: 9px 0;
@@ -1368,11 +1368,10 @@ body:not(.paused) .disc {
    左方形封面 / 右标题+歌词列 / 底部三段式控制栏
    ============================================================ */
 .im-body {
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  gap: 104px;
+  grid-template-columns: clamp(240px, 38vh, 560px) minmax(0, 1fr);
+  gap: clamp(48px, 7vw, 150px);
   padding: 0 24px;
-  width: 100%;
-  max-width: 1128px;
+  width: 94vw;
   margin: 0 auto;
 }
 
@@ -1406,13 +1405,13 @@ body:not(.paused) .disc {
 }
 
 .im-tb b {
-  font-size: 34px;
+  font-size: clamp(26px, 4vh, 54px);
   font-weight: 800;
 }
 
 .im-tb span {
   display: block;
-  font-size: 15px;
+  font-size: clamp(13px, 2vh, 24px);
   color: var(--text-2);
   margin-top: 8px;
 }
@@ -1424,7 +1423,7 @@ body:not(.paused) .disc {
 /* 当前句：主题色高亮（参考稿），保留轻微放大（LR-04）与逐字填充（LR-05） */
 .lyline.current {
   color: var(--accent);
-  font-size: 25px;
+  font-size: clamp(24px, 3.6vh, 54px);
   transform: scale(1.02);
   opacity: 1;
 }

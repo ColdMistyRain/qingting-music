@@ -217,10 +217,12 @@ function updateLyrics(song, force) {
           .map((c) => `<span class="ch">${esc(c)}</span>`).join("");
       }
     });
-    // AMLL 风格弹簧滚动：列表整体位移，当前句居中
+    // AMLL 风格滚动：当前句锚定在可视区上 1/3（海报布局）/ 居中（双栏布局），
+    // 目标位移不小于 0，首句始终紧贴标题下方
     const cur = list.children[idx];
     if (cur) {
-      const target = Math.max(0, cur.offsetTop - box.clientHeight / 2 + cur.offsetHeight / 2);
+      const anchor = document.querySelector(".immersive").classList.contains("layout-poster") ? 0.32 : 0.5;
+      const target = Math.max(0, cur.offsetTop - box.clientHeight * anchor + cur.offsetHeight / 2);
       list.style.transform = `translateY(${-target}px)`;
     }
   }

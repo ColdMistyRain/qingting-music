@@ -1994,7 +1994,22 @@ kbd {
       rgba(255, 255, 255, 0.14) 94%,
       rgba(255, 255, 255, 0.16)
     ),
-    linear-gradient(rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.26)),
+    /* 斜上方打光：左上亮、右下暗的穿透感 */
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.18) 30%,
+      rgba(255, 255, 255, 0.03) 58%,
+      rgba(0, 0, 0, 0.06) 100%
+    ),
+    /* 斜向高光束 */
+    linear-gradient(
+      118deg,
+      transparent 26%,
+      rgba(255, 255, 255, 0.12) 38%,
+      rgba(255, 255, 255, 0.04) 48%,
+      transparent 60%
+    ),
     radial-gradient(circle at 40% 36%, var(--cv1), var(--cv2) 74%);
   box-shadow:
     0 40px 140px rgba(0, 0, 0, 0.35),

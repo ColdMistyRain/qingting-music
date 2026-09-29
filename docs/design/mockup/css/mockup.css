@@ -1972,7 +1972,18 @@ kbd {
   position: absolute;
   top: -16%;
   right: -14%;
-  background: radial-gradient(circle at 36% 32%, var(--cv1), var(--cv2) 74%);
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0.13),
+      transparent 14%,
+      rgba(255, 255, 255, 0.05) 32%,
+      transparent 52%,
+      rgba(0, 0, 0, 0.12) 74%,
+      transparent 90%,
+      rgba(255, 255, 255, 0.13)
+    ),
+    radial-gradient(circle at 36% 32%, var(--cv1), var(--cv2) 74%);
   box-shadow: 0 34px 110px rgba(0, 0, 0, 0.45), 0 0 170px var(--accent-soft);
   animation: disc-spin 32s linear infinite;
   animation-play-state: paused;

@@ -1996,7 +1996,10 @@ kbd {
     ),
     linear-gradient(rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.26)),
     radial-gradient(circle at 40% 36%, var(--cv1), var(--cv2) 74%);
-  box-shadow: 0 40px 140px rgba(0, 0, 0, 0.35), 0 0 190px var(--accent-soft);
+  box-shadow:
+    0 40px 140px rgba(0, 0, 0, 0.35),
+    0 0 80px 12px color-mix(in srgb, var(--cv2) 38%, transparent),
+    0 0 230px 70px color-mix(in srgb, var(--cv2) 22%, transparent);
   animation: disc-spin 32s linear infinite;
   animation-play-state: paused;
 }

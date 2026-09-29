@@ -493,6 +493,18 @@ function bind() {
     openPlaylist(p.id);
     setTimeout(() => $("#plh-rename").click(), 60);
   });
+
+  // 侧栏折叠（图标窄栏，状态记忆）
+  const applyCollapsed = (c) => {
+    $("#app").classList.toggle("collapsed", c);
+    $("#btn-collapse").title = c ? "展开侧边栏" : "折叠侧边栏";
+  };
+  applyCollapsed(localStorage.getItem("qt-sb-collapsed") === "1");
+  $("#btn-collapse").addEventListener("click", () => {
+    const collapsed = $("#app").classList.toggle("collapsed");
+    localStorage.setItem("qt-sb-collapsed", collapsed ? "1" : "0");
+    $("#btn-collapse").title = collapsed ? "展开侧边栏" : "折叠侧边栏";
+  });
 }
 
 /* ---------- 启动 ---------- */

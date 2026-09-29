@@ -121,6 +121,59 @@ input {
   gap: 12px;
   height: 100vh;
   padding: 12px;
+  transition: grid-template-columns 0.25s ease;
+}
+
+/* ---------- 侧栏折叠（图标窄栏，状态记忆） ---------- */
+.app.collapsed {
+  grid-template-columns: 68px 1fr;
+}
+
+.app.collapsed .lbl {
+  display: none;
+}
+
+.app.collapsed .sidebar {
+  padding: 18px 8px 12px;
+}
+
+.app.collapsed .nav-item,
+.app.collapsed .sb-pl {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  gap: 0;
+}
+
+.app.collapsed .sb-logo {
+  text-align: center;
+  padding: 4px 0 18px;
+  font-size: 20px;
+}
+
+.app.collapsed .sb-section-head {
+  justify-content: center;
+  padding: 10px 0 6px;
+}
+
+.app.collapsed .sb-pl-count {
+  display: none;
+}
+
+.app.collapsed .sb-pl-name {
+  display: none;
+}
+
+.app.collapsed .sb-sep {
+  margin: 10px 6px;
+}
+
+#ico-collapse {
+  transition: transform 0.25s;
+}
+
+.app.collapsed #ico-collapse {
+  transform: rotate(180deg);
 }
 
 /* ---------- 侧栏 ---------- */

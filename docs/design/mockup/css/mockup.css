@@ -1197,7 +1197,9 @@ body:not(.paused) .disc {
 /* 动效降级（VS-04 / prefers-reduced-motion） */
 @media (prefers-reduced-motion: reduce) {
   .disc,
-  .eq i {
+  .eq i,
+  .immersive.layout-poster .im-cover,
+  .immersive.layout-poster .im-cover-wrap::before {
     animation: none !important;
   }
 }
@@ -2020,6 +2022,34 @@ kbd {
 }
 
 body:not(.paused) .immersive.layout-poster .im-cover {
+  animation-play-state: running;
+}
+
+/* 随旋转变化的外圈光晕：非对称光斑藏在盘后旋转，转到哪亮到哪 */
+.immersive.layout-poster .im-cover-wrap::before {
+  content: "";
+  position: absolute;
+  top: -27vh;
+  right: -19vw;
+  width: calc(min(90vh, 90vw) * 1.04);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 30deg,
+      transparent 0deg,
+      color-mix(in srgb, var(--cv2) 45%, transparent) 55deg,
+      transparent 150deg,
+      color-mix(in srgb, var(--cv1) 35%, transparent) 235deg,
+      transparent 320deg
+    ),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--cv2) 42%, transparent) 0 58%, transparent 76%);
+  filter: blur(46px);
+  animation: disc-spin 32s linear infinite;
+  animation-play-state: paused;
+}
+
+body:not(.paused) .immersive.layout-poster .im-cover-wrap::before {
   animation-play-state: running;
 }
 

@@ -1960,23 +1960,59 @@ kbd {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 56%;
+  width: 58%;
   display: block;
   z-index: 0;
 }
 
+/* 彩胶：按封面取色渲染的黑胶唱片（参考用户稿），播放时旋转 */
 .immersive.layout-poster .im-cover {
-  width: 100%;
-  height: 100%;
-  border-radius: 0;
-  box-shadow: none;
+  width: min(118vh, 1040px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  right: -16%;
+  transform: translateY(-50%);
+  background: radial-gradient(circle at 36% 32%, var(--cv1), var(--cv2) 74%);
+  box-shadow: 0 34px 110px rgba(0, 0, 0, 0.45), 0 0 170px var(--accent-soft);
+  animation: disc-spin 32s linear infinite;
+  animation-play-state: paused;
+}
+
+body:not(.paused) .immersive.layout-poster .im-cover {
+  animation-play-state: running;
+}
+
+.immersive.layout-poster .im-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at 50% 50%,
+    rgba(0, 0, 0, 0.14) 0 2px,
+    transparent 2px 9px
+  );
+}
+
+.immersive.layout-poster .im-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 21%;
+  height: 21%;
+  border-radius: 50%;
+  background: rgba(10, 12, 20, 0.55);
+  border: 3px solid rgba(255, 255, 255, 0.18);
 }
 
 .immersive.layout-poster .im-cover-wrap::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 35%, transparent) 40%, transparent 75%);
+  background: linear-gradient(90deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 30%, transparent) 38%, transparent 68%);
 }
 
 .immersive.layout-poster .im-right {

@@ -2062,8 +2062,16 @@ body:not(.paused) .immersive.layout-poster .im-cover {
       transparent 86%
     );
   filter: blur(34px);
-  animation: disc-spin 32s linear infinite;
+  animation:
+    disc-spin 32s linear infinite,
+    glow-breathe 6s ease-in-out infinite;
   animation-play-state: paused;
+}
+
+/* 光晕呼吸：透明度缓起缓落，与旋转叠加 */
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 body:not(.paused) .immersive.layout-poster .im-cover-wrap::before {

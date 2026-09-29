@@ -2138,7 +2138,7 @@ body:not(.paused) .immersive.layout-poster .im-cover-wrap::before {
   background: linear-gradient(90deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 32%, transparent) 36%, transparent 60%);
 }
 
-/* 顶栏与底部控制在遮罩层之上 */
+/* 顶栏与底部控制在遮罩层之上（三布局统一位置，无专属偏移） */
 .immersive.layout-poster .im-top,
 .immersive.layout-poster .im-bottom {
   position: relative;
@@ -2149,10 +2149,6 @@ body:not(.paused) .immersive.layout-poster .im-cover-wrap::before {
   position: relative;
   z-index: 1;
   max-width: 540px;
-  /* 歌词与标题整体右移，与左上角按钮拉开层次 */
+  /* 歌词与标题整体右移，与彩胶拉开层次 */
   margin-left: 64px;
-}
-
-.immersive.layout-poster .im-top {
-  margin-left: -16px;
 }

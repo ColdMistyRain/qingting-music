@@ -570,13 +570,13 @@ function bindEq() {
   });
 }
 
-/* ---------- 歌词页布局（VS-09：poster 彩胶为默认 | duo | center） ---------- */
+/* ---------- 歌词页布局（VS-09：duo | center | poster，默认彩胶） ---------- */
 let lyLayout = localStorage.getItem("qt-lylayout") || "poster";
 
 function applyLyLayout() {
   const im = $("#immersive");
-  im.classList.remove("layout-center", "layout-poster");
-  if (lyLayout !== "duo") im.classList.add("layout-" + lyLayout);
+  im.classList.remove("layout-duo", "layout-center", "layout-poster");
+  im.classList.add("layout-" + lyLayout);
   $$("#ly-styles .style-pick").forEach((b) =>
     b.classList.toggle("active", b.dataset.ly === lyLayout));
 }

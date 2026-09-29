@@ -936,14 +936,13 @@ body.paused .eq i {
   color: var(--text-2);
 }
 
+/* 沉浸式播放页：布局作用域重构（2026-09-29）
+   基础层只留三布局共享属性；结构属性各自声明在
+   .layout-duo / .layout-center / .layout-poster 作用域内 */
 .im-body {
   flex: 1;
-  display: grid;
-  grid-template-columns: minmax(300px, 420px) 1fr;
-  gap: 56px;
-  align-items: center;
   min-height: 0;
-  padding: 0 20px;
+  align-items: center;
 }
 
 /* 旋转封面（VS-04） */
@@ -1364,45 +1363,18 @@ body:not(.paused) .disc {
 }
 
 /* ============================================================
-   沉浸式播放页改版（2026-09-29 布局参考用户稿）：
-   左方形封面 / 右标题+歌词列 / 底部三段式控制栏
+   沉浸式播放页：布局作用域重构（2026-09-29）
+   基础层只留三布局共享属性；结构属性各自声明在
+   .layout-duo / .layout-center / .layout-poster 作用域内
    ============================================================ */
-.im-body {
-  grid-template-columns: clamp(240px, 38vh, 560px) clamp(340px, 36vw, 720px);
-  gap: clamp(48px, 7vw, 150px);
-  padding: 0 24px;
-  width: fit-content;
-  max-width: 94vw;
-  margin: 0 auto;
-}
-
-.im-cover-wrap {
-  display: grid;
-  place-items: center;
-}
-
-.im-cover {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 14px;
-  background: radial-gradient(circle at 32% 30%, var(--cv1), var(--cv2) 75%);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), 0 0 90px var(--accent-soft);
-}
 
 .im-right {
   display: flex;
   flex-direction: column;
-  /* 封面+歌词组在列内始终垂直居中（任意视口高度） */
   justify-content: center;
   min-width: 0;
   height: 100%;
   padding: 1vh 0 0;
-}
-
-.im-tb {
-  margin-bottom: 2px;
-  /* 与歌词列 8px 内边距对齐 */
-  padding-left: 8px;
 }
 
 .im-tb b {
@@ -1417,8 +1389,46 @@ body:not(.paused) .disc {
   margin-top: 8px;
 }
 
-.lyrics {
+/* ---------- 布局一：经典双栏（默认，封面左 · 歌词右） ---------- */
+.immersive.layout-duo .im-body {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  grid-template-columns: clamp(240px, 38vh, 560px) clamp(340px, 36vw, 720px);
+  gap: clamp(48px, 7vw, 150px);
+  padding: 0 24px;
+  width: fit-content;
+  max-width: 94vw;
+  margin: 0 auto;
+}
+
+.immersive.layout-duo .im-cover-wrap {
+  display: grid;
+  place-items: center;
+}
+
+.immersive.layout-duo .im-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  background: radial-gradient(circle at 32% 30%, var(--cv1), var(--cv2) 75%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), 0 0 90px var(--accent-soft);
+}
+
+.immersive.layout-duo .im-tb {
+  margin-bottom: 2px;
+  /* 与歌词列左内边距对齐 */
+  padding-left: 8px;
+}
+
+.immersive.layout-duo .lyrics {
   padding: 6px 8px 10px 2px;
+}
+
+.immersive.layout-poster .im-tb {
+  /* 与歌词列左内边距（2px）对齐 */
+  padding-left: 2px;
 }
 
 /* 当前句：主题色高亮（参考稿），保留轻微放大（LR-04）与逐字填充（LR-05） */
@@ -1934,11 +1944,17 @@ kbd {
   color: var(--text-3);
 }
 
-/* 沉浸页布局变体 */
+/* ---------- 布局二：沉浸歌词（纯歌词居中） ---------- */
 .immersive.layout-center .im-body {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
   grid-template-columns: minmax(0, 720px);
+  justify-content: center;
   width: auto;
   max-width: 94vw;
+  padding: 0 24px;
   gap: 0;
 }
 
@@ -1963,6 +1979,8 @@ kbd {
 
 .immersive.layout-poster .im-body {
   display: block;
+  flex: 1;
+  min-height: 0;
   position: static;
   max-width: none;
   padding: 0 24px;

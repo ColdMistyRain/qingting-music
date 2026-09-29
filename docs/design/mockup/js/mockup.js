@@ -54,6 +54,7 @@ const state = {
   role: "admin", page: "library",
   playingId: "s1", playing: true, progress: 42,
   modeIdx: 1,
+  queue: SONGS.map((s) => s.id),
   lyricIdx: -1, charTimer: null,
 };
 let muted = false;
@@ -129,6 +130,7 @@ function playSong(id, autoplay = true) {
   $("#im-cover").style.background = `radial-gradient(circle at 32% 30%, ${song.c1}, ${song.c2} 75%)`;
   renderLyrics(song);
   markPlayingRows();
+  renderQueue();
   updatePlayIcon();
   updateProgressUI();
   document.body.classList.toggle("paused", !state.playing);
@@ -149,18 +151,22 @@ function togglePlay() {
 }
 
 function nextSong() {
-  const i = SONGS.findIndex((s) => s.id === state.playingId);
   const m = MODES[state.modeIdx].key;
-  const n = m === "random"
-    ? SONGS[Math.floor(Math.random() * SONGS.length)].id
-    : SONGS[(i + 1) % SONGS.length].id;
+  if (m === "random") return playSong(SONGS[Math.floor(Math.random() * SONGS.length)].id, state.playing);
+  const q = state.queue.length ? state.queue : SONGS.map((s) => s.id);
+  const i = q.indexOf(state.playingId);
+  const n = q[(i + 1) % q.length] ?? SONGS[0].id;
   playSong(n, state.playing);
 }
 
 function prevSong() {
   if (state.progress > 3) { state.progress = 0; return; } // PL-02 规则
-  const i = SONGS.findIndex((s) => s.id === state.playingId);
-  playSong(SONGS[(i - 1 + SONGS.length) % SONGS.length].id, state.playing);
+  const m = MODES[state.modeIdx].key;
+  if (m === "random") return playSong(SONGS[Math.floor(Math.random() * SONGS.length)].id, state.playing);
+  const q = state.queue.length ? state.queue : SONGS.map((s) => s.id);
+  const i = q.indexOf(state.playingId);
+  const n = q[(i - 1 + q.length) % q.length] ?? SONGS[0].id;
+  playSong(n, state.playing);
 }
 
 function updateProgressUI() {
@@ -302,6 +308,36 @@ function renderAdmin() {
   $("#list-admin").addEventListener("change", updateSelCount);
   $("#list-admin").addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-danger")) e.target.closest(".adminrow").remove();
+  });
+}
+
+/* ---------- 播放队列（PL-06） ---------- */
+function renderQueue() {
+  $("#q-count").textContent = state.queue.length + " 首";
+  $("#q-list").innerHTML = state.queue.length
+    ? state.queue.map((id) => {
+        const s = byId(id);
+        return `
+        <div class="q-row${id === state.playingId ? " playing" : ""}" data-id="${id}">
+          <div class="cover" style="${coverStyle(s)}">${noteSVG}</div>
+          <div class="s-meta"><div class="s-title">${s.title}</div><div class="s-artist">${s.artist}</div></div>
+          <button class="q-del" title="从队列移除">✕</button>
+        </div>`;
+      }).join("")
+    : '<div class="q-empty">播放队列已清空，从曲库或歌单里选首歌吧</div>';
+  $$("#q-list .q-row").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      if (e.target.classList.contains("q-del")) return;
+      playSong(row.dataset.id, true);
+      renderQueue();
+    });
+  });
+  $$("#q-list .q-del").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.queue = state.queue.filter((x) => x !== btn.closest(".q-row").dataset.id);
+      renderQueue();
+    });
   });
 }
 
@@ -545,6 +581,16 @@ function bind() {
     const collapsed = $("#app").classList.toggle("collapsed");
     localStorage.setItem("qt-sb-collapsed", collapsed ? "1" : "0");
     $("#btn-collapse").title = collapsed ? "展开侧边栏" : "折叠侧边栏";
+  });
+
+  // 播放队列弹层（PL-06）
+  $("#pb-queue").addEventListener("click", () => {
+    renderQueue();
+    $("#queue-pop").classList.toggle("hidden");
+  });
+  $("#q-clear").addEventListener("click", () => {
+    state.queue = [];
+    renderQueue();
   });
 }
 

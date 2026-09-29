@@ -570,8 +570,8 @@ function bindEq() {
   });
 }
 
-/* ---------- 歌词页布局（VS-09：duo | center | poster） ---------- */
-let lyLayout = localStorage.getItem("qt-lylayout") || "duo";
+/* ---------- 歌词页布局（VS-09：poster 彩胶为默认 | duo | center） ---------- */
+let lyLayout = localStorage.getItem("qt-lylayout") || "poster";
 
 function applyLyLayout() {
   const im = $("#immersive");

@@ -1500,6 +1500,73 @@ body:not(.paused) .disc {
   color: var(--text-2);
 }
 
+/* ---------- 组件过渡（iOS 风格：fade + 轻位移/缩放，曲线统一） ----------
+   原理：display none→block 翻转时 CSS 动画自动重播，因此入口动画
+   无需 JS 配合；关闭为快速消失（iOS 同款节奏），不做离场动画 */
+:root {
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.page {
+  animation: page-in 0.32s var(--ease-ios);
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.page-login:not(.hidden) {
+  animation: fade-in 0.4s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+#immersive:not(.hidden) {
+  animation: im-in 0.36s var(--ease-ios);
+}
+
+@keyframes im-in {
+  from { opacity: 0; transform: scale(0.985) translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+#queue-pop:not(.hidden) {
+  transform-origin: 92% 100%;
+  animation: pop-in 0.3s var(--ease-ios);
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 播放模式按钮：顺序播放时置灰（PL-05 单按钮四态） */
+.ctl.dim {
+  color: var(--text-3);
+}
+
+.ctl.dim:hover {
+  color: var(--text-2);
+}
+
+/* 主题切换平滑过渡（玻璃面板底色/描边跟随） */
+.glass {
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+/* reduced-motion：过渡与入场动画全部静止 */
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .page-login:not(.hidden),
+  #immersive:not(.hidden),
+  #queue-pop:not(.hidden) {
+    animation: none !important;
+  }
+}
+
 /* ---------- 播放队列弹层（PL-06） ---------- */
 .queue-pop {
   position: fixed;

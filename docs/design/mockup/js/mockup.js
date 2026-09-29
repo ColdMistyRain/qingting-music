@@ -521,7 +521,6 @@ function bind() {
 
   const openIm = () => $("#immersive").classList.remove("hidden");
   $("#pb-open").addEventListener("click", openIm);
-  $("#pb-expand").addEventListener("click", openIm);
   $("#im-close").addEventListener("click", () => $("#immersive").classList.add("hidden"));
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); togglePlay(); }

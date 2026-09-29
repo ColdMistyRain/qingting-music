@@ -1567,6 +1567,20 @@ body:not(.paused) .disc {
   }
 }
 
+/* ---------- View Transition API（Chromium 111+/Safari 18+；
+   不可用时自动降级为上方 CSS 入场动画） ---------- */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: var(--ease-ios);
+}
+
+/* 封面共享元素形变：播放条小图 ⇆ 沉浸页大图 */
+::view-transition-group(cover) {
+  animation-duration: 0.42s;
+  animation-timing-function: var(--ease-ios);
+}
+
 /* ---------- 播放队列弹层（PL-06） ---------- */
 .queue-pop {
   position: fixed;

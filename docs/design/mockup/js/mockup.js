@@ -9,6 +9,13 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 
+/* ---------- View Transition API（可用则启用；降级为直接应用 + CSS 入场动画） ---------- */
+function withVT(fn) {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (document.startViewTransition && !reduce) document.startViewTransition(fn);
+  else fn();
+}
+
 /* ---------- 数据 ---------- */
 const SONGS = [
   { id: "s1", title: "夜行", artist: "林晚", album: "城市霓虹", dur: 225,
@@ -358,8 +365,10 @@ function bindSongRows(sel) {
 /* ---------- 页面切换 ---------- */
 function setPage(name) {
   state.page = name;
-  $$(".page").forEach((p) => p.classList.add("hidden"));
-  $("#page-" + name).classList.remove("hidden");
+  withVT(() => {
+    $$(".page").forEach((p) => p.classList.add("hidden"));
+    $("#page-" + name).classList.remove("hidden");
+  });
   $$(".sidebar .nav-item[data-page]").forEach((n) =>
     n.classList.toggle("active", n.dataset.page === name));
   $$(".sb-pl").forEach((el) => el.classList.remove("active"));
@@ -669,13 +678,26 @@ function bind() {
     updateLyrics(byId(state.playingId), true);
   }));
 
-  const openIm = () => $("#immersive").classList.remove("hidden");
+  // 沉浸页开合：View Transition + 封面共享元素形变（播放条小图 ⇆ 沉浸页大图）
+  function imShow(show) {
+    withVT(() => {
+      $("#immersive").classList.toggle("hidden", !show);
+      if (document.startViewTransition) {
+        $("#pb-cover").style.viewTransitionName = show ? "none" : "cover";
+        $("#im-cover").style.viewTransitionName = show ? "cover" : "none";
+      }
+    });
+  }
+  const openIm = () => imShow(true);
   $("#pb-open").addEventListener("click", openIm);
-  $("#im-close").addEventListener("click", () => $("#immersive").classList.add("hidden"));
+  $("#im-close").addEventListener("click", () => imShow(false));
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); togglePlay(); }
-    if (e.code === "Escape") $("#immersive").classList.add("hidden");
+    if (e.code === "Escape") imShow(false);
   });
+
+  // 初始：播放条封面注册为共享元素（首次展开沉浸页可形变）
+  $("#pb-cover").style.viewTransitionName = "cover";
 
   const libInput = $("#page-library .input");
   libInput.addEventListener("input", () => renderLibrary(libInput.value));

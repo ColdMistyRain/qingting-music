@@ -1,0 +1,237 @@
+<mxfile host="ZCode"><diagram id="page0" name="线框"><mxGraphModel>
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+    <mxCell id="sbframe" style="rounded=0;html=1;fillColor=#F5F5F5;strokeColor=#999999;" vertex="1" parent="1">
+      <mxGeometry x="40" y="40" width="220" height="640" as="geometry"/>
+    </mxCell>
+    <mxCell id="sblogo" value="♫ 轻听音乐" style="text;html=1;fontSize=16;fontStyle=1;align=left;" vertex="1" parent="1">
+      <mxGeometry x="56" y="52" width="190" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="nav1" value="本地播放" style="rounded=1;html=1;fillColor=none;strokeColor=#CCCCCC;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="52" y="100" width="196" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="nav2" value="音乐库" style="rounded=1;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="52" y="142" width="196" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="nav3" value="在线搜索" style="rounded=1;html=1;fillColor=none;strokeColor=#CCCCCC;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="52" y="184" width="196" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="nav4" value="我的歌单" style="rounded=1;html=1;fillColor=none;strokeColor=#CCCCCC;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="52" y="226" width="196" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="sub1" value="├ 日常" style="text;html=1;fontSize=12;fontColor=#666666;align=left;" vertex="1" parent="1">
+      <mxGeometry x="74" y="264" width="170" height="24" as="geometry"/>
+    </mxCell>
+    <mxCell id="sub2" value="└ 运动" style="text;html=1;fontSize=12;fontColor=#666666;align=left;" vertex="1" parent="1">
+      <mxGeometry x="74" y="290" width="170" height="24" as="geometry"/>
+    </mxCell>
+    <mxCell id="nav5" value="管理（仅管理员）" style="rounded=1;html=1;fillColor=none;strokeColor=#666666;dashed=1;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="52" y="326" width="196" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="ctframe" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#999999;" vertex="1" parent="1">
+      <mxGeometry x="260" y="40" width="900" height="640" as="geometry"/>
+    </mxCell>
+    <mxCell id="cttitle" value="音乐库" style="text;html=1;fontSize=16;fontStyle=1;align=left;" vertex="1" parent="1">
+      <mxGeometry x="276" y="52" width="160" height="28" as="geometry"/>
+    </mxCell>
+    <mxCell id="ctsearch" value="🔍 搜索歌名 / 歌手 / 专辑" style="rounded=1;html=1;fillColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="760" y="52" width="200" height="28" as="geometry"/>
+    </mxCell>
+    <mxCell id="ctsort" value="排序 ▾" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="970" y="52" width="88" height="28" as="geometry"/>
+    </mxCell>
+    <mxCell id="ctview" value="⊞ / ≡" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1066" y="52" width="80" height="28" as="geometry"/>
+    </mxCell>
+    <mxCell id="cthd" value=" 封面   歌名 / 歌手                        专辑                时长   操作" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=11;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="276" y="96" width="868" height="28" as="geometry"/>
+    </mxCell>
+    <mxCell id="r1" style="rounded=0;html=1;fillColor=#DAE8FC;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="276" y="132" width="868" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="r1c" value="♪" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#CCCCCC;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="284" y="140" width="32" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r1t" value="歌曲一 · 歌手A" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="326" y="140" width="220" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r1p" value="▶ 播放中" style="text;html=1;fontSize=11;fontColor=#2D6CA2;align=left;" vertex="1" parent="1">
+      <mxGeometry x="560" y="140" width="120" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r1al" value="专辑一" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="700" y="140" width="180" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r1du" value="3:45" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="900" y="140" width="60" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r1op" value="⋯" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="980" y="140" width="150" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r2" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#EEEEEE;" vertex="1" parent="1">
+      <mxGeometry x="276" y="188" width="868" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="r2c" value="♪" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="284" y="196" width="32" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r2t" value="歌曲二 · 歌手B" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="326" y="196" width="240" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r2al" value="专辑二" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="700" y="196" width="180" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r2du" value="4:12" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="900" y="196" width="60" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r2op" value="⋯" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="980" y="196" width="150" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r3" style="rounded=0;html=1;fillColor=#FAFAFA;strokeColor=#EEEEEE;" vertex="1" parent="1">
+      <mxGeometry x="276" y="244" width="868" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="r3c" value="♪" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="284" y="252" width="32" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r3t" value="歌曲三 · 歌手C" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="326" y="252" width="240" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r3al" value="专辑三" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="700" y="252" width="180" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r3du" value="2:58" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="900" y="252" width="60" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r3op" value="⋯" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="980" y="252" width="150" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r4" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#EEEEEE;" vertex="1" parent="1">
+      <mxGeometry x="276" y="300" width="868" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="r4c" value="♪" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="284" y="308" width="32" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r4t" value="歌曲四 · 歌手A" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="326" y="308" width="240" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r4al" value="专辑四" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="700" y="308" width="180" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r4du" value="3:21" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="900" y="308" width="60" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r4op" value="⋯" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="980" y="308" width="150" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r5" style="rounded=0;html=1;fillColor=#FAFAFA;strokeColor=#EEEEEE;" vertex="1" parent="1">
+      <mxGeometry x="276" y="356" width="868" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="r5c" value="♪" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="284" y="364" width="32" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r5t" value="歌曲五 · 歌手D" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="326" y="364" width="240" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r5al" value="专辑五" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="700" y="364" width="180" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r5du" value="5:03" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="900" y="364" width="60" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r5op" value="⋯" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="980" y="364" width="150" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r6" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#EEEEEE;" vertex="1" parent="1">
+      <mxGeometry x="276" y="412" width="868" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="r6c" value="♪" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="284" y="420" width="32" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r6t" value="歌曲六 · 歌手E" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="326" y="420" width="240" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r6al" value="专辑六" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="700" y="420" width="180" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r6du" value="3:37" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="900" y="420" width="60" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r6op" value="⋯" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="980" y="420" width="150" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r7" style="rounded=0;html=1;fillColor=#FAFAFA;strokeColor=#EEEEEE;" vertex="1" parent="1">
+      <mxGeometry x="276" y="468" width="868" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="r7c" value="♪" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="284" y="476" width="32" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r7t" value="歌曲七 · 歌手F" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="326" y="476" width="240" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r7al" value="专辑七" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="700" y="476" width="180" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r7du" value="4:44" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="900" y="476" width="60" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="r7op" value="⋯" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+      <mxGeometry x="980" y="476" width="150" height="32" as="geometry"/>
+    </mxCell>
+    <mxCell id="ctcount" value="共 128 首" style="text;html=1;fontSize=11;fontColor=#999999;align=right;" vertex="1" parent="1">
+      <mxGeometry x="990" y="644" width="150" height="24" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbframe" style="rounded=0;html=1;fillColor=#F5F5F5;strokeColor=#999999;" vertex="1" parent="1">
+      <mxGeometry x="40" y="680" width="1120" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbcover" value="♪" style="rounded=0;html=1;fillColor=#E6E6E6;strokeColor=none;fontSize=16;" vertex="1" parent="1">
+      <mxGeometry x="56" y="692" width="56" height="56" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbtitle" value="歌曲一" style="text;html=1;fontSize=13;fontStyle=1;align=left;" vertex="1" parent="1">
+      <mxGeometry x="124" y="696" width="200" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbartist" value="歌手A" style="text;html=1;fontSize=11;fontColor=#666666;align=left;" vertex="1" parent="1">
+      <mxGeometry x="124" y="720" width="200" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbshuf" value="🔀" style="ellipse;html=1;fillColor=#FFFFFF;strokeColor=#999999;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="466" y="708" width="28" height="28" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbprev" value="⏮" style="ellipse;html=1;fillColor=#FFFFFF;strokeColor=#999999;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="508" y="704" width="36" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbplay" value="▶" style="ellipse;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=16;" vertex="1" parent="1">
+      <mxGeometry x="556" y="698" width="48" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbnext" value="⏭" style="ellipse;html=1;fillColor=#FFFFFF;strokeColor=#999999;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="616" y="704" width="36" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbrep" value="🔁" style="ellipse;html=1;fillColor=#FFFFFF;strokeColor=#999999;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="662" y="708" width="28" height="28" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbt1" value="1:23" style="text;html=1;fontSize=11;align=right;" vertex="1" parent="1">
+      <mxGeometry x="698" y="706" width="38" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbtrk" style="rounded=1;html=1;fillColor=#E6E6E6;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="740" y="714" width="260" height="8" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbtrkfg" style="rounded=1;html=1;fillColor=#6C8EBF;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="740" y="714" width="95" height="8" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbknob" style="ellipse;html=1;fillColor=#FFFFFF;strokeColor=#6C8EBF;" vertex="1" parent="1">
+      <mxGeometry x="827" y="710" width="16" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbt2" value="3:45" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="1">
+      <mxGeometry x="1004" y="706" width="40" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbvol" value="🔊" style="text;html=1;fontSize=13;align=center;" vertex="1" parent="1">
+      <mxGeometry x="1050" y="702" width="28" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbvtrk" style="rounded=1;html=1;fillColor=#E6E6E6;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="1082" y="714" width="60" height="8" as="geometry"/>
+    </mxCell>
+    <mxCell id="pbvfg" style="rounded=1;html=1;fillColor=#6C8EBF;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="1082" y="714" width="40" height="8" as="geometry"/>
+    </mxCell>
+    <mxCell id="caption" value="线框示意 · 对应需求 3.8 主界面 · 正式主题为深色玻璃拟态（此处浅色仅示意布局） · 轻听音乐 v2.4" style="text;html=1;fontSize=10;fontColor=#999999;align=left;" vertex="1" parent="1">
+      <mxGeometry x="40" y="768" width="700" height="20" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel></diagram></mxfile>

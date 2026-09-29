@@ -1537,3 +1537,37 @@ body:not(.paused) .disc {
   justify-content: flex-end;
   gap: 14px;
 }
+
+/* ============================================================
+   歌词动效：AMLL 风格强化
+   （参考 Steve-xmh/applemusic-like-lyrics，MIT；
+    正式开发可直接接入 @applemusic-like-lyrics/core / Vue 绑定）
+   三个标志效果：非当前句模糊 / 弹簧滚动 / 逐字发光
+   ============================================================ */
+.lyrics {
+  overflow: hidden;
+  padding: 34px 8px;
+}
+
+.ly-list {
+  position: relative;
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.lyline {
+  filter: blur(2.2px);
+  transition: opacity 0.45s, transform 0.45s, filter 0.45s, color 0.3s;
+}
+
+.lyline.past {
+  filter: blur(1.1px);
+}
+
+.lyline.current {
+  filter: blur(0);
+}
+
+.lyline.current .ch.done {
+  text-shadow: 0 0 18px var(--accent-soft), 0 0 6px var(--accent-soft);
+}

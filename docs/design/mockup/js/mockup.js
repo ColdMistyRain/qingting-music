@@ -153,14 +153,15 @@ function lyricTimes(song) {
 
 function renderLyrics(song) {
   const box = $("#im-lyrics");
-  box.innerHTML = "";
+  box.innerHTML = '<div class="ly-list" id="ly-list"></div>';
+  const list = $("#ly-list");
   state.lyricIdx = -1;
   lyricTimes(song).forEach((l, i) => {
     const div = document.createElement("div");
     div.className = "lyline";
     div.textContent = l.text;
     div.addEventListener("click", () => { state.progress = l.t; }); // LR-06 点击行跳转
-    box.appendChild(div);
+    list.appendChild(div);
   });
   updateLyrics(song, true);
 }
@@ -170,6 +171,8 @@ function updateLyrics(song, force) {
   let idx = 0;
   lines.forEach((l, i) => { if (state.progress >= l.t) idx = i; });
   const box = $("#im-lyrics");
+  const list = $("#ly-list");
+  if (!list) return;
   if (idx !== state.lyricIdx || force) {
     state.lyricIdx = idx;
     box.querySelectorAll(".lyline").forEach((el, i) => {
@@ -180,11 +183,15 @@ function updateLyrics(song, force) {
           .map((c) => `<span class="ch">${esc(c)}</span>`).join("");
       }
     });
-    const cur = box.children[idx];
-    if (cur) cur.scrollIntoView({ block: "center", behavior: "smooth" });
+    // AMLL 风格弹簧滚动：列表整体位移，当前句居中
+    const cur = list.children[idx];
+    if (cur) {
+      const target = Math.max(0, cur.offsetTop - box.clientHeight / 2 + cur.offsetHeight / 2);
+      list.style.transform = `translateY(${-target}px)`;
+    }
   }
   // 逐字填充（LR-05）
-  const cur = box.children[idx];
+  const cur = list.children[idx];
   if (cur) {
     const line = lines[idx];
     const ratio = Math.min(1, Math.max(0, (state.progress - line.t) / ((lines[idx + 1]?.t ?? song.dur) - line.t)));

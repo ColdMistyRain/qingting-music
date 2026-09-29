@@ -1973,7 +1973,16 @@ kbd {
   top: -2%;
   right: -13%;
   background:
-    repeating-radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.09) 0 2px, transparent 2px 8px),
+    /* 细纹 */
+    repeating-radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 8px),
+    /* 折射光带：与盘心同心的宽明暗环带 */
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.05) 0 24px,
+      transparent 24px 52px,
+      rgba(0, 0, 0, 0.04) 52px 74px,
+      transparent 74px 116px
+    ),
     conic-gradient(
       from 20deg,
       rgba(255, 255, 255, 0.16),

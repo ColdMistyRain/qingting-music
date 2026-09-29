@@ -98,7 +98,6 @@ function playSong(id, autoplay = true) {
   $("#im-title-s").textContent = `${song.artist} · ${song.album}`;
   $("#pb-t2").textContent = $("#im-t2").textContent = fmt(song.dur);
   $("#im-cover").style.background = `radial-gradient(circle at 32% 30%, ${song.c1}, ${song.c2} 75%)`;
-  $("#im-bl-title").textContent = `${song.title} - ${song.artist}`;
   renderLyrics(song);
   markPlayingRows();
   updatePlayIcon();
@@ -518,11 +517,6 @@ function bind() {
     const collapsed = $("#app").classList.toggle("collapsed");
     localStorage.setItem("qt-sb-collapsed", collapsed ? "1" : "0");
     $("#btn-collapse").title = collapsed ? "展开侧边栏" : "折叠侧边栏";
-  });
-
-  // 沉浸页：喜欢按钮（原型交互）
-  $("#im-heart").addEventListener("click", function () {
-    this.classList.toggle("liked");
   });
 }
 

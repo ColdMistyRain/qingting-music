@@ -1964,15 +1964,14 @@ kbd {
   z-index: 0;
 }
 
-/* 彩胶：按封面取色渲染的黑胶唱片（参考用户稿），播放时旋转 */
+/* 彩胶：按封面取色渲染的黑胶唱片（参考用户稿），悬于右上角、顶部出画，播放时旋转 */
 .immersive.layout-poster .im-cover {
-  width: min(118vh, 1040px);
+  width: min(112vh, 980px);
   aspect-ratio: 1;
   border-radius: 50%;
   position: absolute;
-  top: 50%;
-  right: -16%;
-  transform: translateY(-50%);
+  top: -16%;
+  right: -14%;
   background: radial-gradient(circle at 36% 32%, var(--cv1), var(--cv2) 74%);
   box-shadow: 0 34px 110px rgba(0, 0, 0, 0.45), 0 0 170px var(--accent-soft);
   animation: disc-spin 32s linear infinite;

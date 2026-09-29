@@ -1368,10 +1368,11 @@ body:not(.paused) .disc {
    左方形封面 / 右标题+歌词列 / 底部三段式控制栏
    ============================================================ */
 .im-body {
-  grid-template-columns: clamp(240px, 38vh, 560px) minmax(0, 1fr);
+  grid-template-columns: clamp(240px, 38vh, 560px) clamp(340px, 36vw, 720px);
   gap: clamp(48px, 7vw, 150px);
   padding: 0 24px;
-  width: 94vw;
+  width: fit-content;
+  max-width: 94vw;
   margin: 0 auto;
 }
 

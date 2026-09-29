@@ -1936,8 +1936,9 @@ kbd {
 
 /* 沉浸页布局变体 */
 .immersive.layout-center .im-body {
-  grid-template-columns: 1fr;
-  max-width: 680px;
+  grid-template-columns: minmax(0, 720px);
+  width: auto;
+  max-width: 94vw;
   gap: 0;
 }
 
@@ -1948,12 +1949,16 @@ kbd {
 .immersive.layout-center .im-tb {
   text-align: center;
   margin-bottom: 6px;
+  padding-left: 0;
 }
 
 .immersive.layout-center .lyline {
   transform-origin: center;
-  width: 100%;
-  max-width: none;
+  margin: 0 auto;
+}
+
+.immersive.layout-center .ly-list {
+  text-align: center;
 }
 
 .immersive.layout-poster .im-body {

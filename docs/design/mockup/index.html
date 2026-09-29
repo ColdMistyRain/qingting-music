@@ -122,38 +122,7 @@
         <div id="pl-detail"></div>
       </section>
 
-      <!-- 管理台 -->
-      <section id="page-admin" class="page hidden">
-        <div class="page-head">
-          <h1>管理台 <div class="sub">/admin · 仅管理员（AD-04）</div></h1>
-        </div>
-        <div class="stat-row">
-          <div class="stat glass"><b>128</b>曲目总数</div>
-          <div class="stat glass"><b>6.4 GB</b>占用空间（LB-10）</div>
-          <div class="stat glass"><b>12</b>本月上传</div>
-        </div>
-        <div class="dropzone" id="upload-zone" style="padding:26px 24px">
-          <div style="display:flex;align-items:center;gap:14px;justify-content:center">
-            <svg class="icon dz-icon" style="margin:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
-            <div>
-              <div class="dz-main" style="margin:0">拖入音频文件上传到云端音乐库（AD-01）</div>
-              <div class="dz-sub">单文件 ≤ 300MB · 重复文件提示跳过/覆盖 · <u id="btn-fake-upload" style="cursor:pointer">点我模拟一次上传</u></div>
-            </div>
-          </div>
-          <div id="up-list" style="max-width:640px;margin:16px auto 0"></div>
-        </div>
-        <div class="admin-tools">
-          <input class="input" placeholder="🔍 搜索曲库…">
-          <button class="btn">排序：上传时间 ▾</button>
-          <button class="btn" id="btn-reindex">⟳ 重建索引（AD-05）</button>
-          <span class="sel-count">已选 <b id="sel-n">0</b> 项</span>
-          <button class="btn btn-danger btn-sm" id="btn-batchdel">批量删除</button>
-        </div>
-        <div class="list-head admin">
-          <span></span><span></span><span>歌名 / 歌手</span><span>大小</span><span>上传时间</span><span style="text-align:right">操作</span>
-        </div>
-        <div id="list-admin"></div>
-      </section>
+      <!-- 管理台：独立控制台（3.12），从侧栏进入 -->
     </main>
 
     <!-- 播放条 -->
@@ -183,6 +152,69 @@
         <button class="ctl" id="pb-queue" title="当前播放队列"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h11M4 11h11M4 16h7"/><path d="M18 5v11"/><circle cx="16" cy="17" r="2.4"/><path d="M20.4 17V7l2 .9"/></svg></button>
       </div>
     </footer>
+  </div>
+
+  <!-- ═══════════ 管理控制台（独立系统形态，3.12） ═══════════ -->
+  <div id="console" class="console hidden">
+    <aside class="cs-side glass">
+      <div class="sb-logo" style="font-size:15px;padding-bottom:14px"><span class="note">♫</span><span class="lbl">轻听 · 控制台</span></div>
+      <button class="nav-item cs-nav" data-cs="overview">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+        <span class="lbl">概览</span>
+      </button>
+      <button class="nav-item cs-nav active" data-cs="songs">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 4v16M10 4v16"/><path d="M14 5l5 15"/></svg>
+        <span class="lbl">曲库管理</span>
+      </button>
+      <button class="nav-item cs-nav" data-cs="upload">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+        <span class="lbl">上传导入</span>
+      </button>
+      <div class="sb-foot">
+        <button class="nav-item" id="cs-back">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 19l-7-7 7-7M3 12h18"/></svg>
+          <span class="lbl">返回播放器</span>
+        </button>
+      </div>
+    </aside>
+    <main class="cs-main">
+      <!-- 概览 -->
+      <section id="cs-overview" class="cs-page hidden">
+        <div class="page-head"><h1>概览 <div class="sub">管理控制台 · 仅管理员（AD-04）</div></h1></div>
+        <div class="stat-row">
+          <div class="stat glass"><b>128</b>曲目总数</div>
+          <div class="stat glass"><b>6.4 GB</b>占用空间（LB-10）</div>
+          <div class="stat glass"><b>12</b>本月上传</div>
+          <div class="stat glass"><b>2</b>在线音源已配置</div>
+        </div>
+        <div class="plh-empty" style="padding:48px 0">更多统计随 M2 交付：最常播放 Top 20 / 各来源播放占比（第 7 章）</div>
+      </section>
+      <!-- 曲库管理 -->
+      <section id="cs-songs" class="cs-page">
+        <div class="page-head"><h1>曲库管理</h1></div>
+        <div class="admin-tools">
+          <input class="input" placeholder="🔍 搜索曲库…">
+          <button class="btn">排序：上传时间 ▾</button>
+          <button class="btn" id="btn-reindex">⟳ 重建索引（AD-05）</button>
+          <span class="sel-count">已选 <b id="sel-n">0</b> 项</span>
+          <button class="btn btn-danger btn-sm" id="btn-batchdel">批量删除</button>
+        </div>
+        <div class="list-head admin">
+          <span></span><span></span><span>歌名 / 歌手</span><span>大小</span><span>上传时间</span><span style="text-align:right">操作</span>
+        </div>
+        <div id="list-admin"></div>
+      </section>
+      <!-- 上传导入 -->
+      <section id="cs-upload" class="cs-page hidden">
+        <div class="page-head"><h1>上传导入 <div class="sub">拖入音频文件上传到云端音乐库（AD-01）</div></h1></div>
+        <div class="dropzone" id="upload-zone" style="padding:48px 24px">
+          <svg class="icon dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+          <div class="dz-main">拖入音频文件 / 文件夹，或点击选择</div>
+          <div class="dz-sub">单文件 ≤ 300MB · 重复文件提示跳过/覆盖 · <u id="btn-fake-upload" style="cursor:pointer">点我模拟一次上传</u></div>
+        </div>
+        <div id="up-list" style="max-width:640px;margin:0 auto"></div>
+      </section>
+    </main>
   </div>
 
   <!-- ═══════════ 播放队列弹层（PL-06） ═══════════ -->

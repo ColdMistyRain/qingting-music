@@ -369,6 +369,7 @@ function applyRole() {
   ["nav-library", "nav-online", "nav-admin", "sb-playlists"].forEach((id) => {
     $("#" + id).classList.toggle("hidden", guest);
   });
+  if (guest) closeConsole();
   if (guest && ["library", "online", "playlist", "admin"].includes(state.page)) setPage("local");
 }
 
@@ -464,6 +465,23 @@ function openPlaylist(id) {
     else $("#pl-detail").innerHTML = '<div class="plh-empty">还没有歌单，点侧栏「＋」新建一个</div>';
   });
   bindSongRows(".pl-tracks");
+}
+
+/* ---------- 管理控制台（独立系统形态，3.12） ---------- */
+function openConsole(page = "songs") {
+  if (state.role !== "admin") return; // AD-04：仅管理员
+  $("#console").classList.remove("hidden");
+  setConsolePage(page);
+}
+
+function closeConsole() {
+  $("#console").classList.add("hidden");
+}
+
+function setConsolePage(name) {
+  $$(".cs-page").forEach((p) => p.classList.add("hidden"));
+  $("#cs-" + name).classList.remove("hidden");
+  $$(".cs-nav").forEach((n) => n.classList.toggle("active", n.dataset.cs === name));
 }
 
 /* ---------- 事件绑定 ---------- */
@@ -581,6 +599,12 @@ function bind() {
     localStorage.setItem("qt-sb-collapsed", collapsed ? "1" : "0");
     $("#btn-collapse").title = collapsed ? "展开侧边栏" : "折叠侧边栏";
   });
+
+  // 管理控制台：侧栏入口 + 内部导航（独立系统形态）
+  $("#nav-admin").addEventListener("click", () => openConsole("songs"));
+  $("#cs-back").addEventListener("click", closeConsole);
+  $$(".cs-nav").forEach((n) =>
+    n.addEventListener("click", () => setConsolePage(n.dataset.cs)));
 
   // 播放队列弹层（PL-06）
   $("#pb-queue").addEventListener("click", () => {

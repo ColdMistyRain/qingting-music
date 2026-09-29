@@ -365,11 +365,15 @@ function setPage(name) {
 
 function applyRole() {
   const guest = state.role === "guest";
-  ["nav-library", "nav-online", "sb-playlists", "set-admin-card"].forEach((id) => {
+  ["nav-library", "nav-online", "sb-playlists", "tab-admin"].forEach((id) => {
     $("#" + id).classList.toggle("hidden", guest);
   });
   $("#set-role").textContent = guest ? "访客" : "管理员";
-  if (guest) closeConsole();
+  if (guest) {
+    closeConsole();
+    const adminTab = document.querySelector('#set-tabs .tab[data-st="admin"]');
+    if (adminTab?.classList.contains("active")) adminTab.previousElementSibling.click();
+  }
   if (guest && ["library", "online", "playlist", "admin"].includes(state.page)) setPage("local");
 }
 
@@ -467,6 +471,13 @@ function openPlaylist(id) {
   bindSongRows(".pl-tracks");
 }
 
+/* ---------- 设置页 Tab 切换 ---------- */
+function setSettingsTab(name) {
+  $$("#set-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.st === name));
+  $$(".st-panel").forEach((p) => p.classList.add("hidden"));
+  $("#st-" + name).classList.remove("hidden");
+}
+
 /* ---------- 管理控制台（独立系统形态，3.12） ---------- */
 function openConsole(page = "songs") {
   if (state.role !== "admin") return; // AD-04：仅管理员
@@ -494,6 +505,10 @@ function bind() {
   if (thDark) thDark.addEventListener("click", () => setTheme("dark"));
   const thLight = $("#th-light");
   if (thLight) thLight.addEventListener("click", () => setTheme("light"));
+
+  // 设置页 Tab 切换
+  $$("#set-tabs .tab").forEach((t) =>
+    t.addEventListener("click", () => setSettingsTab(t.dataset.st)));
 
   $("#btn-logout").addEventListener("click", () => {
     $("#immersive").classList.add("hidden");

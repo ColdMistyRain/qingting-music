@@ -1659,3 +1659,69 @@ body:not(.paused) .disc {
   background: var(--accent);
   color: #fff;
 }
+
+/* ---------- 设置页 Tab 形态（参考用户稿） ---------- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 20px;
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 10px 16px 12px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  position: relative;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.tab:hover {
+  color: var(--text-1);
+}
+
+.tab.active {
+  color: var(--accent);
+}
+
+.tab.active::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 0;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.st-panel.hidden {
+  display: none;
+}
+
+.st-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+}
+
+.st-panel .set-card {
+  width: 100%;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 26px;
+  text-align: center;
+  padding: 3px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  font-size: 11.5px;
+  font-family: inherit;
+  color: var(--text-1);
+  margin-left: 4px;
+}

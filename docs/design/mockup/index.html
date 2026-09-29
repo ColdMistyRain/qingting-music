@@ -116,33 +116,85 @@
 
       <!-- 管理台：独立控制台（3.12），从设置页进入 -->
 
-      <!-- 设置 -->
+      <!-- 设置（Tab 形态，参考用户稿 2026-09-29） -->
       <section id="page-settings" class="page hidden">
         <div class="page-head"><h1>设置</h1></div>
-        <div class="set-grid">
-          <div class="set-card glass">
-            <b>外观</b>
-            <div class="set-row"><span>主题</span>
-              <div class="seg">
-                <button id="th-dark">深色</button>
-                <button id="th-light">浅色</button>
+        <div class="tabs" id="set-tabs">
+          <button class="tab active" data-st="general">常规</button>
+          <button class="tab" data-st="account">账户</button>
+          <button class="tab" data-st="online">在线音源</button>
+          <button class="tab" data-st="keys">快捷键</button>
+          <button class="tab" data-st="admin" id="tab-admin">管理</button>
+          <button class="tab" data-st="about">关于</button>
+        </div>
+        <div class="set-panels">
+          <!-- 常规 -->
+          <section id="st-general" class="st-panel">
+            <div class="set-card glass">
+              <b>外观</b>
+              <div class="set-row"><span>主题</span>
+                <div class="seg">
+                  <button id="th-dark">深色</button>
+                  <button id="th-light">浅色</button>
+                </div>
               </div>
+              <div class="set-note">默认跟随系统，手动切换后记忆选择（VS-08）</div>
             </div>
-            <div class="set-note">默认跟随系统，手动切换后记忆选择（VS-08）</div>
-          </div>
-          <div class="set-card glass">
-            <b>账户</b>
-            <div class="set-row"><span>当前身份</span><span class="badge local" id="set-role">管理员</span></div>
-            <button class="btn" id="btn-logout">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M4 12h11M11 8l4 4-4 4"/></svg>
-              退出登录
-            </button>
-          </div>
-          <div class="set-card glass" id="set-admin-card">
-            <b>管理</b>
-            <div class="set-note">上传歌曲、曲库管理、存储统计与索引重建（3.12）</div>
-            <button class="btn btn-primary" id="btn-open-console">打开管理控制台</button>
-          </div>
+          </section>
+          <!-- 账户 -->
+          <section id="st-account" class="st-panel hidden">
+            <div class="set-card glass">
+              <b>账户</b>
+              <div class="set-row"><span>当前身份</span><span class="badge local" id="set-role">管理员</span></div>
+              <div class="set-note">未登录时仅可播放本地文件；访客密码可听云端曲库；管理员可管理（AC-01/03）</div>
+              <button class="btn" id="btn-logout">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M4 12h11M11 8l4 4-4 4"/></svg>
+                退出登录
+              </button>
+            </div>
+          </section>
+          <!-- 在线音源 -->
+          <section id="st-online" class="st-panel hidden">
+            <div class="set-card glass">
+              <b>网易云</b>
+              <div class="set-row"><span>API 服务地址</span>
+                <input class="input" style="min-width:280px" placeholder="未配置（由部署者在服务端环境变量设置）" disabled>
+              </div>
+              <div class="set-note">音源地址由部署者经环境变量 NETEASE_API_BASE 配置（ON-04）；未配置时"在线搜索"隐藏——此处仅作状态展示，原型不可编辑</div>
+            </div>
+            <div class="set-card glass">
+              <b>QQ 音乐 / 酷狗</b>
+              <div class="set-note">计划 M3 接入（ON-06/08），届时在此显示各自连接状态</div>
+            </div>
+          </section>
+          <!-- 快捷键 -->
+          <section id="st-keys" class="st-panel hidden">
+            <div class="set-card glass">
+              <b>播放快捷键</b>
+              <div class="set-row"><span>播放 / 暂停</span><kbd>空格</kbd></div>
+              <div class="set-row"><span>快退 / 快进 5 秒</span><span><kbd>←</kbd><kbd>→</kbd></span></div>
+              <div class="set-row"><span>音量调节</span><span><kbd>↑</kbd><kbd>↓</kbd></span></div>
+              <div class="set-row"><span>关闭沉浸式播放页</span><kbd>Esc</kbd></div>
+              <div class="set-note">完整定义见 PL-08（M3 交付上下方向键音量）</div>
+            </div>
+          </section>
+          <!-- 管理 -->
+          <section id="st-admin" class="st-panel hidden">
+            <div class="set-card glass">
+              <b>管理控制台</b>
+              <div class="set-note">上传歌曲、曲库管理、存储统计与索引重建（3.12，仅管理员）</div>
+              <button class="btn btn-primary" id="btn-open-console">打开管理控制台</button>
+            </div>
+          </section>
+          <!-- 关于 -->
+          <section id="st-about" class="st-panel hidden">
+            <div class="set-card glass">
+              <b>轻听音乐</b>
+              <div class="set-row"><span>版本</span><span>v0.1.0 · 界面原型</span></div>
+              <div class="set-row"><span>形态</span><span>私有部署 · 仅供个人学习研究</span></div>
+              <div class="set-note">本地 + 自有云端 + 在线聚合的个人音乐中心 · 需求文档见仓库根目录</div>
+            </div>
+          </section>
         </div>
       </section>
     </main>

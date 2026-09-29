@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>轻听音乐 · 高保真界面原型</title>
+  <link rel="stylesheet" href="css/mockup.css">
+</head>
+<body>
+  <div class="bg-glow"></div>
+
+  <!-- ═══════════ 登录页（AC-07） ═══════════ -->
+  <section id="page-login" class="page-login hidden">
+    <div class="login-card glass">
+      <div class="login-logo"><span class="note">♫</span>轻听音乐</div>
+      <div class="login-sub">QING TING · 私有云音乐中心</div>
+      <form id="login-form">
+        <input class="input" id="login-pwd" type="password" placeholder="请输入访问密码" autocomplete="off">
+        <button class="btn-primary" type="submit">登录</button>
+      </form>
+      <div class="login-div"></div>
+      <button class="login-guest" id="login-guest">先听听本地歌（未登录）</button>
+      <div class="login-note">访问密码由部署者提供 · 原型中任意密码均可登录 · AC-05/06/07</div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 应用外壳 ═══════════ -->
+  <div id="app" class="app">
+    <!-- 侧栏 -->
+    <aside class="sidebar glass">
+      <div class="sb-logo"><span class="note">♫</span>轻听音乐</div>
+      <button class="nav-item" data-page="local" id="nav-local">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/></svg>
+        本地播放
+      </button>
+      <button class="nav-item" data-page="library" id="nav-library">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 4v16M10 4v16"/><path d="M14 5l5 15"/></svg>
+        音乐库
+      </button>
+      <button class="nav-item" data-page="online" id="nav-online">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.7 2.3 4 5 4 8s-1.3 5.7-4 8c-2.7-2.3-4-5-4-8s1.3-5.7 4-8z"/></svg>
+        在线搜索
+      </button>
+      <button class="nav-item" data-page="playlists" id="nav-playlists">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M4 11h10M4 16h6"/><circle cx="17" cy="16" r="3"/><path d="M20 16V6l2 1"/></svg>
+        我的歌单
+      </button>
+      <div class="sb-sep"></div>
+      <button class="nav-item" data-page="admin" id="nav-admin">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2" fill="var(--bg-base)"/><circle cx="15" cy="12" r="2" fill="var(--bg-base)"/><circle cx="11" cy="17" r="2" fill="var(--bg-base)"/></svg>
+        管理台 <span style="opacity:.5;font-size:11px">仅管理员</span>
+      </button>
+      <div class="sb-foot">
+        <button class="nav-item" id="btn-theme">
+          <svg class="icon" id="ico-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
+          <span id="btn-theme-label">浅色模式</span>
+        </button>
+        <button class="nav-item" id="btn-logout">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M4 12h11M11 8l4 4-4 4"/></svg>
+          退出登录
+        </button>
+      </div>
+    </aside>
+
+    <!-- 内容区 -->
+    <main class="content glass">
+      <!-- 音乐库 -->
+      <section id="page-library" class="page">
+        <div class="page-head">
+          <h1>音乐库 <div class="sub">云端曲库 · 128 首</div></h1>
+          <input class="input" placeholder="🔍 搜索歌名 / 歌手 / 专辑">
+          <button class="btn">排序 ▾</button>
+        </div>
+        <div class="list-head">
+          <span></span><span>歌名 / 歌手</span><span>专辑</span><span>时长</span><span style="text-align:right">操作</span>
+        </div>
+        <div id="list-library"></div>
+      </section>
+
+      <!-- 本地播放 -->
+      <section id="page-local" class="page hidden">
+        <div class="page-head">
+          <h1>本地播放 <div class="sub">文件仅在你的浏览器内播放 · 不经过服务器</div></h1>
+        </div>
+        <div class="dropzone" id="dropzone">
+          <svg class="icon dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+          <div class="dz-main">拖入音频文件 / 文件夹，或点击选择</div>
+          <div class="dz-sub">支持 MP3 · FLAC · WAV · OGG · M4A · OPUS（LC-01/02）</div>
+        </div>
+        <div class="privacy-note">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v5c0 4.5-3 8-8 10-5-2-8-5.5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+          隐私承诺：本地文件仅通过浏览器 Blob URL 播放，不上传、不留存（LC-06）
+        </div>
+        <div class="list-head">
+          <span></span><span>歌名 / 歌手</span><span>来源</span><span>时长</span><span style="text-align:right">操作</span>
+        </div>
+        <div id="list-local"></div>
+      </section>
+
+      <!-- 在线搜索 -->
+      <section id="page-online" class="page hidden">
+        <div class="page-head">
+          <h1>在线搜索 <div class="sub">音源：网易云（ON-02/03）</div></h1>
+        </div>
+        <div class="online-search">
+          <input class="input" id="online-kw" placeholder="🔍 搜索在线歌曲…" value="夜行">
+          <button class="btn btn-primary" id="online-go">搜索</button>
+        </div>
+        <div class="list-head">
+          <span></span><span>歌名 / 歌手</span><span>专辑</span><span>时长</span><span style="text-align:right">来源</span>
+        </div>
+        <div id="list-online"></div>
+      </section>
+
+      <!-- 我的歌单 -->
+      <section id="page-playlists" class="page hidden">
+        <div class="page-head">
+          <h1>我的歌单 <div class="sub">存储在服务器端 · 支持混合来源（PS-01/02）</div></h1>
+          <button class="btn">＋ 新建歌单</button>
+        </div>
+        <div class="pl-grid">
+          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#5b7cfa,#8b5cf6)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">夜间飞行</div><div class="pl-count">24 首 · 上周更新</div></div>
+          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#ff6b3d,#f97316)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">夏日公路</div><div class="pl-count">18 首 · 上月更新</div></div>
+          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#0ea5e9,#22d3ee)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">深海专注</div><div class="pl-count">32 首 · 今天更新</div></div>
+          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#22c55e,#84cc16)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">原野漫步</div><div class="pl-count">9 首 · 三天前</div></div>
+          <div class="pl-card glass"><div class="pl-cover" style="background:linear-gradient(135deg,#a855f7,#6366f1)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V6l10-2v11"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="15" r="2.5"/></svg></div><div class="pl-name">紫色午夜</div><div class="pl-count">15 首 · 上周更新</div></div>
+          <div class="pl-card glass pl-new">＋<br>新建歌单</div>
+        </div>
+      </section>
+
+      <!-- 管理台 -->
+      <section id="page-admin" class="page hidden">
+        <div class="page-head">
+          <h1>管理台 <div class="sub">/admin · 仅管理员（AD-04）</div></h1>
+        </div>
+        <div class="stat-row">
+          <div class="stat glass"><b>128</b>曲目总数</div>
+          <div class="stat glass"><b>6.4 GB</b>占用空间（LB-10）</div>
+          <div class="stat glass"><b>12</b>本月上传</div>
+        </div>
+        <div class="dropzone" id="upload-zone" style="padding:26px 24px">
+          <div style="display:flex;align-items:center;gap:14px;justify-content:center">
+            <svg class="icon dz-icon" style="margin:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+            <div>
+              <div class="dz-main" style="margin:0">拖入音频文件上传到云端音乐库（AD-01）</div>
+              <div class="dz-sub">单文件 ≤ 300MB · 重复文件提示跳过/覆盖 · <u id="btn-fake-upload" style="cursor:pointer">点我模拟一次上传</u></div>
+            </div>
+          </div>
+          <div id="up-list" style="max-width:640px;margin:16px auto 0"></div>
+        </div>
+        <div class="admin-tools">
+          <input class="input" placeholder="🔍 搜索曲库…">
+          <button class="btn">排序：上传时间 ▾</button>
+          <button class="btn" id="btn-reindex">⟳ 重建索引（AD-05）</button>
+          <span class="sel-count">已选 <b id="sel-n">0</b> 项</span>
+          <button class="btn btn-danger btn-sm" id="btn-batchdel">批量删除</button>
+        </div>
+        <div class="list-head admin">
+          <span></span><span></span><span>歌名 / 歌手</span><span>大小</span><span>上传时间</span><span style="text-align:right">操作</span>
+        </div>
+        <div id="list-admin"></div>
+      </section>
+    </main>
+
+    <!-- 播放条 -->
+    <footer class="playerbar glass" id="playerbar">
+      <div class="pb-left" id="pb-open" title="展开沉浸式播放页">
+        <div class="cover" id="pb-cover">♪</div>
+        <div style="min-width:0">
+          <div class="pb-title" id="pb-title">—</div>
+          <div class="pb-artist" id="pb-artist">—</div>
+        </div>
+      </div>
+      <div class="pb-center">
+        <div class="pb-ctrls">
+          <button class="ctl toggle" id="c-shuffle" title="随机播放"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.5c3 0 4.6 4.5 7.5 10 1 2 2.4 0 3.5 0H21"/><path d="M18.5 4.5 21 7l-2.5 2.5"/><path d="M3 17h3.5c1.2 0 2.2-2 3.2-3.5"/><path d="M14.6 9.9c.9-1.6 1.9-2.9 3.4-2.9H21"/><path d="M18.5 14.5 21 17l-2.5 2.5"/></svg></button>
+          <button class="ctl" id="c-prev"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M19 5.5v13L9.5 12z"/><path d="M6 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
+          <button class="ctl play" id="c-play" title="播放/暂停（空格）"><svg class="icon" id="ico-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+          <button class="ctl" id="c-next"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M5 5.5v13L14.5 12z"/><path d="M18 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
+          <button class="ctl toggle on" id="c-repeat" title="列表循环"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12V9a3 3 0 0 1 3-3h13"/><path d="M17.5 3.5 20 6l-2.5 2.5"/><path d="M20 12v3a3 3 0 0 1-3 3H4"/><path d="M6.5 20.5 4 18l2.5-2.5"/></svg></button>
+        </div>
+        <div class="progress-row">
+          <span class="time" id="pb-t1">0:00</span>
+          <div class="progress" id="pb-prog"><div class="fill"></div><div class="knob"></div></div>
+          <span class="time" id="pb-t2">0:00</span>
+        </div>
+      </div>
+      <div class="pb-right">
+        <svg class="icon" style="width:18px;height:18px;color:var(--text-2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l4 4V6l-4 4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>
+        <div class="vol-bar"><div class="vol-fill"></div></div>
+        <button class="ctl" id="pb-expand" title="展开沉浸式播放页"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ═══════════ 沉浸式播放页（VS-03/04 + 3.7） ═══════════ -->
+  <div id="immersive" class="immersive hidden">
+    <div class="im-top">
+      <button class="ctl" id="im-close"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <span class="label">N O W&nbsp;&nbsp;P L A Y I N G</span>
+      <span style="width:20px"></span>
+    </div>
+    <div class="im-body">
+      <div class="disc-wrap"><div class="disc" id="im-disc"></div></div>
+      <div class="lyrics" id="im-lyrics"></div>
+    </div>
+    <div class="im-bottom">
+      <div class="im-title"><b id="im-title-b">—</b><span id="im-title-s">—</span></div>
+      <div class="progress-row">
+        <span class="time" id="im-t1">0:00</span>
+        <div class="progress" id="im-prog"><div class="fill"></div><div class="knob"></div></div>
+        <span class="time" id="im-t2">0:00</span>
+      </div>
+      <div class="im-ctrls">
+        <button class="ctl toggle" id="i-shuffle"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.5c3 0 4.6 4.5 7.5 10 1 2 2.4 0 3.5 0H21"/><path d="M18.5 4.5 21 7l-2.5 2.5"/><path d="M3 17h3.5c1.2 0 2.2-2 3.2-3.5"/><path d="M14.6 9.9c.9-1.6 1.9-2.9 3.4-2.9H21"/><path d="M18.5 14.5 21 17l-2.5 2.5"/></svg></button>
+        <button class="ctl" id="i-prev"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M19 5.5v13L9.5 12z"/><path d="M6 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
+        <button class="ctl play" id="i-play"><svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+        <button class="ctl" id="i-next"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M5 5.5v13L14.5 12z"/><path d="M18 5.5v13" fill="none" stroke-linecap="round"/></svg></button>
+        <button class="ctl toggle on" id="i-repeat"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12V9a3 3 0 0 1 3-3h13"/><path d="M17.5 3.5 20 6l-2.5 2.5"/><path d="M20 12v3a3 3 0 0 1-3 3H4"/><path d="M6.5 20.5 4 18l2.5-2.5"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/mockup.js"></script>
+</body>
+</html>

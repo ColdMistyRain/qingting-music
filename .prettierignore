@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+docs/design/mockup/
+.mockup-shots/
+音乐软件需求文档.md
+package-lock.json

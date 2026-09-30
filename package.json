@@ -1,0 +1,32 @@
+{
+  "name": "qingting-music",
+  "version": "0.1.0",
+  "private": true,
+  "description": "轻听音乐 —— 可私有部署的 Web 音乐播放器（本地 + 自有云端 + 在线聚合）",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "overrides": {
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev -w @qingting/server",
+    "dev:client": "npm run dev -w @qingting/client",
+    "build": "npm run build -w @qingting/server && npm run build -w @qingting/client",
+    "start": "npm run start -w @qingting/server",
+    "test": "npm run test -w @qingting/server && npm run test -w @qingting/client",
+    "typecheck": "npm run typecheck -w @qingting/server && npm run typecheck -w @qingting/client",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "prettier": "^3.9.9"
+  }
+}

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>取色调校对比实验室 · HSL 手调 vs OKLCH 感知钳制</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    padding: 32px clamp(16px, 4vw, 56px) 64px;
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: #f2f4f8;
+    color: #1a1d29;
+    transition: background 0.5s, color 0.5s;
+  }
+  body.dark { background: #16181f; color: #e8eaf2; }
+  h1 { font-size: 22px; margin-bottom: 6px; }
+  .sub { font-size: 13px; opacity: 0.65; margin-bottom: 18px; line-height: 1.7; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 22px; }
+  .toolbar button {
+    padding: 8px 18px; border-radius: 10px; border: 1px solid rgba(128,138,168,.35);
+    background: rgba(255,255,255,.6); color: inherit; cursor: pointer; font-size: 13px;
+  }
+  body.dark .toolbar button { background: rgba(255,255,255,.07); }
+  .warn {
+    display: none; padding: 10px 14px; border-radius: 10px; margin-bottom: 18px;
+    background: #fff3cd; color: #7a5c00; font-size: 13px;
+  }
+  .warn.show { display: block; }
+  .cover-ref { display: flex; gap: 14px; align-items: center; margin-bottom: 24px; }
+  .cover-ref img { width: 88px; height: 88px; border-radius: 12px; object-fit: cover; }
+  .cover-ref .note { font-size: 13px; line-height: 1.8; opacity: 0.75; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 150px repeat(3, minmax(150px, 1fr));
+    gap: 14px; align-items: center;
+    padding: 14px 12px; border-radius: 14px;
+  }
+  .row:nth-child(odd) { background: rgba(128,138,168,.07); }
+  .row .name { font-size: 13.5px; line-height: 1.55; }
+  .row .name b { display: block; }
+  .row .name .hex { font-size: 11.5px; opacity: 0.6; font-family: Consolas, monospace; }
+  .cell { text-align: center; }
+  .cell .tag { font-size: 11.5px; opacity: 0.6; margin-bottom: 8px; letter-spacing: 0.04em; }
+  .disc {
+    width: 108px; aspect-ratio: 1; border-radius: 50%; margin: 0 auto;
+    box-shadow: 0 10px 22px -12px rgba(20,30,60,.5), inset 0 0 0 1px rgba(255,255,255,.4);
+    position: relative;
+  }
+  .disc::after {
+    content: ""; position: absolute; inset: 30%; border-radius: 50%;
+    background: radial-gradient(circle at 40% 36%, rgba(255,255,255,.75), rgba(255,255,255,.35) 78%);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.5);
+  }
+  .chip {
+    width: 108px; height: 34px; border-radius: 10px; margin: 0 auto 8px;
+    box-shadow: inset 0 0 0 1px rgba(127,127,127,.25);
+  }
+  .val { font-size: 11px; opacity: 0.62; font-family: Consolas, monospace; margin-top: 6px; }
+  h2 { font-size: 15px; margin: 26px 0 8px; opacity: 0.85; }
+  .head { font-size: 12px; opacity: 0.55; padding: 0 12px 6px; }
+  .head, .row { grid-template-columns: 150px repeat(3, minmax(150px, 1fr)); }
+  .head span { text-align: center; }
+  .head span:first-child { text-align: left; }
+</style>
+</head>
+<body>
+  <h1>取色调校对比实验室</h1>
+  <p class="sub">
+    同一颜色源，三种处理：<b>① 原始色</b>（提取桶平均，未调校）·
+    <b>② HSL 手调</b>（现行 mockup tuneTheme：饱和度收 0.5~0.75、明度收 0.4~0.6 + 色相感知偏置表）·
+    <b>③ OKLCH 感知钳制</b>（Monet/HCT 思路的 CSS 原生实现——相对颜色语法直接钳
+    <code>Tone L 0.40~0.62、Chroma C 0.07~0.15</code>，感知均匀空间，无需偏置表）。
+    盘面用与 mockup 相同的 conic 漩涡配方渲染，明暗两主题下各看一遍。
+  </p>
+  <div class="toolbar">
+    <button id="bt-theme">切换明暗主题</button>
+    <button id="bt-extract">重新提取样张封面</button>
+  </div>
+  <div id="warn" class="warn">当前浏览器不支持 OKLCH 相对颜色语法（需 Chrome 119+ / Safari 16.4+），③ 列会显示原始色。</div>
+
+  <div class="cover-ref">
+    <img src="img/cover-test.jpg" alt="样张封面">
+    <div class="note">样张封面实时提取（24 色相桶加权投票，与 mockup 同一管线）的前 4 个候选色也进入对比。<br>判断标准：盘面深度是否一致、有无刺眼/发灰、和封面是否同调。</div>
+  </div>
+
+  <h2>预设歌封面主色（8 首）</h2>
+  <div class="head"><span>颜色源</span><span>① 原始色</span><span>② HSL 手调（现行）</span><span>③ OKLCH 感知钳制</span></div>
+  <div id="rows-preset"></div>
+
+  <h2>样张封面提取候选（4 个）</h2>
+  <div class="head"><span>颜色源</span><span>① 原始色</span><span>② HSL 手调（现行）</span><span>③ OKLCH 感知钳制</span></div>
+  <div id="rows-cover"></div>
+
+<script>
+/* ---------- 取色核心：与 mockup.js 同源（实验页独立副本） ---------- */
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex([r, g, b]) {
+  return "#" + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, "0")).join("");
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, l];
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return [h, s, l];
+}
+const hslStr = ([h, s, l]) =>
+  `hsl(${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
+
+/* 现行手调（mockup.js 同款） */
+function tuneTheme([h, s, l]) {
+  const hue = h * 360;
+  const bias =
+    hue >= 70 && hue < 170 ? -0.1 :
+    hue >= 170 && hue < 210 ? -0.05 :
+    hue >= 20 && hue < 70 ? -0.05 :
+    hue >= 300 || hue < 20 ? -0.03 :
+    0;
+  return [h, clamp(s, 0.5, 0.75), clamp(l + bias, 0.4, 0.6)];
+}
+
+/* 24 桶加权提取（返回未调校的桶平均色 hex，便于三种处理同源对比） */
+function extractRawColors(img, count) {
+  const SIZE = 64, BUCKETS = 24, GAP = 0.11;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = SIZE;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, SIZE, SIZE);
+  const px = ctx.getImageData(0, 0, SIZE, SIZE).data;
+  const bins = Array.from({ length: BUCKETS }, () => ({ w: 0, r: 0, g: 0, b: 0, h: 0 }));
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 128) continue;
+    const [h, s, l] = rgbToHsl(px[i], px[i + 1], px[i + 2]);
+    if (s < 0.12 || l < 0.1 || l > 0.95) continue;
+    const weight = s * (1 - Math.abs(l - 0.55) * 1.6);
+    if (weight <= 0) continue;
+    const k = Math.floor(h * BUCKETS) % BUCKETS;
+    bins[k].w += weight; bins[k].r += px[i] * weight;
+    bins[k].g += px[i + 1] * weight; bins[k].b += px[i + 2] * weight; bins[k].h = h;
+  }
+  const hueDiff = (a, b) => { const d = Math.abs(a - b); return Math.min(d, 1 - d); };
+  const ranked = bins.filter((b) => b.w > 0)
+    .sort((a, b) => b.w - a.w)
+    .map((b) => ({ h: b.h, hex: rgbToHex([b.r / b.w, b.g / b.w, b.b / b.w]) }));
+  const out = [];
+  for (const item of ranked) {
+    if (out.some((o) => hueDiff(o.h, item.h) < GAP)) continue;
+    out.push(item);
+    if (out.length === count) break;
+  }
+  return out;
+}
+
+/* ---------- 渲染 ---------- */
+const PRESETS = [
+  ["夜行", "#5b7cfa"], ["夏日终结", "#ff6b3d"], ["深海信笺", "#0ea5e9"],
+  ["落日公路", "#f97316"], ["绿野信", "#22c55e"], ["紫罗兰", "#a855f7"],
+  ["晨雾", "#64748b"], ["焰火", "#f43f5e"],
+];
+
+const OK = CSS.supports("color", "oklch(from red l c h)");
+if (!OK) document.getElementById("warn").classList.add("show");
+
+/* HSL 手调盘：mockup --vinyl-gradient 同配方 */
+function hslDisc(srcHex) {
+  const [h, s, l] = tuneTheme(rgbToHsl(...hexToRgb(srcHex)));
+  const H = Math.round(h * 360), S = Math.round(s * 100), L = Math.round(l * 100);
+  return `conic-gradient(from 140deg,
+    hsl(${H} ${S}% ${L - 5}%), hsl(${H} ${S - 8}% ${L + 12}%),
+    hsl(${H} ${S}% ${L - 14}%), hsl(${H} ${S - 14}% ${L + 6}%),
+    hsl(${H} ${S}% ${L - 8}%), hsl(${H} ${S - 5}% ${L - 16}%),
+    hsl(${H} ${S}% ${L - 5}%))`;
+}
+/* OKLCH 感知钳制盘：相对颜色语法，同一源色的 L/C 分量做钳制 + 明度漩涡 */
+function okDisc(srcHex) {
+  const st = (dl, dc) =>
+    `oklch(from ${srcHex} clamp(0.40, calc(l + ${dl}), 0.62) clamp(0.07, calc(c + ${dc}), 0.15) h)`;
+  return `conic-gradient(from 140deg, ${st(-0.03, 0)}, ${st(0.07, -0.01)}, ${st(-0.08, 0)},
+    ${st(0.04, -0.02)}, ${st(-0.05, 0)}, ${st(-0.1, 0)}, ${st(-0.03, 0)})`;
+}
+
+function addRow(parent, name, srcHex, note) {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = `
+    <div class="name"><b>${name}</b><span class="hex">${srcHex}${note ? " · " + note : ""}</span></div>
+    <div class="cell"><div class="chip" style="background:${srcHex}"></div><div class="disc" style="background:${srcHex}"></div><div class="val">${srcHex}</div></div>
+    <div class="cell"><div class="chip js-hsl"></div><div class="disc js-hsl-d"></div><div class="val js-hsl-v"></div></div>
+    <div class="cell"><div class="chip js-ok"></div><div class="disc js-ok-d"></div><div class="val js-ok-v"></div></div>`;
+  parent.appendChild(row);
+  const tuned = tuneTheme(rgbToHsl(...hexToRgb(srcHex)));
+  row.querySelector(".js-hsl").style.background = hslStr(tuned);
+  row.querySelector(".js-hsl-d").style.background = hslDisc(srcHex);
+  row.querySelector(".js-hsl-v").textContent = hslStr(tuned);
+  row.querySelector(".js-ok").style.background = OK
+    ? `oklch(from ${srcHex} clamp(0.40, l, 0.62) clamp(0.07, c, 0.15) h)` : srcHex;
+  row.querySelector(".js-ok-d").style.background = OK ? okDisc(srcHex) : srcHex;
+  if (OK) {
+    const resolved = getComputedStyle(row.querySelector(".js-ok")).backgroundColor;
+    row.querySelector(".js-ok-v").textContent = resolved;
+  }
+}
+
+const rp = document.getElementById("rows-preset");
+PRESETS.forEach(([name, hex]) => addRow(rp, name, hex));
+
+function extractCover() {
+  const rc = document.getElementById("rows-cover");
+  rc.innerHTML = "";
+  const img = new Image();
+  img.onload = () => {
+    extractRawColors(img, 4).forEach((c, i) =>
+      addRow(rc, `候选 ${i + 1}`, c.hex, i === 0 ? "权重最高" : `权重 #${i + 1}`));
+  };
+  img.src = "img/cover-test.jpg";
+}
+extractCover();
+
+document.getElementById("bt-theme").addEventListener("click", () =>
+  document.body.classList.toggle("dark"));
+document.getElementById("bt-extract").addEventListener("click", extractCover);
+</script>
+</body>
+</html>

@@ -4,8 +4,8 @@ import IconFolderOpen from "~icons/ph/folder-open";
 import IconShieldCheck from "~icons/ph/shield-check";
 import IconTrash from "~icons/ph/trash";
 import IconUploadSimple from "~icons/ph/upload-simple";
+import TrackList from "@/components/TrackList.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
-import TrackRow from "@/components/TrackRow.vue";
 import { usePlayerStore } from "@/stores/player";
 import { collectFilesFromEntries, type EntryLike } from "@/utils/fileSystem";
 import { formatTime } from "@/utils/format";
@@ -123,9 +123,12 @@ onUnmounted(() => {
   window.removeEventListener("drop", onWindowDrop);
 });
 
-/** 点行上的播放键：正在播的那首再点即暂停 */
+/** 点行上的播放键：正在播的那首再点即暂停。
+    “是不是正在播这首”统一按 **id** 判定（与列表高亮同一套口径），不用索引——
+    列表将来被搜索/排序/拖拽重排后，索引会对不上。 */
 function onRowPlay(index: number): void {
-  if (index === player.currentIndex) player.toggle();
+  const track = player.queue[index];
+  if (track && player.currentTrack?.id === track.id) player.toggle();
   else player.playAt(index);
 }
 
@@ -211,15 +214,12 @@ watch(
     <TrackListHead v-if="hasTracks" />
 
     <!-- 只有列表滚动：页头与表头固定在上部（方案 A） -->
-    <div v-if="hasTracks" class="local__list row-list page-frame__scroll">
+    <div v-if="hasTracks" class="local__list page-frame__scroll">
       <p v-if="skipped > 0" class="local__hint">已忽略 {{ skipped }} 个非音频文件</p>
       <p v-if="probing > 0" class="local__hint">正在读取歌曲信息…</p>
-      <TrackRow
-        v-for="(track, index) in player.queue"
-        :key="track.id"
-        :track="track"
-        :index="index"
-        :active="player.currentIndex === index"
+      <TrackList
+        :tracks="player.queue"
+        :active-id="player.currentTrack?.id ?? null"
         :playing="player.playing"
         @play="onRowPlay"
         @remove="player.removeAt"

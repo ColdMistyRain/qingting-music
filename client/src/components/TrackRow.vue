@@ -69,8 +69,6 @@ const isPlaying = computed(() => props.active && props.playing);
 
 <style scoped>
 .row {
-  /* 分隔线用伪元素画，需要定位上下文 */
-  position: relative;
   display: grid;
   /* 列宽与行保持一致：与表头（TrackListHead）读同一份 --row-grid（v4.38）。
      第 3 列放专辑：行填满岛宽时，中间那块空间用真实信息吃掉，不留大洞（v4.34）。
@@ -91,22 +89,6 @@ const isPlaying = computed(() => props.active && props.playing);
 
 .row:hover {
   background: var(--hover);
-}
-
-/* 行分隔：属于**前一行**（不是后一行），而且画在行**外面**（落在两行之间的缝里）。
-   两个“不”都是必须的：
-   ① 不用 `border-top`——行有 12px 圆角，border-top 会沿圆角拐下去，两端各留一小段弧；
-   ② 不画在后一行的 `top: 0`（或前一行的 `bottom: 0`）——那样线会落进行的盒子里，
-      高亮/悬浮行的底色上会横着一条线、看着像“没对齐的边框”（用户实拍指出）。
-   两端按行内边距内缩：线顶到圆角处会“戳出”圆角矩形。 */
-.row:not(:last-of-type)::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: var(--row-pad-x);
-  right: var(--row-pad-x);
-  height: 1px;
-  background: var(--glass-border);
 }
 
 .row--active {

@@ -311,11 +311,11 @@ select {
   }
 }
 
-/* 曲目表头：随列表吸顶（与曲库管理表头同规格） */
+/* 曲目表头：说明性的标签行，**不吸顶、不加底色**。
+   吸顶必须有不透明底（否则滚过去的行会和文字叠在一起），而岛是玻璃材质，
+   任何不透明色都会在岛面上露成一条色带（用户一眼看出：“是不是有个背景色”）。
+   列含义看几行就记住了，页头（固定帧）已经把“这是哪一页、多少首”一直留在屏上。 */
 .list-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
   flex: none;
   display: grid;
   grid-template-columns: var(--row-grid);
@@ -325,8 +325,6 @@ select {
   padding: 0 12px;
   font-size: 11.5px;
   color: var(--text-3);
-  /* 让滚过去的行被挡在下面：半透明底会露出字符残影 */
-  background: var(--island-solid);
 }
 
 /* ---------- 应用外壳 ---------- */

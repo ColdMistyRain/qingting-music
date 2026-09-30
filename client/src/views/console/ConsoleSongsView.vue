@@ -360,11 +360,8 @@ async function removeSelected(): Promise<void> {
 }
 
 .sg--head {
-  /* 表头随表格滚动停留：多行数据滚下去后，列的含义才不至于丢掉 */
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--island-solid);
+  /* 与曲目列表表头同一规则：不吸顶、不加底色（吸顶要不透明底，
+     而在玻璃岛上它一定露成色带，见 global.css 的说明） */
   height: 34px;
   border-bottom: 1px solid var(--glass-border);
   border-radius: 0;

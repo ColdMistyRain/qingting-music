@@ -50,6 +50,8 @@ const isPlaying = computed(() => props.active && props.playing);
       <div class="row__artist">{{ track.artist }}</div>
     </div>
 
+    <div class="row__album" :title="track.album">{{ track.album }}</div>
+
     <div class="row__source">{{ sourceLabel }}</div>
     <div class="row__time">{{ formatTime(track.duration) }}</div>
 
@@ -70,8 +72,9 @@ const isPlaying = computed(() => props.active && props.playing);
   /* 分隔线用伪元素画，需要定位上下文 */
   position: relative;
   display: grid;
-  /* 最后一列放开：纯浏览场景（音乐库）不显示移除按钮，列宽自动收窄 */
-  grid-template-columns: 44px 1fr 64px 56px auto;
+  /* 最后一列放开：纯浏览场景（音乐库）不显示移除按钮，列宽自动收窄。
+     第 3 列放专辑：行填满岛宽时，中间那块空间用真实信息吃掉，不留大洞（v4.34）。 */
+  grid-template-columns: 44px minmax(0, 1.5fr) minmax(0, 1fr) 64px 56px auto;
   align-items: center;
   gap: 14px;
   /* 歌名 + 歌手两行字需要呼吸：56px 那样塞两行会显得紧凑（v4.28 统一行节奏） */
@@ -155,6 +158,26 @@ const isPlaying = computed(() => props.active && props.playing);
   font-size: 12px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
+}
+
+/* 专辑列：单行省略，颜色比歌名淡一档 */
+.row__album {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 窄屏：专辑列优先让位（窗口不宽时宁可少一列信息，也不把歌名挤没） */
+@media (max-width: 1024px) {
+  .row {
+    grid-template-columns: 44px minmax(0, 1fr) 64px 56px auto;
+  }
+
+  .row__album {
+    display: none;
+  }
 }
 
 .row__actions {

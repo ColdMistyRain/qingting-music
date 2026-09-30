@@ -206,9 +206,12 @@ watch(
     <!-- 拖入提示：投放卡不在时用一层浮层告诉用户"松手就落进来"（不挤动列表） -->
     <div v-if="dragging && hasTracks" class="drag-veil">松手就加入本地列表</div>
 
-    <!-- 只有列表滚动：页头固定在上部（方案 A） -->
+    <!-- 表头 = “说明”：放在滚动区外面（固定层），所以既不用吸顶、也不用底色，
+         标签常驻而列表在它下面滚（v4.41） -->
+    <TrackListHead v-if="hasTracks" />
+
+    <!-- 只有列表滚动：页头与表头固定在上部（方案 A） -->
     <div v-if="hasTracks" class="local__list page-frame__scroll">
-      <TrackListHead />
       <p v-if="skipped > 0" class="local__hint">已忽略 {{ skipped }} 个非音频文件</p>
       <p v-if="probing > 0" class="local__hint">正在读取歌曲信息…</p>
       <TrackRow

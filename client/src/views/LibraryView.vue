@@ -80,6 +80,10 @@ function playAt(index: number): void {
       </span>
     </div>
 
+    <!-- 表头 = “说明”：放在滚动区外面（固定层），所以既不用吸顶、也不用底色，
+         标签常驻而列表在它下面滚（v4.41） -->
+    <TrackListHead v-if="tracks.length > 0" />
+
     <!-- 只有列表滚动：页头与工具条固定在上部（方案 A） -->
     <div class="page-frame__scroll">
       <div v-if="library.status === 'loading' && library.songs.length === 0" class="page-frame__fill">
@@ -112,7 +116,6 @@ function playAt(index: number): void {
       <p v-else-if="isSearching && tracks.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
 
       <div v-else class="library">
-        <TrackListHead />
         <TrackRow
           v-for="(track, index) in tracks"
           :key="track.id"

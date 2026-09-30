@@ -8,7 +8,7 @@ import IconWarningCircle from "~icons/ph/warning-circle";
 import IconX from "~icons/ph/x";
 import { SONG_DUPLICATE_CODE, isAudioFileName } from "@qingting/shared";
 import { ApiError } from "@/api/http";
-import { uploadSong } from "@/api/upload";
+import { isRetryableUploadError, uploadSong } from "@/api/upload";
 import { useConfigStore } from "@/stores/config";
 import { useLibraryStore } from "@/stores/library";
 import { formatSize } from "@/utils/format";
@@ -29,6 +29,8 @@ interface UploadItem {
   /** 0~1 */
   progress: number;
   message: string;
+  /** 值不值得重试（不可重试的错误不给重试按钮，避免误导） */
+  retryable: boolean;
   overwrite: boolean;
 }
 
@@ -54,20 +56,34 @@ let keySeed = 0;
 let running = false;
 const controllers = new Map<string, AbortController>();
 
-const limitLabel = computed(() => (config.maxUploadSize ? formatSize(config.maxUploadSize) : "300 MB"));
+const limitLabel = computed(() => (config.maxUploadSize ? formatSize(config.maxUploadSize, 0) : "300 MB"));
 const doneCount = computed(() => items.value.filter((item) => item.status === "done").length);
-const failedCount = computed(
-  () => items.value.filter((item) => item.status === "failed" || item.status === "duplicate").length,
-);
+const duplicateCount = computed(() => items.value.filter((item) => item.status === "duplicate").length);
+const failedCount = computed(() => items.value.filter((item) => item.status === "failed").length);
+/** 只有“可重试的失败”才计入，用于汇总与“全部重试” */
+const retryableItems = computed(() => items.value.filter((item) => item.status === "failed" && item.retryable));
 const busy = computed(() =>
   items.value.some((item) => item.status === "waiting" || item.status === "uploading"),
 );
-const totalLabel = computed(() => {
-  if (items.value.length === 0) return "0 个任务";
-  const tail = failedCount.value > 0 ? ` · 待处理 ${failedCount.value}` : "";
-  return `${items.value.length} 个任务 · 完成 ${doneCount.value}${tail}`;
+/** 汇总只说“需要你知道的”：完成 / 重复 / 失败各多少 */
+const summaryText = computed(() => {
+  if (items.value.length === 0) return "";
+  const parts = [`${items.value.length} 个任务`];
+  if (doneCount.value > 0) parts.push(`完成 ${doneCount.value}`);
+  if (duplicateCount.value > 0) parts.push(`重复 ${duplicateCount.value}`);
+  if (failedCount.value > 0) parts.push(`失败 ${failedCount.value}`);
+  return parts.join(" · ");
 });
 const clearable = computed(() => items.value.some((item) => item.status === "done" || item.status === "skipped"));
+
+/** 把可重试的失败全部重新排回队列 */
+function retryAll(): void {
+  for (const item of retryableItems.value) {
+    item.status = "waiting";
+    item.message = "";
+  }
+  void runQueue();
+}
 
 function addFiles(files: FileList | File[]): void {
   const list = Array.from(files);
@@ -81,6 +97,7 @@ function addFiles(files: FileList | File[]): void {
       status: "waiting",
       progress: 0,
       message: "",
+      retryable: true,
       overwrite: false,
     });
   }
@@ -152,6 +169,7 @@ async function runOne(item: UploadItem): Promise<void> {
     } else {
       item.status = "failed";
       item.message = error instanceof Error ? error.message : "上传失败";
+      item.retryable = isRetryableUploadError(error);
     }
   } finally {
     controllers.delete(item.key);
@@ -230,7 +248,17 @@ function clearFinished(): void {
     <div class="queue card">
       <div class="queue__head">
         <b>上传队列</b>
-        <span>{{ totalLabel }}</span>
+        <span
+          class="queue__summary"
+          :class="{ 'queue__summary--warn': failedCount > 0 }"
+          aria-live="polite"
+        >
+          {{ summaryText }}
+        </span>
+        <button v-if="retryableItems.length > 0 && !busy" class="btn btn-quiet" @click="retryAll">
+          <IconArrowsClockwise class="icon" />
+          全部重试（{{ retryableItems.length }}）
+        </button>
         <button v-if="clearable" class="btn btn-quiet" @click="clearFinished">清空已完成</button>
       </div>
 
@@ -248,19 +276,17 @@ function clearFinished(): void {
             <IconUploadSimple v-else class="icon" />
           </span>
 
-          <div class="up__name" :title="item.file.name">
-            <div class="up__title">{{ item.file.name }}</div>
-            <div class="up__meta">{{ formatSize(item.file.size) }}</div>
-          </div>
+          <div class="up__info">
+            <div class="up__title" :title="item.file.name">{{ item.file.name }}</div>
 
-          <div class="up__detail">
-            <template v-if="item.status === 'uploading'">
+            <!-- 结果行紧贴文件名：不用把眼睛跨到最右边去找失败原因 -->
+            <div v-if="item.status === 'uploading'" class="up__progress">
               <div class="bar up__bar">
                 <div class="bar__fill" :style="{ width: `${Math.round(item.progress * 100)}%` }" />
               </div>
               <span class="up__percent">{{ Math.round(item.progress * 100) }}%</span>
-            </template>
-            <span v-else class="up__status">{{ statusText(item) }}</span>
+            </div>
+            <div v-else class="up__result">{{ statusText(item) }}</div>
           </div>
 
           <div class="up__actions">
@@ -268,7 +294,12 @@ function clearFinished(): void {
               <button class="btn btn-quiet" @click="overwrite(item)">覆盖</button>
               <button class="btn btn-quiet" @click="skip(item)">跳过</button>
             </template>
-            <button v-else-if="item.status === 'failed'" class="btn btn-quiet" @click="retry(item)">
+            <!-- 不可重试的错误（文件不合规）不给重试：重试永远不会成功，只会误导 -->
+            <button
+              v-else-if="item.status === 'failed' && item.retryable"
+              class="btn btn-quiet"
+              @click="retry(item)"
+            >
               <IconArrowsClockwise class="icon" />
               重试
             </button>
@@ -346,13 +377,24 @@ function clearFinished(): void {
    进度不再单独占一整列——不上传时那一列会变成一条没意义的长灰线。 */
 .up {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 200px auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  height: 56px;
-  padding: 0 10px;
+  min-height: 56px;
+  padding: 8px 10px;
   border-radius: var(--radius-row);
   transition: background 0.15s;
+}
+
+/* 汇总：只说“需要你知道的”，有失败时标红 */
+.queue__summary {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.queue__summary--warn {
+  color: var(--danger);
 }
 
 .up:hover {
@@ -415,7 +457,12 @@ function clearFinished(): void {
   }
 }
 
-.up__name {
+/* 失败行给一层极淡的警示底：一眼能抳出哪几行要处理（不靠满屏红字） */
+.up--failed {
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
+}
+
+.up__info {
   min-width: 0;
 }
 
@@ -426,47 +473,41 @@ function clearFinished(): void {
   text-overflow: ellipsis;
 }
 
-.up__meta {
-  margin-top: 3px;
+/* 结果行：成功写“大小 · 歌名”，失败写原因，都紧贴文件名下方 */
+.up__result {
+  margin-top: 4px;
   font-size: 11.5px;
   color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 进度与状态同占一列，右对齐贴着操作键 */
-.up__detail {
+.up--done .up__result {
+  color: var(--text-2);
+}
+
+.up--failed .up__result {
+  color: var(--danger);
+}
+
+/* 上传中：进度条就坐在结果行的位置（与文件名同一个信息块） */
+.up__progress {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  min-width: 0;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .up__bar {
   flex: 1;
-  max-width: 140px;
+  max-width: 220px;
 }
 
 .up__percent {
   font-size: 11.5px;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
-}
-
-.up__status {
-  font-size: 12px;
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.up--failed .up__status {
-  color: var(--danger);
-}
-
-.up--skipped .up__status,
-.up--duplicate .up__status {
-  color: var(--text-3);
 }
 
 .up__actions {

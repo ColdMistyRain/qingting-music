@@ -7,8 +7,8 @@ export function formatTime(seconds: number | null | undefined): string {
   return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
-/** 字节 → 人读大小（1 位小数；B 取整）；非法值返回 `—` */
-export function formatSize(bytes: number | null | undefined): string {
+/** 字节 → 人读大小（默认 1 位小数；B 取整）；非法值返回 `—`。digits 可指定小数位（如上限提示用 0 位） */
+export function formatSize(bytes: number | null | undefined, digits = 1): string {
   if (bytes == null || !Number.isFinite(bytes) || bytes < 0) return "—";
   if (bytes < 1024) return `${Math.round(bytes)} B`;
 
@@ -19,7 +19,7 @@ export function formatSize(bytes: number | null | undefined): string {
     value /= 1024;
     index += 1;
   }
-  return `${value.toFixed(1)} ${units[index]}`;
+  return `${value.toFixed(Math.min(3, Math.max(0, Math.trunc(digits))))} ${units[index]}`;
 }
 
 /** ISO 8601（UTC）→ 本地 `yyyy-MM-dd HH:mm`；非法值原样返回 */

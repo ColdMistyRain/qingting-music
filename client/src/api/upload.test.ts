@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./http";
-import { parseUploadResponse } from "./upload";
+import { isRetryableUploadError, parseUploadResponse } from "./upload";
 
 describe("parseUploadResponse", () => {
   it("成功：取出 data 里的歌曲", () => {
@@ -35,5 +35,20 @@ describe("parseUploadResponse", () => {
     expect(() => parseUploadResponse(200, JSON.stringify({ code: 500, message: "内部错误" }))).toThrowError(
       "内部错误",
     );
+  });
+});
+
+describe("isRetryableUploadError", () => {
+  it("网络错误 / 5xx / 429 值得重试", () => {
+    expect(isRetryableUploadError(new Error("网络中断，上传失败"))).toBe(true);
+    expect(isRetryableUploadError(new ApiError(500, 500, "内部错误"))).toBe(true);
+    expect(isRetryableUploadError(new ApiError(503, 503, "服务不可用"))).toBe(true);
+    expect(isRetryableUploadError(new ApiError(429, 429, "太频繁"))).toBe(true);
+  });
+
+  it("文件本身不合规（400/413/415）不值得重试", () => {
+    expect(isRetryableUploadError(new ApiError(400, 400, "只支持音频文件"))).toBe(false);
+    expect(isRetryableUploadError(new ApiError(413, 413, "文件超过 300 MB 上限"))).toBe(false);
+    expect(isRetryableUploadError(new ApiError(415, 415, "不支持的音频格式"))).toBe(false);
   });
 });

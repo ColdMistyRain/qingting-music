@@ -14,6 +14,18 @@ export interface UploadOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * 这个错误值不值得给“重试”：
+ * - 网络中断 / 5xx / 429 / 超时 → 值得（同一文件再试一次可能就过了）；
+ * - 400 / 413 / 415 这类“文件本身不合规” → 不值得，重试永远不会成功，
+ *   给重试按钮只会误导（v4.27 用户追问“这是最优解法吗”）。
+ */
+export function isRetryableUploadError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return true;
+  if (error.status === 429) return true;
+  return error.status >= 500;
+}
+
 /** 解析上传响应：成功返回歌曲，失败抛出带状态码与业务码的错误（纯函数，便于单测） */
 export function parseUploadResponse(status: number, body: string): Song {
   let payload: unknown = null;

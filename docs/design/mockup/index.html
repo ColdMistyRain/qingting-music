@@ -356,14 +356,13 @@
     </div>
     <div class="im-body">
       <div class="im-cover-wrap">
-        <!-- 彩胶：QQ 音乐分层资源组装（光晕→基底→封面→纹理→压印），整体旋转 -->
+        <!-- 彩胶：主题色彩胶盘体 + 大理石纹理 + 中心标签，整体旋转；外圈光晕与固定高光不随盘转 -->
         <div class="vinyl-assembly" id="im-cover">
-          <img class="v-layer v-glow" src="img/vinyl/glow.png" alt="">
-          <img class="v-layer v-base" src="img/vinyl/base.png" alt="">
-          <div class="v-layer v-art"></div>
-          <img class="v-layer v-grooves" src="img/vinyl/grooves.png" alt="">
-          <img class="v-layer v-emboss" src="img/vinyl/emboss.png" alt="">
+          <div class="v-vinyl"></div>
+          <div class="v-texture"></div>
+          <div class="v-label"></div>
         </div>
+        <div class="v-gloss" aria-hidden="true"></div>
       </div>
       <div class="im-right">
         <div class="im-tb"><b id="im-title-b">—</b><span id="im-title-s">—</span></div>

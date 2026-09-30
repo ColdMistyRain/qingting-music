@@ -2089,44 +2089,88 @@ body:not(.paused) .immersive.layout-poster .vinyl-assembly {
   animation-play-state: running;
 }
 
-.v-layer {
+/* 彩胶盘体：主题色漩涡（conic 彩虹胶面，QQ 音乐同款结构） */
+.v-vinyl {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  background: var(--vinyl-gradient);
 }
 
-/* 层 0：底部光晕（官方资源，柔化 + 呼吸常驻，随盘旋转） */
-.v-glow {
-  filter: blur(8px);
-  transform: scale(1.08);
-  animation: vinyl-breathe 6s ease-in-out infinite;
+/* ---------- 主题色三变量：@property 注册后可平滑过渡 ---------- */
+@property --theme-h {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 215;
 }
 
-@keyframes vinyl-breathe {
-  0%, 100% { opacity: 0.65; }
-  50% { opacity: 1; }
+@property --theme-s {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 72%;
 }
 
-/* 层 2：封面取色（中心标签区；M1 接入真实封面图） */
-.v-art {
-  inset: 16%;
+@property --theme-l {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 60%;
+}
+
+:root {
+  --theme-h: 215;
+  --theme-s: 72%;
+  --theme-l: 60%;
+  transition: --theme-h 0.5s ease, --theme-s 0.5s ease, --theme-l 0.5s ease;
+
+  /* 彩胶盘面：同一主题色只做明度/饱和度漩涡，就是彩胶的质感 */
+  --vinyl-gradient: conic-gradient(
+    from 140deg,
+    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 5%)),
+    hsl(var(--theme-h), calc(var(--theme-s) - 8%), calc(var(--theme-l) + 12%)),
+    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 14%)),
+    hsl(var(--theme-h), calc(var(--theme-s) - 14%), calc(var(--theme-l) + 6%)),
+    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 8%)),
+    hsl(var(--theme-h), calc(var(--theme-s) - 5%), calc(var(--theme-l) - 16%)),
+    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 5%))
+  );
+}
+
+/* 大理石纹理：官方 shadow@2x，overlay 混合提亮 */
+.v-texture {
+  position: absolute;
+  inset: 0;
+  background: url("../img/vinyl/emboss.png") center / cover no-repeat;
+  mix-blend-mode: overlay;
+  opacity: 0.6;
+}
+
+/* 中心标签 = 封面位（原型用取色渐变代替，正式版换 <img>） */
+.v-label {
+  position: absolute;
+  inset: 21%;
   border-radius: 50%;
   background: radial-gradient(circle at 40% 36%, var(--cv1), var(--cv2) 78%);
-  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.5),
+    0 0 0 3.5px hsl(var(--theme-h) 55% 22% / 0.2),
+    0 0 0 5px rgba(255, 255, 255, 0.34),
+    0 8px 22px -8px hsl(var(--theme-h) 55% 18% / 0.5);
 }
 
-/* 层 3：官方纹理，screen 混合让黑底透出下层 */
-.v-grooves {
-  mix-blend-mode: screen;
-  opacity: 0.9;
-}
-
-/* 层 4：官方压印，柔光混合出冲压质感 */
-.v-emboss {
-  mix-blend-mode: soft-light;
-  opacity: 0.95;
+/* 固定光源高光：hightlight1(深反光) + hightlight2(白纹槽) 同元素叠加
+   overlay 混合才凑得出完整盘面光泽；不随盘旋转（光源固定） */
+.v-gloss {
+  position: absolute;
+  top: var(--vinyl-t, -6vh);
+  right: var(--vinyl-r, -6vw);
+  width: var(--vinyl-d, min(58vh, 42vw));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  background:
+    url("../img/vinyl/base.png") center / cover no-repeat,
+    url("../img/vinyl/grooves.png") center / cover no-repeat;
 }
 
 /* 全页渐变遮罩：保证歌词可读 */

@@ -103,6 +103,51 @@ input[type="range"]::-moz-range-thumb {
   background: var(--accent);
 }
 
+/* ---------- 自定义复选框：OS 对勾风格与玻璃主题脱节 ---------- */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+input[type="checkbox"]::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) scale(0);
+  transition: transform 0.15s;
+  margin-top: -2px;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+input[type="checkbox"]:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+/* ---------- 文本选中色与键盘焦点环：跟主题走 ---------- */
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 html,
 body {
   height: 100%;

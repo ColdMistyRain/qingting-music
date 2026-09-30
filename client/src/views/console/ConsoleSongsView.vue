@@ -100,7 +100,7 @@ async function removeSelected(): Promise<void> {
 </script>
 
 <template>
-  <section>
+  <section class="page-frame">
     <div class="page-head">
       <h1>
         曲库管理
@@ -118,38 +118,19 @@ async function removeSelected(): Promise<void> {
       </button>
     </div>
 
-    <p v-if="library.status === 'loading' && library.songs.length === 0" class="note">正在读取曲库…</p>
-
-    <div v-else-if="showErrorPanel" class="fail card">
-      <span class="fail__badge"><IconWarningCircle class="icon" /></span>
-      <div class="fail__title">曲库没能读出来</div>
-      <p class="fail__desc">{{ library.error }}</p>
-      <button class="btn btn-primary" @click="library.load(true)">重试</button>
+    <!-- 刷新失败 / 操作失败：保留列表，只在上部给提示（不要白屏） -->
+    <div v-if="library.status === 'error' && library.songs.length > 0" class="strip">
+      <IconWarningCircle class="icon" />
+      <span>{{ library.error }}</span>
+      <button class="btn btn-quiet" @click="library.load(true)">重试</button>
     </div>
 
-    <EmptyState
-      v-else-if="showEmptyState"
-      :icon="IconListDashes"
-      title="曲库还是空的"
-      desc="上传的音乐会出现在这里，可以搜索、排序与批量管理。"
-      fill
-    >
-      <RouterLink class="btn btn-primary" :to="{ name: 'console-upload' }">去上传音乐</RouterLink>
-    </EmptyState>
+    <div v-if="actionError" class="strip">
+      <IconWarningCircle class="icon" />
+      <span>{{ actionError }}</span>
+    </div>
 
-    <template v-else>
-      <div v-if="library.status === 'error'" class="strip">
-        <IconWarningCircle class="icon" />
-        <span>{{ library.error }}</span>
-        <button class="btn btn-quiet" @click="library.load(true)">重试</button>
-      </div>
-
-      <div v-if="actionError" class="strip">
-        <IconWarningCircle class="icon" />
-        <span>{{ actionError }}</span>
-      </div>
-
-      <div class="toolbar sticky-bar">
+    <div v-if="library.songs.length > 0" class="toolbar">
         <label class="search">
           <IconMagnifyingGlass class="icon" />
           <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />
@@ -184,9 +165,35 @@ async function removeSelected(): Promise<void> {
           <IconTrash class="icon" />
           批量删除{{ selectedCount > 0 ? `（${selectedCount}）` : "" }}
         </button>
+    </div>
+
+    <!-- 只有表格滚动（方案 A）：页头与工具条固定在上部 -->
+    <div class="page-frame__scroll">
+      <div v-if="library.status === 'loading' && library.songs.length === 0" class="page-frame__fill">
+        <p class="note">正在读取曲库…</p>
       </div>
 
-      <div class="songs card">
+      <div v-else-if="showErrorPanel" class="page-frame__fill">
+        <div class="fail card">
+          <span class="fail__badge"><IconWarningCircle class="icon" /></span>
+          <div class="fail__title">曲库没能读出来</div>
+          <p class="fail__desc">{{ library.error }}</p>
+          <button class="btn btn-primary" @click="library.load(true)">重试</button>
+        </div>
+      </div>
+
+      <div v-else-if="showEmptyState" class="page-frame__fill">
+        <EmptyState
+          :icon="IconListDashes"
+          title="曲库还是空的"
+          desc="上传的音乐会出现在这里，可以搜索、排序与批量管理。"
+          fill
+        >
+          <RouterLink class="btn btn-primary" :to="{ name: 'console-upload' }">去上传音乐</RouterLink>
+        </EmptyState>
+      </div>
+
+      <div v-else class="songs card">
         <div class="sg sg--head">
           <label class="sg__check">
             <input type="checkbox" :checked="allSelected" aria-label="全选" @change="toggleAll" />
@@ -234,7 +241,7 @@ async function removeSelected(): Promise<void> {
           </div>
         </div>
       </div>
-    </template>
+    </div>
   </section>
 </template>
 
@@ -353,6 +360,11 @@ async function removeSelected(): Promise<void> {
 }
 
 .sg--head {
+  /* 表头随表格滚动停留：多行数据滚下去后，列的含义才不至于丢掉 */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--glass-bg-strong);
   height: 34px;
   border-bottom: 1px solid var(--glass-border);
   border-radius: 0;

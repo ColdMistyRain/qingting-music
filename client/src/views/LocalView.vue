@@ -125,7 +125,7 @@ function onRowPlay(index: number): void {
 </script>
 
 <template>
-  <section>
+  <section class="page-frame">
     <div class="page-head">
       <h1>
         本地播放
@@ -143,10 +143,10 @@ function onRowPlay(index: number): void {
       </button>
     </div>
 
-    <div class="local" :class="{ 'local--empty': !hasTracks }">
+    <div class="stage" :class="hasTracks ? 'stage--fixed' : 'stage--center'">
       <div
         class="dropzone"
-        :class="{ 'dropzone--drag': dragging, 'dropzone--compact': hasTracks, 'sticky-bar': hasTracks }">
+        :class="{ 'dropzone--drag': dragging, 'dropzone--compact': hasTracks }">
         <span class="dz-badge"><IconUploadSimple class="icon" /></span>
         <div class="dz-title">{{ hasTracks ? "继续添加音乐" : "拖入音乐文件或文件夹" }}</div>
         <div class="dz-sub">支持 MP3 · FLAC · WAV · OGG · M4A · OPUS</div>
@@ -169,35 +169,42 @@ function onRowPlay(index: number): void {
           @change="onFileInput"
         />
       </div>
+    </div>
 
-      <div v-if="hasTracks" class="local__list">
-        <p v-if="skipped > 0" class="local__hint">已忽略 {{ skipped }} 个非音频文件</p>
-        <p v-if="probing > 0" class="local__hint">正在读取歌曲信息…</p>
-        <TrackRow
-          v-for="(track, index) in player.queue"
-          :key="track.id"
-          :track="track"
-          :index="index"
-          :active="player.currentIndex === index"
-          :playing="player.playing"
-          @play="onRowPlay"
-          @remove="player.removeAt"
-        />
-      </div>
+    <!-- 只有列表滚动：页头与投放区固定在上部（方案 A） -->
+    <div v-if="hasTracks" class="local__list page-frame__scroll">
+      <p v-if="skipped > 0" class="local__hint">已忽略 {{ skipped }} 个非音频文件</p>
+      <p v-if="probing > 0" class="local__hint">正在读取歌曲信息…</p>
+      <TrackRow
+        v-for="(track, index) in player.queue"
+        :key="track.id"
+        :track="track"
+        :index="index"
+        :active="player.currentIndex === index"
+        :playing="player.playing"
+        @play="onRowPlay"
+        @remove="player.removeAt"
+      />
     </div>
   </section>
 </template>
 
 <style scoped>
-/* 列表为空时：投放卡居中，页面不显得空 */
-.local--empty {
+/* 空列表：投放卡在帧里居中，页面不显得空 */
+.stage--center {
+  flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
-  min-height: 52vh;
 }
 
-.local--empty .dropzone {
+.stage--center .dropzone {
   width: min(100%, 560px);
+}
+
+/* 已有曲目：投放区收成一条，固定在上部（方案 A：上部不动，只有列表滚动） */
+.stage--fixed {
+  flex: none;
 }
 
 .dropzone__actions {

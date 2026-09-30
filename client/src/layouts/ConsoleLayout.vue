@@ -70,8 +70,7 @@ const navItems: ConsoleNavItem[] = [
 .cs-main {
   /* 内容区与播放器外壳一致，同为玻璃岛（否则控制台是裸背景，两套外壳视觉不统一） */
   overflow-y: auto;
-  /* 顶部留白挪到内容块（global.css 的 `.cs-main > section`），吸顶工具条才能贴齐岛顶 */
-  padding: 0 26px 26px;
+  padding: 0 var(--island-pad-x) var(--island-pad-x);
 }
 
 .sb-logo {

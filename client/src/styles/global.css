@@ -105,16 +105,39 @@ select {
   margin-bottom: 12px;
 }
 
-/* ---------- 吸顶工具条 ----------
-   列表页的常驻操作（拖入/继续添加、搜索、批量操作）不该随列表滚走（用户实拍提出）。
-   贴在内容岛顶部；列表从下方穿过，所以背景要接近实底，否则文字会透叠。 */
-.sticky-bar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: color-mix(in srgb, var(--bg-base) 90%, transparent);
-  backdrop-filter: blur(22px) saturate(1.4);
-  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+/* ---------- 列表页骨架：上部固定、只有列表滚动（v4.36 定稿，方案 A） ----------
+   滚动时需要在手边的其实有“页头（干什么的）+ 操作区（添加/搜索）”一整套，
+   用吸顶去做会让页头盖不住岛全宽（它待在带内边距的内容块里，列表从缝里露出来）。
+   改为把岛变成固定帧：岛本身不滚，上部是普通块，只有内层滚动区滚。 */
+.content:has(> section.page-frame),
+.cs-main:has(> section.page-frame) {
+  overflow: hidden;
+}
+
+.page-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* 只有这一层滚动；负边距让它铺到岛边（滚动条贴岛），内边距再把内容缩回来 */
+.page-frame__scroll {
+  flex: 1;
+  /* 保底高度：窗口极矮时宁可让岛自己出现兼底滚动，也不要把列表压成 0 高 */
+  min-height: 180px;
+  overflow-y: auto;
+  margin-inline: calc(var(--island-pad-x) * -1);
+  padding-inline: var(--island-pad-x);
+}
+
+/* 空态/加载/失败：撑满帧并居中 */
+.page-frame__fill {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
 }
 
 .toolbar__spacer {
@@ -271,9 +294,8 @@ select {
   grid-row: 1;
   grid-column: 2;
   overflow-y: auto;
-  /* 顶部留白挪到内容块上（见下面 section 规则）：滚动容器带 padding-top 时，
-     吸顶元素只能贴到内容盒下沿，上方会留一条 22px 的缝，列表会从缝里穿过去。 */
-  padding: 0 26px 26px;
+  /* 顶部留白挪到内容块上（见下面 section 规则） */
+  padding: 0 var(--island-pad-x) var(--island-pad-x);
 }
 
 /* 正文块：顶部留白；铺满岛宽（不要再把正文收成窄列，见 v4.34） */

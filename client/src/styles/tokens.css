@@ -47,6 +47,9 @@
   --radius-row: 12px;
   --radius-control: 10px;
   --radius-cover: 9px;
+
+  /* 内容岛水平内边距：滚动区要用它做负边距补偿，让滚动条贴在岛边 */
+  --island-pad-x: 26px;
 }
 
 /* ---------- 令牌：浅色（VS-08） ---------- */

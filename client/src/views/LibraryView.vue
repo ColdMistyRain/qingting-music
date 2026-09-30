@@ -45,7 +45,7 @@ function playAt(index: number): void {
 </script>
 
 <template>
-  <section>
+  <section class="page-frame">
     <div class="page-head">
       <h1>
         音乐库
@@ -62,47 +62,53 @@ function playAt(index: number): void {
       </button>
     </div>
 
-    <p v-if="library.status === 'loading' && library.songs.length === 0" class="note">正在读取曲库…</p>
-
-    <div v-else-if="showErrorPanel" class="fail card">
-      <span class="fail__badge"><IconWarningCircle class="icon" /></span>
-      <div class="fail__title">曲库没能读出来</div>
-      <p class="fail__desc">{{ library.error }}</p>
-      <button class="btn btn-primary" @click="library.load(true)">重试</button>
+    <!-- 刷新失败但手上还有列表：保留列表，只在上面给一条提示（不要白屏） -->
+    <div v-if="library.status === 'error' && library.songs.length > 0" class="strip">
+      <IconWarningCircle class="icon" />
+      <span>{{ library.error }}</span>
+      <button class="btn btn-quiet" @click="library.load(true)">重试</button>
     </div>
 
-    <EmptyState
-      v-else-if="showEmptyState"
-      :icon="IconMusicNotes"
-      title="音乐库还是空的"
-      desc="上传的音乐会出现在这里，可以搜索、排序、播放。"
-      fill
-    >
-      <RouterLink v-if="auth.isAdmin" class="btn btn-primary" :to="{ name: 'console-upload' }">
-        去管理台上传音乐
-      </RouterLink>
-      <p v-else class="hint">等管理员上传后，这里就会出现曲库列表。</p>
-    </EmptyState>
+    <div v-if="library.songs.length > 0" class="toolbar">
+      <label class="search">
+        <IconMagnifyingGlass class="icon" />
+        <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />
+      </label>
+      <span class="toolbar__spacer count">
+        {{ isSearching ? `找到 ${tracks.length} 首` : `共 ${library.songs.length} 首` }}
+      </span>
+    </div>
 
-    <template v-else>
-      <!-- 刷新失败但手上还有列表：保留列表，只在上面给一条提示（不要白屏） -->
-      <div v-if="library.status === 'error'" class="strip">
-        <IconWarningCircle class="icon" />
-        <span>{{ library.error }}</span>
-        <button class="btn btn-quiet" @click="library.load(true)">重试</button>
+    <!-- 只有列表滚动：页头与工具条固定在上部（方案 A） -->
+    <div class="page-frame__scroll">
+      <div v-if="library.status === 'loading' && library.songs.length === 0" class="page-frame__fill">
+        <p class="note">正在读取曲库…</p>
       </div>
 
-      <div class="toolbar sticky-bar">
-        <label class="search">
-          <IconMagnifyingGlass class="icon" />
-          <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />
-        </label>
-        <span class="toolbar__spacer count">
-          {{ isSearching ? `找到 ${tracks.length} 首` : `共 ${library.songs.length} 首` }}
-        </span>
+      <div v-else-if="showErrorPanel" class="page-frame__fill">
+        <div class="fail card">
+          <span class="fail__badge"><IconWarningCircle class="icon" /></span>
+          <div class="fail__title">曲库没能读出来</div>
+          <p class="fail__desc">{{ library.error }}</p>
+          <button class="btn btn-primary" @click="library.load(true)">重试</button>
+        </div>
       </div>
 
-      <p v-if="isSearching && tracks.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
+      <div v-else-if="showEmptyState" class="page-frame__fill">
+        <EmptyState
+          :icon="IconMusicNotes"
+          title="音乐库还是空的"
+          desc="上传的音乐会出现在这里，可以搜索、排序、播放。"
+          fill
+        >
+          <RouterLink v-if="auth.isAdmin" class="btn btn-primary" :to="{ name: 'console-upload' }">
+            去管理台上传音乐
+          </RouterLink>
+          <p v-else class="hint">等管理员上传后，这里就会出现曲库列表。</p>
+        </EmptyState>
+      </div>
+
+      <p v-else-if="isSearching && tracks.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
 
       <div v-else class="library">
         <TrackRow
@@ -116,7 +122,7 @@ function playAt(index: number): void {
           @play="playAt"
         />
       </div>
-    </template>
+    </div>
   </section>
 </template>
 

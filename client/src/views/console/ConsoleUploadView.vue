@@ -210,7 +210,7 @@ function clearFinished(): void {
 </script>
 
 <template>
-  <section>
+  <section class="page-frame">
     <div class="page-head">
       <h1>
         上传导入
@@ -245,6 +245,8 @@ function clearFinished(): void {
       />
     </div>
 
+    <!-- 只有队列滚动（方案 A）：页头与投放区固定在上部 -->
+    <div class="page-frame__scroll">
     <div class="queue card">
       <div class="queue__head">
         <b>上传队列</b>
@@ -316,6 +318,7 @@ function clearFinished(): void {
       <p v-if="items.length > 0 && !busy" class="queue__foot">
         这一批处理完了，去<RouterLink :to="{ name: 'console-songs' }">曲库管理</RouterLink>看看。
       </p>
+    </div>
     </div>
   </section>
 </template>

@@ -77,6 +77,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 2. **npm workspace 装包偶发不写入**：曾出现 `npm install -w @qingting/client <pkg>` 报 `no workspace folder present` 且依赖没进 `package.json`；装完请 `Get-Content <pkg>/package.json | Select-String <dep>` 复核。
 3. esbuild 的 postinstall 被本机策略拦截（有告警），不影响运行（平台二进制走 optionalDependencies）。
 4. **中文 commit message 用文件传入**：PowerShell 5.1 向原生程序传中文参数存在编码风险，一律 `git commit -F <UTF-8 文件>`（写文件时用 `[IO.File]::WriteAllText($p, $m, (New-Object Text.UTF8Encoding($false)))` 避免 BOM）。
+5. **`<template>` 里别挂"测量用隐藏元素"**：为一个 `.vue` 模板多加一个 `visibility:hidden` 的探针 span，`vue-tsc` 会生成错误的虚拟代码——实测表现为模板里明明在用 `IconSkipBack`/`playIcon` 等，却报 4 个 `TS6133 声明未读取`，且改样式/重跑都不消失（删掉那个 span 立刻恢复正常）。需要量尺寸就用离屏探针（`utils/marquee.ts` 的 `measureTextWidth`，注入宿主便于单测），模板保持干净。判断技巧：`vue-tsc` 只报“模板专用符号未使用”，而模板里的类型错误照常报出，就是踩了这个坑。
 
 ## 文档索引
 

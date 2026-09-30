@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from "vue";
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import IconArrowRight from "~icons/ph/arrow-right";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
@@ -14,8 +14,8 @@ import IconSkipForward from "~icons/ph/skip-forward";
 import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
 import { usePlayerStore } from "@/stores/player";
+import ScrollingText from "@/components/ScrollingText.vue";
 import { formatTime } from "@/utils/format";
-import { marqueeDuration } from "@/utils/marquee";
 import type { PlayMode } from "@/utils/player";
 
 /**
@@ -65,67 +65,29 @@ function onVolumeInput(event: Event): void {
   player.setVolume(Number((event.target as HTMLInputElement).value));
 }
 
-/* 长歌名：量出溢出宽度，溢出时才允许悬浮滚动（短标题不滚） */
-const titleRef = ref<HTMLElement | null>(null);
-const titleOverflow = ref(0);
-const titleDuration = computed(() => `${marqueeDuration(titleOverflow.value)}s`);
-const titleStyle = computed(() =>
-  titleOverflow.value > 0
-    ? { "--marquee-shift": `-${titleOverflow.value}px`, "--marquee-duration": titleDuration.value }
-    : undefined,
+/* 长文本滚动（歌名 / 歌手 · 专辑）：宽度从 store 与 utils 拿，滚动交给 ScrollingText */
+const titleText = computed(() => player.currentTrack?.title ?? "尚未播放");
+const subtitleText = computed(() =>
+  player.currentTrack
+    ? `${player.currentTrack.artist} · ${player.currentTrack.album}`
+    : "从本地播放或音乐库选择歌曲",
 );
 
-function measureTitle(): void {
-  const element = titleRef.value;
-  titleOverflow.value = element
-    ? Math.max(0, Math.round(element.scrollWidth - element.clientWidth))
-    : 0;
-}
-
-let titleObserver: ResizeObserver | null = null;
-
-onMounted(() => {
-  measureTitle();
-  // 容器宽度会随侧栏折叠/窗口缩放变化（那不是 window resize），用 RO 更可靠
-  if (typeof ResizeObserver !== "undefined" && titleRef.value) {
-    titleObserver = new ResizeObserver(measureTitle);
-    titleObserver.observe(titleRef.value);
-  }
-});
-
-onUnmounted(() => titleObserver?.disconnect());
-
-// 换歌后等 DOM 更新完再量（flush: post）
-watch(
-  () => player.currentTrack?.title,
-  () => measureTitle(),
-  { flush: "post" },
-);
+/* 播放中或鼠标停在左侧信息区时，两条长文本才滚动；其余时间保持静态单行 */
+const hovering = ref(false);
+const marqueeActive = computed(() => player.playing || hovering.value);
 </script>
 
 <template>
-  <footer class="playerbar glass" :class="{ 'is-idle': isIdle }">
-    <div class="pb-left">
+  <footer class="playerbar glass" :class="{ 'is-idle': isIdle, 'is-playing': player.playing }">
+    <div class="pb-left" @mouseenter="hovering = true" @mouseleave="hovering = false">
       <div class="cover">
         <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
         <IconMusicNotes v-else class="icon" />
       </div>
       <div style="min-width: 0">
-        <div
-          ref="titleRef"
-          class="pb-title"
-          :class="{ 'pb-title--scrollable': titleOverflow > 0 }"
-          :style="titleStyle"
-        >
-          <span class="pb-title__text">{{ player.currentTrack?.title ?? "尚未播放" }}</span>
-        </div>
-        <div class="pb-artist">
-          {{
-            player.currentTrack
-              ? `${player.currentTrack.artist} · ${player.currentTrack.album}`
-              : "从本地播放或音乐库选择歌曲"
-          }}
-        </div>
+        <ScrollingText class="pb-title" :text="titleText" :active="marqueeActive" />
+        <ScrollingText class="pb-artist" :text="subtitleText" :active="marqueeActive" />
         <div v-if="player.notice" class="pb-notice">{{ player.notice }}</div>
       </div>
     </div>
@@ -160,7 +122,7 @@ watch(
           >
             <component :is="volumeIcon" class="icon" />
           </button>
-          <div class="vol-pop" role="group" aria-label="音量调节">
+          <div class="vol-pop" :class="{ 'vol-pop--muted': player.muted }" role="group" aria-label="音量调节">
             <div class="vol-pop__track">
               <input
                 class="vol-pop__range"
@@ -212,37 +174,6 @@ watch(
 </template>
 
 <style scoped>
-/* ---------- 长歌名：悬浮横向滚动 ----------
-   只在真正溢出时启用（JS 量出 titleOverflow 后加 .pb-title--scrollable），
-   短标题不滚、也不会出现“滑出空白”的现象。 */
-.pb-title__text {
-  display: inline-block;
-  white-space: nowrap;
-}
-
-/* 滚动期间不要再叠一个省略号（省略号由全局 .pb-title 提供） */
-.pb-left:hover .pb-title--scrollable {
-  text-overflow: clip;
-}
-
-.pb-left:hover .pb-title--scrollable .pb-title__text {
-  animation: pb-title-marquee var(--marquee-duration, 8s) linear infinite;
-}
-
-@keyframes pb-title-marquee {
-  0%,
-  12% {
-    transform: translateX(0);
-  }
-  50%,
-  62% {
-    transform: translateX(var(--marquee-shift, 0));
-  }
-  100% {
-    transform: translateX(0);
-  }
-}
-
 /* ---------- 音量：悬浮/聚焦展开的竖向音量条（PL-04） ----------
    玻璃令牌 + 主题色填充，与全站一套视觉语言；纯 CSS 控制显隐（含键盘 focus-within），
    无需 JS 状态，触摸设备上仍可直接点按钮静音。 */
@@ -261,8 +192,9 @@ watch(
   justify-items: center;
   gap: 6px;
   padding: 14px 10px 10px;
-  /* 固定最小宽度：否则“100% → 44%”读数变化会让面板宽度抽动 */
-  min-width: 54px;
+  /* 固定最小宽度：“100% → 44%”读数变化不能让面板宽度抽动；
+     同时要能容下“已静音”三个字不换行 */
+  min-width: 60px;
   border-radius: var(--radius-control);
   /* 悬浮层要压在页面内容之上：用接近实底的令牌色，保证两种主题下都读得清 */
   background: color-mix(in srgb, var(--bg-base) 86%, transparent);
@@ -339,9 +271,19 @@ watch(
   font-size: 11px;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
+  /* 读数永远单行：“已静音”被挤成两行会把面板撑高、看着像排版坏了 */
+  white-space: nowrap;
 }
 
+/* 静音：用中性色说明“当前不生效”，不要用错误红（静音不是错误）；
+   滑杆同时转灰但保留位置——鼠标一拖就会自动解除静音（store 里已处理），
+   所以这里不需要谎报成 0。 */
 .vol-pop__value--muted {
-  color: var(--danger);
+  color: var(--text-3);
+}
+
+.vol-pop--muted .vol-pop__range {
+  opacity: 0.55;
+  filter: saturate(0.15);
 }
 </style>

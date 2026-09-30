@@ -331,6 +331,30 @@ function renderLyrics(song) {
   updateLyrics(song, true);
 }
 
+/** 歌词滚动定位。两种锚定（2026-09-30 用户对照 QQ 实机定稿）：
+    - 海报布局：当前句锚可视区上 1/3，列表不越过顶部；
+    - 双栏布局：QQ 式「钉在第二行槽位」——首句高亮在第一行自然位，
+      自第二句起当前句永远固定停在歌词区第二行的位置，列表在其上滑动
+      （上句留在钉位上方一行，下方逐渐放空）。
+    位置在页面打开/切布局/改尺寸后几何会变，必须重算（hidden 态
+    clientHeight/offsetTop 全为 0，算一次就固化会导致歌词上偏） */
+function positionLyrics() {
+  const box = $("#im-lyrics");
+  const list = $("#ly-list");
+  if (!box || !list) return;
+  const cur = list.children[state.lyricIdx];
+  if (!cur) return;
+  const poster = document.querySelector(".immersive").classList.contains("layout-poster");
+  let target;
+  if (poster) {
+    target = Math.max(0, cur.offsetTop - box.clientHeight * 0.32 + cur.offsetHeight / 2);
+  } else {
+    const slot = list.children[1] || cur; // 第二行槽位；仅一句歌用自身
+    target = Math.max(0, cur.offsetTop - slot.offsetTop);
+  }
+  list.style.transform = `translateY(${-target}px)`;
+}
+
 function updateLyrics(song, force) {
   const lines = lyricTimes(song);
   let idx = 0;
@@ -348,14 +372,8 @@ function updateLyrics(song, force) {
           .map((c) => `<span class="ch">${esc(c)}</span>`).join("");
       }
     });
-    // AMLL 风格滚动：当前句锚定在可视区上 1/3（海报布局）/ 居中（双栏布局），
-    // 目标位移不小于 0，首句始终紧贴标题下方
-    const cur = list.children[idx];
-    if (cur) {
-      const anchor = document.querySelector(".immersive").classList.contains("layout-poster") ? 0.32 : 0.5;
-      const target = Math.max(0, cur.offsetTop - box.clientHeight * anchor + cur.offsetHeight / 2);
-      list.style.transform = `translateY(${-target}px)`;
-    }
+    // AMLL 风格滚动定位（几何随页面打开/切布局/改尺寸变化，见 positionLyrics）
+    positionLyrics();
   }
   // 逐字填充（LR-05）
   const cur = list.children[idx];
@@ -714,7 +732,12 @@ function applyLyLayout() {
   im.classList.add("layout-" + lyLayout);
   $$("#ly-styles .style-pick").forEach((b) =>
     b.classList.toggle("active", b.dataset.ly === lyLayout));
+  // 锚定方式随布局变化（海报上 1/3 / 双栏钉第二行槽位），切完重新定位
+  positionLyrics();
 }
+
+/* 视口尺寸变化：歌词钉位几何随之改变，重算 */
+window.addEventListener("resize", positionLyrics);
 
 /* ---------- 管理控制台（独立系统形态，3.12） ---------- */
 function openConsole(page = "songs") {
@@ -812,6 +835,8 @@ function bind() {
         $("#pb-cover").style.viewTransitionName = show ? "none" : "cover";
         $("#im-cover").style.viewTransitionName = show ? "cover" : "none";
       }
+      // 打开后布局才生效（hidden 时 clientHeight/offsetTop = 0），歌词定位必须重算
+      if (show) positionLyrics();
     });
   }
   const openIm = () => imShow(true);

@@ -82,6 +82,8 @@ export interface AuthStatus {
 export interface AppConfig {
   /** 在线音源是否可用（未配置 NETEASE_API_BASE 时为 false，ON-04） */
   onlineEnabled: boolean;
+  /** 单文件上传上限（字节，LB-02）：上传页据此提示；旧后端未返回时前端用兑底值 */
+  maxUploadSize?: number;
 }
 
 /** 成功响应体（PRD 5.6.2） */

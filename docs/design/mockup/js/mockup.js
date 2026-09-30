@@ -217,15 +217,18 @@ function applyExtracted(themes) {
   r.setProperty("--cover-src-2", themes[1] || themes[0]);
 }
 
-/** 中心标签接真实封面（正式版形态预览）；无封面歌回落取色渐变 */
+/** 封面图接入：中心标签（海报布局圆标签）与双栏方形封面共用同一判断，
+    有封面显示图、无封面回落取色渐变 */
 function setLabelArt(song) {
-  const img = document.getElementById("v-label-art");
-  if (!img) return;
-  if (song.cover) {
-    if (!img.src.endsWith(song.cover)) img.src = song.cover;
-    img.style.display = "block";
-  } else {
-    img.style.display = "none";
+  for (const id of ["v-label-art", "im-cover-art"]) {
+    const img = document.getElementById(id);
+    if (!img) continue;
+    if (song.cover) {
+      if (!img.src.endsWith(song.cover)) img.src = song.cover;
+      img.hidden = false;
+    } else {
+      img.hidden = true;
+    }
   }
 }
 

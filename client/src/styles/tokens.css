@@ -1,0 +1,236 @@
+/* ============================================================
+   轻听音乐 · 设计令牌
+   事实来源：docs/design/mockup/css/mockup.css（PRD 3.9 设计令牌速查）
+   规范：变量在 :root 定义，组件样式只引用变量、不写死颜色（PRD 5.6.5）
+   ============================================================ */
+
+/* ---------- 令牌：深色（默认推荐） ---------- */
+:root,
+:root[data-theme="dark"] {
+  /* 原生控件（range 轨道/checkbox/滚动条）跟随主题，
+     否则浅色主题下 UA 会把滑杆轨道渲染成黑色 */
+  color-scheme: dark;
+
+  --bg-base: #0a0c12;
+  --text-1: rgba(255, 255, 255, 0.94);
+  /* 次级/弱化文字：原型给的 0.36/0.60 在实机上读着费劲，以可读性为准上调 */
+  --text-2: rgba(255, 255, 255, 0.64);
+  --text-3: rgba(255, 255, 255, 0.46);
+
+  --glass-bg: rgba(255, 255, 255, 0.055);
+  --glass-bg-strong: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --hover: rgba(255, 255, 255, 0.07);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  /* 岛内卡片：深色下投影几乎不可见，只用极轻的一层压出边缘 */
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --row-alt: rgba(255, 255, 255, 0.025);
+  --fill-track: rgba(255, 255, 255, 0.12);
+
+  --danger: #fb7185;
+  --danger-bg: rgba(244, 63, 94, 0.14);
+  --danger-border: rgba(244, 63, 94, 0.35);
+
+  /* 展示变量：由当前曲目封面取色写入（VS-02） */
+  --accent: #7c8cff;
+  --accent-2: #8b5cf6;
+  --accent-soft: rgba(124, 140, 255, 0.14);
+  --glow1: rgba(91, 124, 250, 0.26);
+  --glow2: rgba(139, 92, 246, 0.2);
+
+  /* 封面颜色源：JS 只写原始色，调校在下方 OKLCH 相对色完成 */
+  --cover-src: #5b7cfa;
+  --cover-src-2: #8b5cf6;
+
+  /* 圆角体系（PRD 3.9②，v4.16 二审：面板略放大让岛更"浮"） */
+  --radius-panel: 18px;
+  --radius-row: 12px;
+  --radius-control: 10px;
+  --radius-cover: 9px;
+}
+
+/* ---------- 令牌：浅色（VS-08） ---------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-base: #f1f2f5;
+  --text-1: rgba(18, 24, 38, 0.94);
+  --text-2: rgba(18, 24, 38, 0.66);
+  --text-3: rgba(18, 24, 38, 0.48);
+
+  /* 浅色底是平浅灰：岛面需比深色主题更实，否则主题色光晕透过去会把整页染成淡紫；
+     描边改用淡灰蓝细线（白描边在白底上等于没有） */
+  --glass-bg: rgba(255, 255, 255, 0.66);
+  --glass-bg-strong: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(30, 40, 80, 0.09);
+  --hover: rgba(18, 24, 38, 0.06);
+  /* 浅色底为平浅灰，拉不开层次时靠投影把岛"浮"起来 */
+  --shadow: 0 10px 34px -14px rgba(30, 40, 80, 0.3);
+  /* 岛内卡片：浅色下"白卡片 + 白岛面"分不出来，必须靠投影压出层次（用户报过） */
+  --card-shadow:
+    0 1px 2px rgba(30, 40, 80, 0.06),
+    0 10px 22px -16px rgba(30, 40, 80, 0.24);
+  --row-alt: rgba(18, 24, 38, 0.03);
+  --fill-track: rgba(18, 24, 38, 0.12);
+
+  /* 背景光晕按主题减弱：深色那套不透明度会直接把浅色页面染成一片淡紫，
+     改为由主题色在 CSS 里派生（取色管线接入后 JS 也不必再写这两个变量） */
+  --glow1: color-mix(in srgb, var(--accent) 9%, transparent);
+  --glow2: color-mix(in srgb, var(--accent-2) 6%, transparent);
+
+  --danger: #e11d48;
+  --danger-bg: rgba(244, 63, 94, 0.1);
+  --danger-border: rgba(244, 63, 94, 0.28);
+}
+
+/* ---------- 感知调校核心：OKLCH 相对颜色（VS-02，v3.8 定稿） ----------
+   JS 只注入原始颜色源 --cover-src / --cover-src-2，一切调校在此完成：
+   OKLCH 的 L（Tone）感知均匀——clamp 即统一盘面深度，绿黄不再过曝；
+   C（Chroma）钳制 0.07~0.15 防过艳也防过灰，无需 HSL 偏置表。
+   每条派生前先写一条降级声明，不支持相对色语法的浏览器自动保留上一条。 */
+@property --cover-src {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5b7cfa;
+}
+
+@property --cover-src-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #8b5cf6;
+}
+
+:root {
+  --cv1: var(--cover-src);
+  --cv1: oklch(from var(--cover-src) clamp(0.4, l, 0.62) clamp(0.07, c, 0.15) h);
+  --cv2: var(--cover-src-2);
+  --cv2: oklch(from var(--cover-src-2) clamp(0.4, l, 0.62) clamp(0.07, c, 0.15) h);
+  --cover-deep: var(--cover-src);
+  --cover-deep: oklch(from var(--cover-src) 0.3 clamp(0.07, c, 0.15) h);
+
+  transition:
+    --cover-src 0.5s ease,
+    --cover-src-2 0.5s ease;
+}
+
+/* ---------- 兜底 ---------- */
+/* author 级 display 规则（如 .btn）会盖过 UA 的 [hidden]，没有这条 hidden 形同虚设 */
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- 原生滑杆自绘：轨道与播放进度条同一令牌 ----------
+   appearance:none 后轨道用 --fill-track、主题色填充用渐变断点 --p 随值同步 */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  --p: 50%;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--accent) var(--p), var(--fill-track) var(--p));
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--accent) var(--p), var(--fill-track) var(--p));
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ---------- 自定义复选框：OS 对勾风格与玻璃主题脱节 ---------- */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+input[type="checkbox"]::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) scale(0);
+  transition: transform 0.15s;
+  margin-top: -2px;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+input[type="checkbox"]:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+/* ---------- 文本选中色与键盘焦点环：跟主题走 ---------- */
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- 滚动条（令牌化） ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ---------- 动效降级（VS-07 / RT） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

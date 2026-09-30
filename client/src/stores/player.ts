@@ -1,0 +1,337 @@
+import { defineStore } from "pinia";
+import { computed, ref } from "vue";
+import type { Track } from "@qingting/shared";
+import {
+  nextMode as nextPlayMode,
+  PLAY_MODE_LABELS,
+  resolveNextIndex,
+  resolvePrevIndex,
+  shouldRestartTrack,
+  type PlayMode,
+} from "@/utils/player";
+
+const STORAGE_KEY = "qt-player";
+/** PL-02：播放超过该秒数后按"上一首"回到本曲开头 */
+const RESTART_THRESHOLD_SECONDS = 3;
+
+interface PersistedPlayer {
+  mode: PlayMode;
+  volume: number;
+  muted: boolean;
+}
+
+/**
+ * 播放器单例 store（PRD 3.2）。
+ * - 队列与模式等在 store 里统一维护，播放动作全部经由这里的四个纯函数（`utils/player.ts`）；
+ * - 只创建一个 `<audio>` 元素，避免多曲目叠播；
+ * - 无 DOM 环境（单测）下不创建 audio，只维护状态，所有动作自行降级。
+ */
+export const usePlayerStore = defineStore("player", () => {
+  const queue = ref<Track[]>([]);
+  const currentIndex = ref(-1);
+  const playing = ref(false);
+  const mode = ref<PlayMode>("list");
+  const volume = ref(1);
+  const muted = ref(false);
+  const progress = ref(0);
+  const duration = ref(0);
+  /** 面向用户的即时提示（加载失败、自动播放被拦截等，PL-09） */
+  const notice = ref("");
+  const seeking = ref(false);
+  const seekTarget = ref(0);
+
+  let audio: HTMLAudioElement | null = null;
+
+  const currentTrack = computed<Track | null>(() => queue.value[currentIndex.value] ?? null);
+  const hasTrack = computed(() => currentTrack.value !== null);
+  const modeLabel = computed(() => PLAY_MODE_LABELS[mode.value]);
+  /** 拖拽进度条期间显示手指位置，松手才真正跳转（PL-03） */
+  const displaySeconds = computed(() => (seeking.value ? seekTarget.value : progress.value));
+  const displayRatio = computed(() => {
+    const total = duration.value;
+    if (!(total > 0)) return 0;
+    return Math.min(1, Math.max(0, displaySeconds.value / total));
+  });
+
+  function ensureAudio(): HTMLAudioElement | null {
+    if (typeof Audio === "undefined") return null;
+    if (audio) return audio;
+
+    audio = new Audio();
+    audio.preload = "metadata";
+    audio.volume = volume.value;
+    audio.muted = muted.value;
+    // 挂进文档（隐藏）：便于在开发者工具里查看状态，后续 Media Session（RT-04）也依赖它在文档中
+    audio.style.display = "none";
+    document.body.appendChild(audio);
+
+    audio.addEventListener("timeupdate", () => {
+      if (!seeking.value) progress.value = audio?.currentTime ?? 0;
+    });
+    audio.addEventListener("loadedmetadata", () => {
+      duration.value = audio?.duration ?? 0;
+    });
+    audio.addEventListener("ended", () => {
+      handleEnded();
+    });
+    // PL-09：加载失败提示并自动跳下一曲，不打断整张列表的播放
+    audio.addEventListener("error", () => {
+      notice.value = "这首歌加载失败，已自动跳到下一首";
+      next();
+    });
+    return audio;
+  }
+
+  /** 自然播完：单曲循环重播本曲，其余按模式取下一首 */
+  function handleEnded(): void {
+    if (mode.value === "one" && currentTrack.value) {
+      seekTo(0);
+      void play();
+      return;
+    }
+    next();
+  }
+
+  async function play(): Promise<void> {
+    const element = ensureAudio();
+    if (!element || !hasTrack.value) return;
+    try {
+      await element.play();
+      playing.value = true;
+      notice.value = "";
+    } catch {
+      // 浏览器自动播放策略（iOS 尤其严格）：需要一次用户手势
+      playing.value = false;
+      notice.value = "浏览器阻止了自动播放，点一下播放按钮即可";
+    }
+  }
+
+  function pause(): void {
+    audio?.pause();
+    playing.value = false;
+  }
+
+  function toggle(): void {
+    if (!hasTrack.value) {
+      if (queue.value.length > 0) playAt(0);
+      return;
+    }
+    if (playing.value) pause();
+    else void play();
+  }
+
+  /** 播放队列中的某一首（PL-06 列表点击播放） */
+  function playAt(index: number, autoplay = true): void {
+    const track = queue.value[index];
+    if (!track) return;
+    currentIndex.value = index;
+    progress.value = 0;
+    duration.value = track.duration ?? 0;
+    notice.value = "";
+
+    const element = ensureAudio();
+    if (!element) return;
+    element.src = track.url;
+    if (autoplay) void play();
+  }
+
+  /** 下一曲（PL-05）：顺序播放到末尾即停止 */
+  function next(): void {
+    const index = resolveNextIndex(queue.value.length, currentIndex.value, mode.value);
+    if (index < 0) {
+      pause();
+      progress.value = 0;
+      return;
+    }
+    playAt(index);
+  }
+
+  /** 上一曲（PL-02）：播放超过 3 秒先回本曲开头，否则切上一曲 */
+  function prev(): void {
+    if (audio && shouldRestartTrack(audio.currentTime, RESTART_THRESHOLD_SECONDS)) {
+      seekTo(0);
+      return;
+    }
+    const index = resolvePrevIndex(queue.value.length, currentIndex.value, mode.value);
+    if (index < 0) return;
+    playAt(index);
+  }
+
+  function seekTo(seconds: number): void {
+    const target = Math.max(0, duration.value > 0 ? Math.min(seconds, duration.value) : seconds);
+    progress.value = target;
+    if (audio) audio.currentTime = target;
+  }
+
+  function beginSeek(ratio: number): void {
+    seeking.value = true;
+    updateSeek(ratio);
+  }
+
+  function updateSeek(ratio: number): void {
+    seekTarget.value = Math.min(1, Math.max(0, ratio)) * duration.value;
+  }
+
+  function endSeek(): void {
+    if (!seeking.value) return;
+    seeking.value = false;
+    seekTo(seekTarget.value);
+  }
+
+  /** 音量（PL-04）：非零即解除静音 */
+  function setVolume(value: number): void {
+    volume.value = Math.min(1, Math.max(0, value));
+    if (volume.value > 0) muted.value = false;
+    if (audio) {
+      audio.volume = volume.value;
+      audio.muted = muted.value;
+    }
+    persist();
+  }
+
+  function toggleMute(): void {
+    muted.value = !muted.value;
+    if (audio) audio.muted = muted.value;
+    persist();
+  }
+
+  function cycleMode(): void {
+    mode.value = nextPlayMode(mode.value);
+    persist();
+  }
+
+  /** 追加曲目；同 ID 视为重复，直接跳过并释放其 Blob URL，返回新增条数 */
+  function addTracks(tracks: readonly Track[]): number {
+    const existing = new Set(queue.value.map((track) => track.id));
+    const fresh: Track[] = [];
+    for (const track of tracks) {
+      if (existing.has(track.id)) {
+        releaseTrack(track);
+        continue;
+      }
+      existing.add(track.id);
+      fresh.push(track);
+    }
+    if (fresh.length === 0) return 0;
+    queue.value = [...queue.value, ...fresh];
+    return fresh.length;
+  }
+
+  /** 标签解析完成后回填曲目信息（LC-04：覆盖 LC-03 的文件名回退结果） */
+  function patchTrack(id: string, patch: Partial<Track>): void {
+    const track = queue.value.find((item) => item.id === id);
+    if (!track) return;
+    Object.assign(track, patch);
+    if (currentTrack.value?.id === id && typeof patch.duration === "number") {
+      duration.value = patch.duration;
+    }
+  }
+
+  /** 时长回填的简写（读不出标签时的兜底） */
+  function patchDuration(id: string, seconds: number): void {
+    patchTrack(id, { duration: seconds });
+  }
+
+  function removeAt(index: number): void {
+    const [removed] = queue.value.splice(index, 1);
+    if (removed) releaseTrack(removed);
+
+    if (queue.value.length === 0) {
+      clear();
+      return;
+    }
+    if (index < currentIndex.value) {
+      currentIndex.value -= 1;
+    } else if (index === currentIndex.value) {
+      playAt(Math.min(index, queue.value.length - 1));
+    }
+  }
+
+  /** 清空队列并释放本地 Blob URL（LC-06：不留存，同时避免内存泄漏） */
+  function clear(): void {
+    for (const track of queue.value) releaseTrack(track);
+    queue.value = [];
+    currentIndex.value = -1;
+    progress.value = 0;
+    duration.value = 0;
+    notice.value = "";
+    pause();
+    if (audio) audio.removeAttribute("src");
+  }
+
+  /** 释放 Blob URL（本地音频、内嵌封面），避免反复拖入后内存堆积 */
+  function releaseTrack(track: Track): void {
+    revokeBlob(track.url);
+    if (track.cover) revokeBlob(track.cover);
+  }
+
+  function revokeBlob(url: string): void {
+    const canRevoke = typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function";
+    if (canRevoke && url.startsWith("blob:")) URL.revokeObjectURL(url);
+  }
+
+  /** 持久化用户偏好（PL-04 音量记忆；曲目与进度见 PL-07，等云端曲目可用后再补） */
+  function persist(): void {
+    if (typeof localStorage === "undefined") return;
+    const payload: PersistedPlayer = { mode: mode.value, volume: volume.value, muted: muted.value };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }
+
+  function restore(): void {
+    if (typeof localStorage === "undefined") return;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw) as Partial<PersistedPlayer>;
+      if (data.mode && PLAY_MODE_LABELS[data.mode]) mode.value = data.mode;
+      if (typeof data.volume === "number") volume.value = Math.min(1, Math.max(0, data.volume));
+      if (typeof data.muted === "boolean") muted.value = data.muted;
+      if (audio) {
+        audio.volume = volume.value;
+        audio.muted = muted.value;
+      }
+    } catch {
+      // 存档损坏（手改 / 旧版本）时忽略，用默认值继续
+    }
+  }
+
+  return {
+    // 状态
+    queue,
+    currentIndex,
+    playing,
+    mode,
+    volume,
+    muted,
+    progress,
+    duration,
+    notice,
+    seeking,
+    // 派生
+    currentTrack,
+    hasTrack,
+    modeLabel,
+    displaySeconds,
+    displayRatio,
+    // 动作
+    play,
+    pause,
+    toggle,
+    playAt,
+    next,
+    prev,
+    seekTo,
+    beginSeek,
+    updateSeek,
+    endSeek,
+    setVolume,
+    toggleMute,
+    cycleMode,
+    addTracks,
+    patchTrack,
+    patchDuration,
+    removeAt,
+    clear,
+    restore,
+  };
+});

@@ -1197,8 +1197,8 @@ body:not(.paused) .disc {
 @media (prefers-reduced-motion: reduce) {
   .disc,
   .eq i,
-  .immersive.layout-poster .im-cover,
-  .immersive.layout-poster .im-cover-wrap::before {
+  .immersive.layout-poster .vinyl-assembly,
+  .immersive.layout-poster .v-glow {
     animation: none !important;
   }
 }
@@ -2074,144 +2074,62 @@ kbd {
   z-index: 0;
 }
 
-/* 彩胶：封面图案压在彩胶里（参考 QQ 音乐实机），悬于右上、顶部微出画，播放时随图案旋转 */
-.immersive.layout-poster .im-cover {
-  width: min(90vh, 90vw);
-  aspect-ratio: 1;
-  border-radius: 50%;
+/* 彩胶：QQ 音乐官方分层资源组装（光晕→基底→封面取色→纹理→压印），整体旋转 */
+.immersive.layout-poster .vinyl-assembly {
   position: absolute;
   top: -27vh;
   right: -19vw;
-  background:
-    /* 细纹 */
-    repeating-radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 8px),
-    /* 折射光带：与盘心同心的宽明暗环带 */
-    repeating-radial-gradient(
-      circle at 50% 50%,
-      rgba(255, 255, 255, 0.05) 0 24px,
-      transparent 24px 52px,
-      rgba(0, 0, 0, 0.04) 52px 74px,
-      transparent 74px 116px
-    ),
-    conic-gradient(
-      from 20deg,
-      rgba(255, 255, 255, 0.16),
-      transparent 12%,
-      rgba(255, 255, 255, 0.07) 26%,
-      transparent 44%,
-      rgba(0, 0, 0, 0.10) 62%,
-      transparent 78%,
-      rgba(255, 255, 255, 0.14) 94%,
-      rgba(255, 255, 255, 0.16)
-    ),
-    /* 斜上方打光：左上亮、右下暗的穿透感 */
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.45) 0%,
-      rgba(255, 255, 255, 0.18) 30%,
-      rgba(255, 255, 255, 0.03) 58%,
-      rgba(0, 0, 0, 0.06) 100%
-    ),
-    /* 斜向高光束 */
-    linear-gradient(
-      118deg,
-      transparent 26%,
-      rgba(255, 255, 255, 0.12) 38%,
-      rgba(255, 255, 255, 0.04) 48%,
-      transparent 60%
-    ),
-    radial-gradient(circle at 40% 36%, var(--cv1), var(--cv2) 74%);
-  box-shadow:
-    0 40px 140px rgba(0, 0, 0, 0.35),
-    0 0 80px 12px color-mix(in srgb, var(--cv2) 38%, transparent),
-    0 0 230px 70px color-mix(in srgb, var(--cv2) 22%, transparent);
+  width: min(90vh, 90vw);
+  aspect-ratio: 1;
   animation: disc-spin 32s linear infinite;
   animation-play-state: paused;
 }
 
-body:not(.paused) .immersive.layout-poster .im-cover {
+body:not(.paused) .immersive.layout-poster .vinyl-assembly {
   animation-play-state: running;
 }
 
-/* 随旋转变化的外圈光晕：非对称光斑藏在盘后旋转，转到哪亮到哪 */
-.immersive.layout-poster .im-cover-wrap::before {
-  content: "";
-  position: absolute;
-  top: -27vh;
-  right: -19vw;
-  width: calc(min(90vh, 90vw) * 1.04);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background:
-    conic-gradient(
-      from 30deg,
-      transparent 0deg,
-      color-mix(in srgb, var(--cv2) 18%, transparent) 22deg,
-      color-mix(in srgb, var(--cv2) 52%, transparent) 48deg,
-      color-mix(in srgb, var(--cv2) 85%, transparent) 70deg,
-      color-mix(in srgb, var(--cv2) 62%, transparent) 95deg,
-      color-mix(in srgb, var(--cv2) 26%, transparent) 125deg,
-      transparent 155deg,
-      transparent 185deg,
-      color-mix(in srgb, var(--cv1) 16%, transparent) 208deg,
-      color-mix(in srgb, var(--cv1) 48%, transparent) 228deg,
-      color-mix(in srgb, var(--cv1) 75%, transparent) 248deg,
-      color-mix(in srgb, var(--cv1) 46%, transparent) 275deg,
-      color-mix(in srgb, var(--cv1) 15%, transparent) 300deg,
-      transparent 325deg
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      color-mix(in srgb, var(--cv2) 72%, transparent) 0 40%,
-      color-mix(in srgb, var(--cv2) 58%, transparent) 52%,
-      color-mix(in srgb, var(--cv2) 38%, transparent) 63%,
-      color-mix(in srgb, var(--cv2) 20%, transparent) 72%,
-      color-mix(in srgb, var(--cv2) 8%, transparent) 79%,
-      transparent 86%
-    );
-  filter: blur(34px);
-  animation:
-    disc-spin 32s linear infinite,
-    glow-breathe 6s ease-in-out infinite;
-  /* 旋转跟随播放状态；呼吸常驻不随暂停停止 */
-  animation-play-state: paused, running;
-}
-
-/* 光晕呼吸：透明度深呼吸 + 尺寸微缩放（独立 scale 属性，不与 disc-spin 的 rotate 冲突） */
-@keyframes glow-breathe {
-  0%, 100% {
-    opacity: 0.3;
-    scale: 0.965;
-  }
-  50% {
-    opacity: 1;
-    scale: 1.035;
-  }
-}
-
-body:not(.paused) .immersive.layout-poster .im-cover-wrap::before {
-  animation-play-state: running, running;
-}
-
-/* 外圈胶环：更饱和的胶色包住封面图案 */
-.immersive.layout-poster .im-cover::before {
-  content: "";
+.v-layer {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 层 0：底部光晕（官方资源，柔化 + 呼吸常驻，随盘旋转） */
+.v-glow {
+  filter: blur(8px);
+  transform: scale(1.08);
+  animation: vinyl-breathe 6s ease-in-out infinite;
+}
+
+@keyframes vinyl-breathe {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+/* 层 2：封面取色（中心标签区；M1 接入真实封面图） */
+.v-art {
+  inset: 16%;
   border-radius: 50%;
-  background: radial-gradient(
-    circle at 50% 50%,
-    transparent 0 55%,
-    color-mix(in srgb, var(--cv2) 58%, var(--cv1)) 62%,
-    color-mix(in srgb, var(--cv2) 76%, #000 14%) 100%
-  );
+  background: radial-gradient(circle at 40% 36%, var(--cv1), var(--cv2) 78%);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.18);
 }
 
-/* 彩胶无中心标 */
-.immersive.layout-poster .im-cover::after {
-  content: none;
+/* 层 3：官方纹理，screen 混合让黑底透出下层 */
+.v-grooves {
+  mix-blend-mode: screen;
+  opacity: 0.9;
 }
 
+/* 层 4：官方压印，柔光混合出冲压质感 */
+.v-emboss {
+  mix-blend-mode: soft-light;
+  opacity: 0.95;
+}
+
+/* 全页渐变遮罩：保证歌词可读 */
 .immersive.layout-poster .im-cover-wrap::after {
   content: "";
   position: absolute;

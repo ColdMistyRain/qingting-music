@@ -583,6 +583,8 @@ function bindEq() {
 let lyLayout = localStorage.getItem("qt-lylayout") || "poster";
 
 function applyLyLayout() {
+  // 以最新存储为准（防止外部/其他标签页修改后状态过期）
+  lyLayout = localStorage.getItem("qt-lylayout") || lyLayout || "poster";
   const im = $("#immersive");
   im.classList.remove("layout-duo", "layout-center", "layout-poster");
   im.classList.add("layout-" + lyLayout);

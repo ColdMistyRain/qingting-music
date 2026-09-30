@@ -612,36 +612,51 @@ select {
   height: 21px;
 }
 
+/* 播放主按钮：**不用实心主题色底**（用户：“这个实心按钮不好看吧” → “像这样半透明” →
+   “周围再来主题色的阴影”）。改成与空态圆徽（EmptyState 的 .empty__badge）同一套语言：
+   半透明主题色软底 + 主题色图标 + 一圈极淡描边 + 一层主题色光晕
+   （光晕按 42px 的尺寸缩小，不照搬圆徽的 62px 参数）。 */
 .ctl.play {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
+    /* 光晕收敛过一轮（用户：“阴影收敛点”）：半径 22 → 14、不透明度 65% → 45%，
+       让它只是“坐得稳一点”的一层，不抢旁边的进度条与图标 */
+    0 3px 14px -7px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.ctl.play:hover:not(:disabled) {
+  /* 悬浮只提亮一丁点：软底本身就是主题色，再叠底色会发闷（与 .btn-primary 同一手法） */
+  filter: brightness(1.12);
 }
 
 .ctl.play .icon {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 /* 空闲态（还没选歌）：控制区退为"幽灵态"——
    不把主按钮画成一个点不动的高亮块，避免让人以为坏了；
-   选歌后由播放器状态移除 .is-idle，主按钮才亮起主题色 */
+   选歌后由播放器状态移除 .is-idle，主按钮才戴上软底 */
 .playerbar.is-idle .ctl:disabled {
   opacity: 1;
   color: var(--text-3);
 }
 
+/* 空闲态（还没选歌）：主按钮连软底也收掉——一个有色但点不动的按钮最像“坏了” */
 .playerbar.is-idle .ctl.play {
   background: transparent;
-  border: none;
+  box-shadow: none;
   color: var(--text-3);
 }
 
 .playerbar.is-idle .ctl.play .icon {
-  width: 21px;
-  height: 21px;
+  width: 24px;
+  height: 24px;
 }
 
 /* 空闲态连左侧封面占位也退下去：亮色留给真实播放的内容 */

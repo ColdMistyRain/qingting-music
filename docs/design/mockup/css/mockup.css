@@ -1049,16 +1049,23 @@ body.paused .eq i {
 }
 
 .ctl.play {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 3px 14px -7px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.ctl.play:hover {
+  filter: brightness(1.12);
 }
 
 .ctl.play .icon {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 .ctl.toggle.on {

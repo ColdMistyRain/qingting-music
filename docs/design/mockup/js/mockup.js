@@ -125,15 +125,17 @@ function hexToHsl(hex) {
   return [h, s, l];
 }
 
-/** 归一化 + 感知补偿。两条路径：
-    - 预设调色板（deep=false）：设计色本身鲜活，只收区间，不做提升——
-      提升后饱和度全部撞死上限霓虹化，也会破坏晨雾这类刻意低饱和的配色；
-    - 真实封面采样（deep=true）：照片取出的颜色普遍偏淡偏灰（淡色区域
-      面积大、权重高），QQ 音乐同款策略——饱和度 ×1.5 补偿并压深明度，
-      避免「蓝帽取出来是淡天蓝」这类洗白效果。
-    通用底座：HSL 明度不是感知均匀的，同 L 下绿黄观感远亮于蓝
-    （Rec.601 luma 权重 g.59/r.30/b.11），按色相压暗亮色系。 */
-function tuneTheme([h, s, l], deep = false) {
+/** 归一化 + 感知补偿（单一档位，忠实封面原色）。
+    - 只收区间、不做饱和度提升：预设色是鲜活设计色，提升会全部撞死
+      上限霓虹化，也会破坏晨雾这类刻意低饱和的配色；
+    - 真实照片采样同样只收区间：照片取出的颜色本来就反映封面观感
+      （2026-09-30 用户定稿：淡蓝封面就该配浅蓝天蓝盘，QQ 音乐的
+      「提饱和+压明度」压深策略试过，用户觉得不如忠实原色好看，
+      已回退——M1 若想做可加 deep 参数：s×1.5 收 0.55~0.78、
+      l-0.04 收 0.36~0.52）；
+    - HSL 明度不是感知均匀的，同 L 下绿黄观感远亮于蓝（Rec.601
+      luma 权重 g.59/r.30/b.11），按色相压暗亮色系防止过曝。 */
+function tuneTheme([h, s, l]) {
   const hue = h * 360;
   const bias =
     hue >= 70 && hue < 170 ? -0.1 :  // 黄→绿：观感最亮，压最狠
@@ -141,9 +143,7 @@ function tuneTheme([h, s, l], deep = false) {
     hue >= 20 && hue < 70 ? -0.05 :   // 橙→黄
     hue >= 300 || hue < 20 ? -0.03 :  // 品红→红
     0;                                 // 蓝、紫
-  return deep
-    ? [h, clamp(s * 1.5, 0.55, 0.78), clamp(l + bias - 0.04, 0.36, 0.52)]
-    : [h, clamp(s, 0.5, 0.75), clamp(l + bias, 0.4, 0.6)];
+  return [h, clamp(s, 0.5, 0.75), clamp(l + bias, 0.4, 0.6)];
 }
 
 const hsl = (t) =>
@@ -233,8 +233,7 @@ function extractThemes(img) {
     themes.push(item.hsl);
     if (themes.length === 4) break;
   }
-  // deep=true：真实照片采样走 QQ 式压深（提饱和 + 压明度）
-  return themes.map((t) => tuneTheme(t, true));
+  return themes.map(tuneTheme);
 }
 
 /* 提取结果按图片地址缓存，来回切歌不重算 */

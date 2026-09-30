@@ -2098,6 +2098,17 @@ body:not(.paused) .immersive.layout-poster .vinyl-assembly {
   animation-play-state: running;
 }
 
+/* 彩胶各层只在海报布局渲染。双栏/居中布局的封面走 .im-cover 的纯封面色，
+   同时防止绝对定位子层在无定位容器里逃逸到整页
+   （双栏布局出现大椭圆 = 逃逸的 v-label 被拉扁，此为根因修复） */
+.vinyl-assembly { position: relative; }
+.v-vinyl, .v-texture, .v-label, .v-gloss, .v-glow { display: none; }
+.immersive.layout-poster .v-vinyl,
+.immersive.layout-poster .v-texture,
+.immersive.layout-poster .v-label,
+.immersive.layout-poster .v-gloss,
+.immersive.layout-poster .v-glow { display: block; }
+
 /* 层 -1：外圈光晕 —— 官方 background@2x 本身是浅灰的，灰色没有意义，
    有意义的是 alpha 分层：拿它当 mask、填主题色，才得到跟着封面配色走的
    有机柔光（box-shadow 做不出这种不规则衰减）。

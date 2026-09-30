@@ -77,12 +77,11 @@ const isPlaying = computed(() => props.active && props.playing);
   align-items: center;
   /* 列间距与表头共享同一令牌：两边读同一份，列才对得上 */
   gap: var(--row-gap);
-  /* 歌名 + 歌手两行字需要呼吸：62px 时封面与两行字挤在一起（用户两次反馈“拥挤”），
-     v4.43 上调到 76px / 上下 12px，封面同步放大到 44px（正好填满封面列）。
-     行内呼吸和行高是两回事：上一轮只加了行高，行内 3px 的行间距/14px 的列间距
-     依旧挤，所以这次一起放开。 */
-  min-height: 76px;
-  padding: 12px var(--row-pad-x);
+  /* 行盒子（悬浮/选中底色的大小）：只由封面与上下内边距决定。
+     “内容离细线远一点”**不是**靠这里——那是 .row-list 的 gap 管的（两个独立旋钮，
+     当时把前者当后者调，才把行拱到 76px。见 global.css 的 .row-list）。 */
+  min-height: 64px;
+  padding: 10px var(--row-pad-x);
   border-radius: var(--radius-row);
   transition: background 0.15s;
 }

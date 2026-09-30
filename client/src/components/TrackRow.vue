@@ -83,6 +83,13 @@ const isPlaying = computed(() => props.active && props.playing);
   background: var(--hover);
 }
 
+/* 相邻两行用一条极淡分割线分隔（不用斑马纹：圆角行 + 没有列分隔线时，
+   斑马纹看着像"残留的悬浮态"，v4.29 实拍对比过）。行本身够高（62px），
+   细线不会显挤；悬浮/选中仍是圆角底色块。 */
+.row + .row {
+  border-top: 1px solid var(--glass-border);
+}
+
 .row--active {
   background: var(--accent-soft);
 }

@@ -337,6 +337,13 @@ async function removeSelected(): Promise<void> {
   background: var(--hover);
 }
 
+/* 数据行之间用极淡分割线：集合型列表（曲目、曲库）用线，
+   任务型列表（上传队列，行有状态底色）用间距 + 行块，两者不混用（v4.29 定稿）。
+   表头不加，否则标题与首行会断开。 */
+.sg:not(.sg--head) + .sg:not(.sg--head) {
+  border-top: 1px solid var(--glass-border);
+}
+
 .sg--head {
   height: 34px;
   border-bottom: 1px solid var(--glass-border);

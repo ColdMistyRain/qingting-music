@@ -913,6 +913,13 @@ body.paused .eq i {
   -webkit-backdrop-filter: blur(60px) saturate(1.3);
 }
 
+/* 海报布局：右下环境光撤掉——彩胶的有机光晕已是画面唯一主光源，
+   同主题色的角落光斑会像一块孤立的色渍（用户报 bug） */
+.immersive.layout-poster {
+  background:
+    radial-gradient(70% 90% at 20% 10%, var(--glow1), transparent 60%);
+}
+
 .immersive::before {
   content: "";
   position: absolute;

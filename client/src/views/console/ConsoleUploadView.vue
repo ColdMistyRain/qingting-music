@@ -326,12 +326,6 @@ function clearFinished(): void {
   padding: 16px 20px 18px;
 }
 
-/* 控制台内容岛很宽，超宽卡片里的居中文字会显得空：正文区限宽 */
-.dropzone,
-.queue {
-  max-width: var(--content-width);
-}
-
 .queue__head {
   display: flex;
   align-items: center;

@@ -262,6 +262,16 @@ select {
   padding: 22px 26px 26px;
 }
 
+/* ---------- 正文列：内容岛很宽时让正文块居中 ----------
+   岛宽随窗口/侧栏变化，正文如果左边贴满、右边空一大片，看着就像没排好。
+   统一按 --content-width 居中，左右留白对称（v4.32 定稿）。
+   页面里不要再各自写 max-width。 */
+.content > section,
+.cs-main > section {
+  max-width: var(--content-width);
+  margin-inline: auto;
+}
+
 .page-head {
   display: flex;
   align-items: center;

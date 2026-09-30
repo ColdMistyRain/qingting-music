@@ -209,7 +209,6 @@ function onRowPlay(index: number): void {
   gap: 12px;
   padding: 16px 24px;
   margin-bottom: 14px;
-  max-width: var(--content-width);
 }
 
 .dropzone--compact .dz-badge,
@@ -232,8 +231,6 @@ function onRowPlay(index: number): void {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* 内容岛很宽，不限宽的话标题与时长会被拉到屏幕两端，行内还会留一大片死空间 */
-  max-width: var(--content-width);
 }
 
 .local__hint {

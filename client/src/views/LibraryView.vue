@@ -189,9 +189,5 @@ function playAt(index: number): void {
 .strip .btn {
   margin-left: auto;
 }
-
-.library {
-  max-width: var(--content-width);
-}
 </style>
 

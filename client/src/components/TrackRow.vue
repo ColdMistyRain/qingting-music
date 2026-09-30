@@ -86,14 +86,15 @@ const isPlaying = computed(() => props.active && props.playing);
 }
 
 /* 相邻两行之间的极淡分隔线：用伪元素画**直线**，不用 border-top——
-   行有 12px 圆角，border-top 会沿着圆角拐下去，两端各留一小段弧（用户一眼就看出来了）。
-   行本身够高（62px），细线不会显挤。 */
+   行有 12px 圆角，border-top 会沿着圆角拐下去，两端各留一小段弧。
+   两端再按行的水平内边距（12px）**内缩**：线顶到圆角处会显得“戳出”了圆角矩形
+   （用户实拍指出），内缩后线刚好落在圆角起弧的位置之内。 */
 .row + .row::before {
   content: "";
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 12px;
+  right: 12px;
   height: 1px;
   background: var(--glass-border);
 }

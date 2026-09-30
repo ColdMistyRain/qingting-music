@@ -318,7 +318,6 @@ async function removeSelected(): Promise<void> {
 }
 
 .songs {
-  max-width: var(--content-width);
   padding: 6px 10px 10px;
 }
 
@@ -340,14 +339,15 @@ async function removeSelected(): Promise<void> {
   background: var(--hover);
 }
 
-/* 数据行之间用极淡直线分隔（同上：不用 border-top，避开圆角末端的弧）。
+/* 数据行之间用极淡直线分隔（同上：不用 border-top，避开圆角末端的弧；
+   两端按行的水平内边距内缩，不顶到圆角）。
    集合型列表用线、任务型列表（上传队列，行带状态底色）用间距 + 行块，两者不混用。 */
 .sg:not(.sg--head) + .sg:not(.sg--head)::before {
   content: "";
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 8px;
+  right: 8px;
   height: 1px;
   background: var(--glass-border);
 }

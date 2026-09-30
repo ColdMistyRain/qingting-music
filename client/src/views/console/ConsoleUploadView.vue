@@ -370,18 +370,21 @@ function clearFinished(): void {
 }
 
 .up-list {
-  padding-top: 6px;
+  display: grid;
+  /* 用间距代替细分割线：行本身有圆角与底色，贴太紧会显得挤（用户反馈） */
+  gap: 6px;
+  padding-top: 10px;
 }
 
-/* 行栅格：图标 / 文件名 / （进度或状态） / 操作。
-   进度不再单独占一整列——不上传时那一列会变成一条没意义的长灰线。 */
+/* 行栅格：图标 / 文件名+结果 / 操作。
+   行高比单行列表高一些：两行文字需要呼吸，否则显得紧凑。 */
 .up {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  min-height: 56px;
-  padding: 8px 10px;
+  min-height: 64px;
+  padding: 10px 12px;
   border-radius: var(--radius-row);
   transition: background 0.15s;
 }
@@ -399,10 +402,6 @@ function clearFinished(): void {
 
 .up:hover {
   background: var(--hover);
-}
-
-.up + .up {
-  border-top: 1px solid var(--glass-border);
 }
 
 .up__icon {
@@ -462,6 +461,10 @@ function clearFinished(): void {
   background: color-mix(in srgb, var(--danger) 6%, transparent);
 }
 
+.up--failed:hover {
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+}
+
 .up__info {
   min-width: 0;
 }
@@ -475,7 +478,7 @@ function clearFinished(): void {
 
 /* 结果行：成功写“大小 · 歌名”，失败写原因，都紧贴文件名下方 */
 .up__result {
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 11.5px;
   color: var(--text-3);
   white-space: nowrap;

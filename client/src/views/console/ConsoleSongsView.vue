@@ -327,8 +327,9 @@ async function removeSelected(): Promise<void> {
   grid-template-columns: 24px 40px minmax(0, 1fr) 90px 148px auto;
   align-items: center;
   gap: 14px;
-  height: 54px;
-  padding: 0 8px;
+  /* 与上传队列、曲目行同一套行节奏：两行文字不塞在 54px 里 */
+  min-height: 62px;
+  padding: 8px 8px;
   border-radius: var(--radius-row);
 }
 

@@ -72,8 +72,9 @@ const isPlaying = computed(() => props.active && props.playing);
   grid-template-columns: 44px 1fr 64px 56px auto;
   align-items: center;
   gap: 14px;
-  height: 56px;
-  padding: 0 12px;
+  /* 歌名 + 歌手两行字需要呼吸：56px 那样塞两行会显得紧凑（v4.28 统一行节奏） */
+  min-height: 62px;
+  padding: 8px 12px;
   border-radius: var(--radius-row);
   transition: background 0.15s;
 }

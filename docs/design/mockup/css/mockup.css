@@ -2,6 +2,10 @@
    轻听音乐 · 高保真原型样式系统
    规范来源：需求文档 3.9（玻璃拟态/VS-01~08）、5.6.5（CSS 规范）
    主题：data-theme="dark"(默认) / "light"，主题色由 JS 注入（模拟 VS-02 封面取色）
+
+   ⚠ 本文件已降级为「参考与素材库」（用户定稿：界面以美观易用为准，感受是最终裁决权，
+   见 PRD v4.16 / AGENTS.md 铁律 2）。实现侧的最新数值以 client/src/styles/tokens.css
+   与 global.css 为准；两侧不一致时不要照着本文件改回去，先看 PRD 修订记录。
    ============================================================ */
 
 /* ---------- 设计令牌 ---------- */
@@ -203,8 +207,21 @@ input {
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   border: 1px solid var(--glass-border);
-  border-radius: 16px;
+  border-radius: 18px;
   box-shadow: var(--shadow);
+}
+
+/* 岛内卡片：已在 .glass 岛（侧栏/内容区/控制台主区）里面的卡片不再叠 backdrop-filter——
+   VS-07 要求模糊层数克制，且玻璃叠玻璃会互相稀释成一片灰糊；
+   改用更实的底色 + 描边与岛面区分。前端对应 global.css 的 .card 类。 */
+.content .set-card,
+.cs-main .stat,
+.cs-main .panel {
+  background: var(--glass-bg-strong);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border-radius: 12px;
 }
 
 /* ---------- 应用外壳布局 ---------- */
@@ -214,9 +231,9 @@ input {
   display: grid;
   grid-template-columns: 224px 1fr;
   grid-template-rows: 1fr 84px;
-  gap: 12px;
+  gap: 14px;
   height: 100vh;
-  padding: 12px;
+  padding: 14px;
   transition: grid-template-columns 0.25s ease;
 }
 
@@ -1875,8 +1892,8 @@ body.paused .eq i {
   z-index: 30;
   display: grid;
   grid-template-columns: 208px 1fr;
-  gap: 12px;
-  padding: 12px;
+  gap: 14px;
+  padding: 14px;
   background: var(--bg-base);
 }
 
@@ -1887,10 +1904,11 @@ body.paused .eq i {
   overflow-y: auto;
 }
 
+/* 内容区与播放器外壳一致同为玻璃岛（.glass 提供背景/模糊/描边），
+   此前只有圆角没有面板，控制台成裸背景，与播放器两套外壳视觉不统一 */
 .cs-main {
   overflow-y: auto;
-  padding: 22px 28px 28px;
-  border-radius: 16px;
+  padding: 22px 26px 26px;
 }
 
 .cs-page.hidden {

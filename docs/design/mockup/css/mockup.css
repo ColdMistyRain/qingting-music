@@ -1450,6 +1450,15 @@ body.paused .eq i {
   padding: 34px 8px;
 }
 
+/* 双栏：歌词窗口贴合列表内容高度——「标题+歌词行块」作为整组
+   与封面垂直居中对齐（.im-right 的 justify-content:center 已居中整组，
+   固定 66vh 窗口会在行块下方拖出大段空白，视觉上整组偏上） */
+.immersive.layout-duo .lyrics {
+  height: auto;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
 .ly-list {
   position: relative;
   transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);

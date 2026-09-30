@@ -346,14 +346,15 @@
     </div>
     <div class="im-body">
       <div class="im-cover-wrap">
-        <!-- 彩胶：主题色彩胶盘体 + 大理石纹理 + 中心标签，整体旋转；外圈光晕与固定高光不随盘转 -->
-        <div class="v-glow" aria-hidden="true"></div>
+        <!-- 彩胶：结构对齐 01-colorfull——外壳（不转：光晕=::before 溢出盘外，边缘环=::after）> 旋转盘 .v-disc（转+裁剪）> 盘体/纹理/标签；高光固定不转 -->
         <div class="vinyl-assembly im-cover" id="im-cover">
-          <div class="v-vinyl"></div>
-          <div class="v-texture"></div>
-          <div class="v-label"><img id="v-label-art" alt="" style="display:none"></div>
+          <div class="v-disc">
+            <div class="v-vinyl"></div>
+            <div class="v-texture"></div>
+            <div class="v-label"><img id="v-label-art" alt="" style="display:none"></div>
+          </div>
+          <div class="v-gloss" aria-hidden="true"></div>
         </div>
-        <div class="v-gloss" aria-hidden="true"></div>
       </div>
       <div class="im-right">
         <div class="im-tb"><b id="im-title-b">—</b><span id="im-title-s">—</span></div>

@@ -1149,8 +1149,8 @@ body.paused .eq i {
 /* 动效降级（VS-04 / prefers-reduced-motion） */
 @media (prefers-reduced-motion: reduce) {
   .eq i,
-  .immersive.layout-poster .vinyl-assembly,
-  .immersive.layout-poster .v-glow {
+  .immersive.layout-poster .v-disc,
+  .immersive.layout-poster .vinyl-assembly::before {
     animation: none !important;
   }
 }
@@ -2024,31 +2024,53 @@ kbd {
   inset: 0;
   display: block;
   z-index: 0;
-  /* 盘面基准位（2026-09-29 校准）：光晕/盘体/高光三层共用 */
+  /* 盘面基准位（2026-09-29 校准）：彩胶外壳定位用 */
   --vinyl-t: -27vh;
   --vinyl-r: -19vw;
   --vinyl-d: min(90vh, 90vw);
 }
 
-/* 彩胶：QQ 音乐官方分层资源组装（光晕→基底→纹理→压印），整体旋转
-   裁剪成圆 + isolate：纹理 overlay 只在盘内混合，不漏到页面背景上
-   转速 8s/圈（45°/s 顺时针）——2026-09-30 对照 QQ 实机视频实测修正，
-   旧值 32s 凭感觉拍的，差 4 倍 */
+/* 彩胶：QQ 音乐官方分层资源组装。DOM 结构对齐用户 01-colorfull 实现——
+   外壳 .vinyl-assembly（不转、不裁剪：光晕=::before 溢出盘外，边缘环=::after）
+   > 旋转盘 .v-disc（转 + overflow:hidden 裁剪）> 盘体/纹理/标签；
+   高光 .v-gloss 为外壳子元素（固定光源，不随盘转）。
+   转速 8s/圈（45°/s 顺时针）——2026-09-30 对照 QQ 实机视频实测修正 */
 .immersive.layout-poster .vinyl-assembly {
   position: absolute;
-  top: -27vh;
-  right: -19vw;
-  width: min(90vh, 90vw);
+  top: var(--vinyl-t);
+  right: var(--vinyl-r);
+  width: var(--vinyl-d);
   aspect-ratio: 1;
-  border-radius: 50%;
-  overflow: hidden;
   isolation: isolate;
-  will-change: transform;
-  animation: disc-spin 8s linear infinite;
-  animation-play-state: paused;
 }
 
-/* 盘缘内阴影环：一圈白边 + 向内晕开的深色，增加盘体厚度感 */
+/* ::before = 外圈光晕：官方 background@2x 本身浅灰，灰色没有意义，
+   有意义的是 alpha 分层——作 mask、填主题色，才得到跟着封面配色走的
+   有机柔光。inset -20% 比盘体大 1.4 倍溢出盘外（外壳不裁剪才能显示），
+   随盘旋转 + 呼吸，暂停停在最亮帧 */
+.immersive.layout-poster .vinyl-assembly::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  background: var(--cv1);
+  background: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
+  -webkit-mask: url("../img/vinyl/glow.png") center / contain no-repeat;
+  mask: url("../img/vinyl/glow.png") center / contain no-repeat;
+  animation: disc-spin 8s linear infinite, vinyl-breathe 3.4s ease-in-out infinite;
+  animation-play-state: paused, paused;
+}
+
+body:not(.paused) .immersive.layout-poster .vinyl-assembly::before {
+  animation-play-state: running, running;
+}
+
+@keyframes vinyl-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+/* ::after = 盘缘内阴影环：一圈白边 + 向内晕开的深色，增加盘体厚度感 */
 .immersive.layout-poster .vinyl-assembly::after {
   content: "";
   position: absolute;
@@ -2060,7 +2082,19 @@ kbd {
   pointer-events: none;
 }
 
-body:not(.paused) .immersive.layout-poster .vinyl-assembly {
+/* 旋转盘：随盘转 + 裁剪（纹理 overlay 只在盘内混合，不漏到页面背景） */
+.immersive.layout-poster .v-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
+  will-change: transform;
+  animation: disc-spin 8s linear infinite;
+  animation-play-state: paused;
+}
+
+body:not(.paused) .immersive.layout-poster .v-disc {
   animation-play-state: running;
 }
 
@@ -2068,40 +2102,8 @@ body:not(.paused) .immersive.layout-poster .vinyl-assembly {
    同时防止绝对定位子层在无定位容器里逃逸到整页
    （双栏布局出现大椭圆 = 逃逸的 v-label 被拉扁，此为根因修复） */
 .vinyl-assembly { position: relative; }
-.v-vinyl, .v-texture, .v-label, .v-gloss, .v-glow { display: none; }
-.immersive.layout-poster .v-vinyl,
-.immersive.layout-poster .v-texture,
-.immersive.layout-poster .v-label,
-.immersive.layout-poster .v-gloss,
-.immersive.layout-poster .v-glow { display: block; }
-
-/* 层 -1：外圈光晕 —— 官方 background@2x 本身是浅灰的，灰色没有意义，
-   有意义的是 alpha 分层：拿它当 mask、填主题色，才得到跟着封面配色走的
-   有机柔光（box-shadow 做不出这种不规则衰减）。
-   比盘体大 1.4 倍居中铺开，随盘旋转 + 呼吸，暂停时一起停在最亮帧 */
-.v-glow {
-  position: absolute;
-  top: calc(var(--vinyl-t) - var(--vinyl-d) * 0.2);
-  right: calc(var(--vinyl-r) - var(--vinyl-d) * 0.2);
-  width: calc(var(--vinyl-d) * 1.4);
-  aspect-ratio: 1;
-  pointer-events: none;
-  background: var(--cv1);
-  background: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
-  -webkit-mask: url("../img/vinyl/glow.png") center / contain no-repeat;
-  mask: url("../img/vinyl/glow.png") center / contain no-repeat;
-  animation: disc-spin 8s linear infinite, vinyl-breathe 3.4s ease-in-out infinite;
-  animation-play-state: paused, paused;
-}
-
-body:not(.paused) .immersive.layout-poster .v-glow {
-  animation-play-state: running, running;
-}
-
-@keyframes vinyl-breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.72; }
-}
+.v-vinyl, .v-texture, .v-label, .v-gloss, .v-disc { display: none; }
+.immersive.layout-poster :is(.v-vinyl, .v-texture, .v-label, .v-gloss, .v-disc) { display: block; }
 
 /* 彩胶盘体：主题色漩涡（conic 彩虹胶面，QQ 音乐同款结构） */
 .v-vinyl {
@@ -2188,12 +2190,12 @@ body:not(.paused) .immersive.layout-poster .v-glow {
 
 /* 固定光源高光：hightlight1(深反光) + hightlight2(白纹槽) 同元素叠加
    overlay 混合才凑得出完整盘面光泽；不随盘旋转（光源固定） */
+/* 表面高光：hightlight1(深反光) + hightlight2(白纹槽) 同元素叠加
+   overlay 混合才凑得出完整盘面光泽；不随盘旋转（光源固定）。
+   挂在外壳内、填满旋转盘上方（z-index 高于 .v-disc） */
 .v-gloss {
   position: absolute;
-  top: var(--vinyl-t, -27vh);
-  right: var(--vinyl-r, -19vw);
-  width: var(--vinyl-d, min(90vh, 90vw));
-  aspect-ratio: 1;
+  inset: 0;
   border-radius: 50%;
   overflow: hidden;
   pointer-events: none;

@@ -149,7 +149,7 @@ async function removeSelected(): Promise<void> {
         <span>{{ actionError }}</span>
       </div>
 
-      <div class="toolbar">
+      <div class="toolbar sticky-bar">
         <label class="search">
           <IconMagnifyingGlass class="icon" />
           <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />

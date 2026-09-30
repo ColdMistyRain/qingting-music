@@ -144,7 +144,9 @@ function onRowPlay(index: number): void {
     </div>
 
     <div class="local" :class="{ 'local--empty': !hasTracks }">
-      <div class="dropzone" :class="{ 'dropzone--drag': dragging, 'dropzone--compact': hasTracks }">
+      <div
+        class="dropzone"
+        :class="{ 'dropzone--drag': dragging, 'dropzone--compact': hasTracks, 'sticky-bar': hasTracks }">
         <span class="dz-badge"><IconUploadSimple class="icon" /></span>
         <div class="dz-title">{{ hasTracks ? "继续添加音乐" : "拖入音乐文件或文件夹" }}</div>
         <div class="dz-sub">支持 MP3 · FLAC · WAV · OGG · M4A · OPUS</div>

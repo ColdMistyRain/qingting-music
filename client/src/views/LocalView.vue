@@ -211,7 +211,7 @@ watch(
     <TrackListHead v-if="hasTracks" />
 
     <!-- 只有列表滚动：页头与表头固定在上部（方案 A） -->
-    <div v-if="hasTracks" class="local__list page-frame__scroll">
+    <div v-if="hasTracks" class="local__list row-list page-frame__scroll">
       <p v-if="skipped > 0" class="local__hint">已忽略 {{ skipped }} 个非音频文件</p>
       <p v-if="probing > 0" class="local__hint">正在读取歌曲信息…</p>
       <TrackRow
@@ -239,12 +239,6 @@ watch(
 
 .stage .dropzone {
   width: min(100%, 560px);
-}
-
-.local__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .local__hint {

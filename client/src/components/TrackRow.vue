@@ -84,7 +84,7 @@ const isPlaying = computed(() => props.active && props.playing);
      行内呼吸和行高是两回事：上一轮只加了行高，行内 3px 的行间距/14px 的列间距
      依旧挤，所以这次一起放开。 */
   min-height: 76px;
-  padding: 12px;
+  padding: 12px var(--row-pad-x);
   border-radius: var(--radius-row);
   transition: background 0.15s;
 }
@@ -93,16 +93,18 @@ const isPlaying = computed(() => props.active && props.playing);
   background: var(--hover);
 }
 
-/* 相邻两行之间的极淡分隔线：用伪元素画**直线**，不用 border-top——
-   行有 12px 圆角，border-top 会沿着圆角拐下去，两端各留一小段弧。
-   两端再按行的水平内边距（12px）**内缩**：线顶到圆角处会显得“戳出”了圆角矩形
-   （用户实拍指出），内缩后线刚好落在圆角起弧的位置之内。 */
-.row + .row::before {
+/* 行分隔：属于**前一行**（不是后一行），而且画在行**外面**（落在两行之间的缝里）。
+   两个“不”都是必须的：
+   ① 不用 `border-top`——行有 12px 圆角，border-top 会沿圆角拐下去，两端各留一小段弧；
+   ② 不画在后一行的 `top: 0`（或前一行的 `bottom: 0`）——那样线会落进行的盒子里，
+      高亮/悬浮行的底色上会横着一条线、看着像“没对齐的边框”（用户实拍指出）。
+   两端按行内边距内缩：线顶到圆角处会“戳出”圆角矩形。 */
+.row:not(:last-of-type)::after {
   content: "";
   position: absolute;
-  top: 0;
-  left: 12px;
-  right: 12px;
+  top: 100%;
+  left: var(--row-pad-x);
+  right: var(--row-pad-x);
   height: 1px;
   background: var(--glass-border);
 }

@@ -115,7 +115,7 @@ function playAt(index: number): void {
 
       <p v-else-if="isSearching && tracks.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
 
-      <div v-else class="library">
+      <div v-else class="library row-list">
         <TrackRow
           v-for="(track, index) in tracks"
           :key="track.id"

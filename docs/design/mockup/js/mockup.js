@@ -50,6 +50,10 @@ const SONGS = [
     c1: "#f43f5e", c2: "#fb923c", accent: "#fb7185", soft: "rgba(251,113,133,.14)",
     glow1: "rgba(244,63,94,.24)", glow2: "rgba(251,146,60,.2)",
     lyrics: ["倒数三二一 别眨眼", "夜空被撕开 一道金色的边", "焰火落下来 像谁的愿望碎掉", "碎掉也好 碎了才发光", "人群欢呼着 拥抱又告别", "我把这一秒 悄悄存进左胸膛", "以后每个平淡的夜里", "拿出来 都能照亮一小段路"] },
+  { id: "s9", title: "样张实测", artist: "封面取色", album: "caijiao", dur: 200, cover: "img/cover-test.jpg",
+    c1: "#7d9fc6", c2: "#b4cbdf", accent: "#9dbede", soft: "rgba(157,190,222,.14)",
+    glow1: "rgba(125,159,198,.24)", glow2: "rgba(180,203,223,.2)",
+    lyrics: ["把样张封面交给取色管线", "六十四像素里数出色相", "谁的帽子谁的脸谁的衣服", "都变成一桶一桶的权重", "蓝帽子还是奶油的皮肤", "最多票的那个来当主题", "别担心荧光色不再回来", "感知偏置会压住它们"] },
 ];
 
 const byId = (id) => SONGS.find((s) => s.id === id);
@@ -153,12 +157,122 @@ function applyPalette(song) {
   // 原始 c1/c2 对亮色系（绿黄）会亮得像霓虹，感知压暗后才是「封面」的观感
   r.setProperty("--cv1", hsl(tuneTheme(hexToHsl(song.c1))));
   r.setProperty("--cv2", hsl(tuneTheme(hexToHsl(song.c2))));
-  // 主题色三变量：彩胶盘体 conic 漩涡与外圈光晕由它派生，
-  // @property 注册过，换歌时整页平滑过渡而非硬切
-  const [h, s, l] = tuneTheme(hexToHsl(song.c1));
+  applyThemeTriple(tuneTheme(hexToHsl(song.c1)));
+}
+
+/** 主题色三变量统一入口（预设色与真实取色共用），@property 注册过换色即平滑过渡 */
+function applyThemeTriple([h, s, l]) {
+  const r = document.documentElement.style;
   r.setProperty("--theme-h", String(Math.round(h * 360)));
   r.setProperty("--theme-s", Math.round(s * 100) + "%");
   r.setProperty("--theme-l", Math.round(l * 100) + "%");
+}
+
+/* ---------- 封面真实取色（VS-02 完整管线，与定稿实现同思路） ----------
+   封面缩到 64x64，按色相分 24 桶，权重 = 饱和度 × 明度居中度，
+   丢弃灰白黑与过暗过亮像素；最高权重桶即主题色相，其余高频色相
+   留作备选。候选色最后过 tuneTheme 感知收束再上场。 */
+const HUE_BUCKETS = 24;
+const HUE_GAP = 0.11; // 备选色之间至少差 ~40°，避免挤在同一色系
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, l];
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return [h, s, l];
+}
+
+const hueDiff = (a, b) => {
+  const d = Math.abs(a - b);
+  return Math.min(d, 1 - d);
+};
+
+/** 返回调好的候选主题色 [[h,s,l],...]；读不到像素（画布污染/加载失败）返回 [] */
+function extractThemes(img) {
+  const SIZE = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = SIZE;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return [];
+  ctx.drawImage(img, 0, 0, SIZE, SIZE);
+  let px;
+  try {
+    px = ctx.getImageData(0, 0, SIZE, SIZE).data;
+  } catch {
+    return []; // file:// 等场景画布被污染，走预设调色板兜底
+  }
+
+  const bins = Array.from({ length: HUE_BUCKETS }, () => ({ w: 0, r: 0, g: 0, b: 0 }));
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 128) continue;
+    const [h, s, l] = rgbToHsl(px[i], px[i + 1], px[i + 2]);
+    if (s < 0.12 || l < 0.1 || l > 0.95) continue; // 丢灰白黑与两端
+    const weight = s * (1 - Math.abs(l - 0.55) * 1.6); // 越鲜艳、明度越居中越高
+    if (weight <= 0) continue;
+    const bin = bins[Math.floor(h * HUE_BUCKETS) % HUE_BUCKETS];
+    bin.w += weight; bin.r += px[i] * weight; bin.g += px[i + 1] * weight; bin.b += px[i + 2] * weight;
+  }
+
+  const ranked = bins
+    .filter((b) => b.w > 0)
+    .map((b) => ({ w: b.w, hsl: rgbToHsl(b.r / b.w, b.g / b.w, b.b / b.w) }))
+    .sort((a, b) => b.w - a.w);
+
+  const themes = [];
+  for (const item of ranked) {
+    if (themes.some((t) => hueDiff(t[0], item.hsl[0]) < HUE_GAP)) continue;
+    themes.push(item.hsl);
+    if (themes.length === 4) break;
+  }
+  return themes.map(tuneTheme);
+}
+
+/* 提取结果按图片地址缓存，来回切歌不重算 */
+const themeCache = new Map();
+
+function loadThemes(src) {
+  if (themeCache.has(src)) return Promise.resolve(themeCache.get(src));
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const themes = extractThemes(img);
+      console.log("[取色]", src, "→ 候选:",
+        themes.map((t) => `${Math.round(t[0] * 360)}°/${Math.round(t[1] * 100)}%/${Math.round(t[2] * 100)}%`).join(" | "));
+      themeCache.set(src, themes);
+      resolve(themes);
+    };
+    img.onerror = () => resolve([]);
+    img.src = src;
+  });
+}
+
+/** 真实取色落地：覆盖主题三变量与封面模拟色；提取失败保留预设调色板 */
+function applyExtracted(themes) {
+  if (!themes.length) return;
+  const t1 = themes[0];
+  const t2 = themes[1] || [t1[0], t1[1] * 0.7, Math.min(0.72, t1[2] + 0.08)];
+  const r = document.documentElement.style;
+  applyThemeTriple(t1);
+  r.setProperty("--cv1", hsl(t1));
+  r.setProperty("--cv2", hsl(t2));
+}
+
+/** 中心标签接真实封面（正式版形态预览）；无封面歌回落取色渐变 */
+function setLabelArt(song) {
+  const img = document.getElementById("v-label-art");
+  if (!img) return;
+  if (song.cover) {
+    if (!img.src.endsWith(song.cover)) img.src = song.cover;
+    img.style.display = "block";
+  } else {
+    img.style.display = "none";
+  }
 }
 
 /* ---------- 模拟播放引擎 ---------- */
@@ -174,6 +288,13 @@ function playSong(id, autoplay = true) {
   state.playing = autoplay;
   state.lyricIdx = -1;
   applyPalette(song);
+  setLabelArt(song);
+  // 有真实封面 → 异步提取主题色覆盖预设色；期间切歌则丢弃本次结果
+  if (song.cover) {
+    loadThemes(song.cover).then((themes) => {
+      if (state.playingId === song.id) applyExtracted(themes);
+    });
+  }
   $("#pb-title").textContent = song.title;
   $("#pb-artist").textContent = `${song.artist} · ${song.album}`;
   $("#im-title-b").textContent = song.title;

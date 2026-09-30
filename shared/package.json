@@ -1,0 +1,14 @@
+{
+  "name": "@qingting/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "前后端共享的 TypeScript 类型与纯函数（PRD 5.1 类型共享）",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

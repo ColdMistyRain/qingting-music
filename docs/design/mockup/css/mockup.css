@@ -946,54 +946,6 @@ body.paused .eq i {
   align-items: center;
 }
 
-/* 旋转封面（VS-04） */
-.disc-wrap {
-  display: grid;
-  place-items: center;
-}
-
-.disc {
-  width: min(34vw, 360px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 30%, var(--cv1), var(--cv2) 70%);
-  position: relative;
-  box-shadow:
-    0 30px 90px rgba(0, 0, 0, 0.55),
-    0 0 140px var(--accent-soft);
-  animation: disc-spin 26s linear infinite;
-  animation-play-state: paused;
-}
-
-body:not(.paused) .disc {
-  animation-play-state: running;
-}
-
-.disc::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: repeating-radial-gradient(
-    circle at 50% 50%,
-    rgba(255, 255, 255, 0.05) 0 2px,
-    transparent 2px 9px
-  );
-}
-
-.disc::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 66px;
-  height: 66px;
-  border-radius: 50%;
-  background: var(--bg-base);
-  border: 4px solid rgba(255, 255, 255, 0.14);
-}
-
 @keyframes disc-spin {
   to { transform: rotate(360deg); }
 }
@@ -1196,7 +1148,6 @@ body:not(.paused) .disc {
 
 /* 动效降级（VS-04 / prefers-reduced-motion） */
 @media (prefers-reduced-motion: reduce) {
-  .disc,
   .eq i,
   .immersive.layout-poster .vinyl-assembly,
   .immersive.layout-poster .v-glow {
@@ -2080,7 +2031,9 @@ kbd {
 }
 
 /* 彩胶：QQ 音乐官方分层资源组装（光晕→基底→纹理→压印），整体旋转
-   裁剪成圆 + isolate：纹理 overlay 只在盘内混合，不漏到页面背景上 */
+   裁剪成圆 + isolate：纹理 overlay 只在盘内混合，不漏到页面背景上
+   转速 8s/圈（45°/s 顺时针）——2026-09-30 对照 QQ 实机视频实测修正，
+   旧值 32s 凭感觉拍的，差 4 倍 */
 .immersive.layout-poster .vinyl-assembly {
   position: absolute;
   top: -27vh;
@@ -2090,8 +2043,21 @@ kbd {
   border-radius: 50%;
   overflow: hidden;
   isolation: isolate;
-  animation: disc-spin 32s linear infinite;
+  will-change: transform;
+  animation: disc-spin 8s linear infinite;
   animation-play-state: paused;
+}
+
+/* 盘缘内阴影环：一圈白边 + 向内晕开的深色，增加盘体厚度感 */
+.immersive.layout-poster .vinyl-assembly::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    inset 0 0 26px oklch(from var(--cover-src) 0.3 clamp(0.07, c, 0.15) h / 0.26);
+  pointer-events: none;
 }
 
 body:not(.paused) .immersive.layout-poster .vinyl-assembly {
@@ -2124,7 +2090,7 @@ body:not(.paused) .immersive.layout-poster .vinyl-assembly {
   background: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
   -webkit-mask: url("../img/vinyl/glow.png") center / contain no-repeat;
   mask: url("../img/vinyl/glow.png") center / contain no-repeat;
-  animation: disc-spin 32s linear infinite, vinyl-breathe 3.4s ease-in-out infinite;
+  animation: disc-spin 8s linear infinite, vinyl-breathe 3.4s ease-in-out infinite;
   animation-play-state: paused, paused;
 }
 
@@ -2200,6 +2166,7 @@ body:not(.paused) .immersive.layout-poster .v-glow {
 .v-label {
   position: absolute;
   inset: 21%;
+  overflow: hidden;
   border-radius: 50%;
   background: radial-gradient(circle at 40% 36%, var(--cv1), var(--cv2) 78%);
   box-shadow:

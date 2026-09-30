@@ -2077,9 +2077,9 @@ kbd {
 /* 彩胶：QQ 音乐官方分层资源组装（光晕→基底→封面取色→纹理→压印），整体旋转 */
 .immersive.layout-poster .vinyl-assembly {
   position: absolute;
-  top: -6vh;
-  right: -6vw;
-  width: min(58vh, 42vw);
+  top: -27vh;
+  right: -19vw;
+  width: min(90vh, 90vw);
   aspect-ratio: 1;
   animation: disc-spin 32s linear infinite;
   animation-play-state: paused;

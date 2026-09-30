@@ -1400,8 +1400,8 @@ body.paused .eq i {
 
 .immersive.layout-duo .im-tb {
   margin-bottom: 2px;
-  /* 与歌词列左内边距对齐 */
-  padding-left: 8px;
+  /* 与歌词列左内边距对齐（2026-09-30 用户 DevTools 实调 2px） */
+  padding-left: 2px;
 }
 
 .immersive.layout-duo .lyrics {

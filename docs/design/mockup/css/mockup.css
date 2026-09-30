@@ -2108,7 +2108,7 @@ body:not(.paused) .immersive.layout-poster .vinyl-assembly {
   width: calc(var(--vinyl-d) * 1.4);
   aspect-ratio: 1;
   pointer-events: none;
-  background: hsl(var(--theme-h), var(--theme-s), 62%);
+  background: hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) + 4%));
   -webkit-mask: url("../img/vinyl/glow.png") center / contain no-repeat;
   mask: url("../img/vinyl/glow.png") center / contain no-repeat;
   animation: disc-spin 32s linear infinite, vinyl-breathe 3.4s ease-in-out infinite;

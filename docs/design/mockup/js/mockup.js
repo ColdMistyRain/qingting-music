@@ -121,11 +121,26 @@ function hexToHsl(hex) {
   return [h, s, l];
 }
 
-/** 封面里挑出的颜色常偏灰/偏暗，只留色相，把饱和度和明度收进
-    既铺得开盘面、又压得住按钮的区间（与定稿实现一致） */
+/** 归一化 + 感知补偿。两个要点：
+    1) 预设调色板本身已是鲜活的设计色（不同于真实照片采样偏灰），
+       不做 ×1.5 提升——提升后饱和度全部撞死上限，盘面霓虹化
+       （M1 真实采样管线才需要 ×1.5 补偿）；
+    2) HSL 明度不是感知均匀的：同 L 下绿黄观感远亮于蓝（Rec.601
+       luma 权重 g.59/r.30/b.11），不补偿会「蓝盘刚好、绿盘过曝」。
+       按色相压暗亮色系，蓝紫不动，再收进统一区间 */
 function tuneTheme([h, s, l]) {
-  return [h, clamp(s * 1.5, 0.55, 0.9), clamp(l, 0.55, 0.68)];
+  const hue = h * 360;
+  const bias =
+    hue >= 70 && hue < 170 ? -0.1 :  // 黄→绿：观感最亮，压最狠
+    hue >= 170 && hue < 210 ? -0.05 : // 青
+    hue >= 20 && hue < 70 ? -0.05 :   // 橙→黄
+    hue >= 300 || hue < 20 ? -0.03 :  // 品红→红
+    0;                                 // 蓝、紫
+  return [h, clamp(s, 0.5, 0.75), clamp(l + bias, 0.42, 0.6)];
 }
+
+const hsl = (t) =>
+  `hsl(${Math.round(t[0] * 360)} ${Math.round(t[1] * 100)}% ${Math.round(t[2] * 100)}%)`;
 
 function applyPalette(song) {
   const r = document.documentElement.style;
@@ -134,8 +149,10 @@ function applyPalette(song) {
   r.setProperty("--accent-soft", song.soft);
   r.setProperty("--glow1", song.glow1);
   r.setProperty("--glow2", song.glow2);
-  r.setProperty("--cv1", song.c1);
-  r.setProperty("--cv2", song.c2);
+  // 封面模拟色同样过 tuneTheme：中心标签/播放条小图/库内迷你盘共用，
+  // 原始 c1/c2 对亮色系（绿黄）会亮得像霓虹，感知压暗后才是「封面」的观感
+  r.setProperty("--cv1", hsl(tuneTheme(hexToHsl(song.c1))));
+  r.setProperty("--cv2", hsl(tuneTheme(hexToHsl(song.c2))));
   // 主题色三变量：彩胶盘体 conic 漩涡与外圈光晕由它派生，
   // @property 注册过，换歌时整页平滑过渡而非硬切
   const [h, s, l] = tuneTheme(hexToHsl(song.c1));

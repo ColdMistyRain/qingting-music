@@ -331,23 +331,6 @@ function renderLyrics(song) {
   updateLyrics(song, true);
 }
 
-/** 歌词滚动定位（独立于句序变化——页面打开/切布局/改尺寸后几何变了也必须重算，
-    否则 hidden 状态下算出的 translateY(0) 会一直留到下一句，歌词整体上偏）。
-    海报布局锚可视区上 1/3 且列表不越过顶部；双栏 AMLL 式纯居中，
-    首尾句允许上下留白 */
-function positionLyrics() {
-  const box = $("#im-lyrics");
-  const list = $("#ly-list");
-  if (!box || !list) return;
-  const cur = list.children[state.lyricIdx];
-  if (!cur) return;
-  const poster = document.querySelector(".immersive").classList.contains("layout-poster");
-  const anchor = poster ? 0.32 : 0.5;
-  const raw = cur.offsetTop - box.clientHeight * anchor + cur.offsetHeight / 2;
-  const target = poster ? Math.max(0, raw) : raw;
-  list.style.transform = `translateY(${-target}px)`;
-}
-
 function updateLyrics(song, force) {
   const lines = lyricTimes(song);
   let idx = 0;
@@ -365,7 +348,14 @@ function updateLyrics(song, force) {
           .map((c) => `<span class="ch">${esc(c)}</span>`).join("");
       }
     });
-    positionLyrics();
+    // AMLL 风格滚动：当前句锚定在可视区上 1/3（海报布局）/ 居中（双栏布局），
+    // 目标位移不小于 0，首句始终紧贴标题下方
+    const cur = list.children[idx];
+    if (cur) {
+      const anchor = document.querySelector(".immersive").classList.contains("layout-poster") ? 0.32 : 0.5;
+      const target = Math.max(0, cur.offsetTop - box.clientHeight * anchor + cur.offsetHeight / 2);
+      list.style.transform = `translateY(${-target}px)`;
+    }
   }
   // 逐字填充（LR-05）
   const cur = list.children[idx];
@@ -724,12 +714,7 @@ function applyLyLayout() {
   im.classList.add("layout-" + lyLayout);
   $$("#ly-styles .style-pick").forEach((b) =>
     b.classList.toggle("active", b.dataset.ly === lyLayout));
-  // 锚点比例随布局变化（海报 0.32 / 双栏 0.5），切完必须重新定位歌词
-  positionLyrics();
 }
-
-/* 视口尺寸变化：歌词锚定几何随之改变，重算 */
-window.addEventListener("resize", positionLyrics);
 
 /* ---------- 管理控制台（独立系统形态，3.12） ---------- */
 function openConsole(page = "songs") {
@@ -827,8 +812,6 @@ function bind() {
         $("#pb-cover").style.viewTransitionName = show ? "none" : "cover";
         $("#im-cover").style.viewTransitionName = show ? "cover" : "none";
       }
-      // 打开后布局才生效（hidden 时 clientHeight=0），歌词定位必须重算
-      if (show) positionLyrics();
     });
   }
   const openIm = () => imShow(true);

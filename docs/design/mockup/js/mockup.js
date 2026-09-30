@@ -386,6 +386,17 @@ function updateLyrics(song, force) {
   }
 }
 
+/* ---------- 滑杆填充同步：值变化时更新渐变断点 --p ---------- */
+function syncRangeFill(input) {
+  const min = +input.min || 0, max = +input.max || 100;
+  const p = Math.min(100, Math.max(0, ((+input.value - min) / (max - min)) * 100));
+  input.style.setProperty("--p", p + "%");
+}
+$$("input[type=range]").forEach((r) => {
+  syncRangeFill(r);
+  r.addEventListener("input", () => syncRangeFill(r));
+});
+
 /* ---------- 模拟心跳 ---------- */
 setInterval(() => {
   if (!state.playing) return;

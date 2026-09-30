@@ -34,10 +34,20 @@ const MODE_ICONS: Record<PlayMode, Component> = {
 const isIdle = computed(() => !player.hasTrack);
 const modeIcon = computed(() => MODE_ICONS[player.mode]);
 const playIcon = computed(() => (player.playing ? IconPause : IconPlay));
-const volumeIcon = computed(() =>
-  player.muted || player.volume === 0 ? IconSpeakerSlash : IconSpeakerHigh,
-);
+
+/**
+ * 静音（PL-04）：包括"点了静音键"与"把音量拉到 0"两种到达方式——
+ * 它们是同一件事，图标 / 读数 / 滑杆必须长得一模一样（用户反馈三态不统一）。
+ */
+const silent = computed(() => player.muted || player.volume === 0);
+const volumeIcon = computed(() => (silent.value ? IconSpeakerSlash : IconSpeakerHigh));
 const volumePercent = computed(() => `${Math.round(player.volume * 100)}%`);
+/**
+ * 静音时滑杆与读数都按 0 显示（与斜杠图标一致），但**视觉样式保持正常**：
+ * 清灰/降透明度会被当成“禁用、点不了”（用户反馈），空轨道 + 旋钮落底已经足够说明是 0。
+ */
+const sliderValue = computed(() => (silent.value ? 0 : player.volume));
+const levelPercent = computed(() => (silent.value ? "0%" : volumePercent.value));
 const totalSeconds = computed(() => player.duration || player.currentTrack?.duration || 0);
 
 /* 进度条交互（PL-03）：用指针事件同时覆盖鼠标与触摸；
@@ -116,13 +126,13 @@ const marqueeActive = computed(() => player.playing || hovering.value);
         <div class="vol-wrap">
           <button
             class="ctl"
-            :title="player.muted ? '取消静音' : '静音'"
-            :aria-label="player.muted ? '取消静音' : '静音'"
+            :title="silent ? '取消静音' : '静音'"
+            :aria-label="silent ? '取消静音' : '静音'"
             @click="player.toggleMute()"
           >
             <component :is="volumeIcon" class="icon" />
           </button>
-          <div class="vol-pop" :class="{ 'vol-pop--muted': player.muted }" role="group" aria-label="音量调节">
+          <div class="vol-pop" role="group" aria-label="音量调节">
             <div class="vol-pop__track">
               <input
                 class="vol-pop__range"
@@ -130,15 +140,13 @@ const marqueeActive = computed(() => player.playing || hovering.value);
                 min="0"
                 max="1"
                 step="0.01"
-                :value="player.volume"
-                :style="{ '--p': volumePercent }"
+                :value="sliderValue"
+                :style="{ '--p': levelPercent }"
                 aria-label="音量"
                 @input="onVolumeInput"
               />
             </div>
-            <span class="vol-pop__value" :class="{ 'vol-pop__value--muted': player.muted }">
-              {{ player.muted ? "已静音" : volumePercent }}
-            </span>
+            <span class="vol-pop__value">{{ levelPercent }}</span>
           </div>
         </div>
       </div>
@@ -271,19 +279,7 @@ const marqueeActive = computed(() => player.playing || hovering.value);
   font-size: 11px;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
-  /* 读数永远单行：“已静音”被挤成两行会把面板撑高、看着像排版坏了 */
+  /* 读数永远单行：“100% → 44%”变化时不能让面板宽度抽动 */
   white-space: nowrap;
-}
-
-/* 静音：用中性色说明“当前不生效”，不要用错误红（静音不是错误）；
-   滑杆同时转灰但保留位置——鼠标一拖就会自动解除静音（store 里已处理），
-   所以这里不需要谎报成 0。 */
-.vol-pop__value--muted {
-  color: var(--text-3);
-}
-
-.vol-pop--muted .vol-pop__range {
-  opacity: 0.55;
-  filter: saturate(0.15);
 }
 </style>

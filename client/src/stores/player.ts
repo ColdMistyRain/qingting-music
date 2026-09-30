@@ -15,6 +15,12 @@ const STORAGE_KEY = "qt-player";
 const RESTART_THRESHOLD_SECONDS = 3;
 /** 播放条提示的存活时间：瞬时信息（自动播放被拦、加载失败）不该长期占用位置 */
 export const NOTICE_TTL_MS = 8000;
+/**
+ * 从 0 音量取消静音时的兜底音量。
+ * 正常情况下会恢复到“上次能听见的音量”（lastAudibleVolume），
+ * 这个值只在“一上来就是 0 音量”（例如存档里就是 0）时才用得上。
+ */
+const DEFAULT_AUDIBLE_VOLUME = 0.8;
 
 interface PersistedPlayer {
   mode: PlayMode;
@@ -35,6 +41,8 @@ export const usePlayerStore = defineStore("player", () => {
   const mode = ref<PlayMode>("list");
   const volume = ref(1);
   const muted = ref(false);
+  /** 最近一次“能听见”的音量：静音 / 归零后解除静音时恢复到它，避免“取消了静音却仍听不见” */
+  const lastAudibleVolume = ref(DEFAULT_AUDIBLE_VOLUME);
   const progress = ref(0);
   const duration = ref(0);
   /** 面向用户的即时提示（加载失败、自动播放被拦截等，PL-09） */
@@ -221,20 +229,41 @@ export const usePlayerStore = defineStore("player", () => {
     seekTo(seekTarget.value);
   }
 
-  /** 音量（PL-04）：非零即解除静音 */
+  /** 音量/静音只影响 audio 的这两个属性，集中一处，避免漏同步 */
+  function syncVolumeToAudio(): void {
+    if (!audio) return;
+    audio.volume = volume.value;
+    audio.muted = muted.value;
+  }
+
+  /**
+   * 音量（PL-04）。全局语义统一为“**音量为 0 就是静音**”，不再有“0%”与“已静音”两种说法：
+   * - 拖到 0 → 直接按静音表现（图标/读数/滑杆与点静音键完全一致）；
+   * - 拖到非 0 → 立即解除静音，并记住这个能听见的音量。
+   */
   function setVolume(value: number): void {
-    volume.value = Math.min(1, Math.max(0, value));
-    if (volume.value > 0) muted.value = false;
-    if (audio) {
-      audio.volume = volume.value;
-      audio.muted = muted.value;
-    }
+    const next = Math.min(1, Math.max(0, value));
+    volume.value = next;
+    muted.value = next === 0;
+    if (next > 0) lastAudibleVolume.value = next;
+    syncVolumeToAudio();
     persist();
   }
 
+  /**
+   * 静音键：静音时（或被拉到 0 时）再点一下 = 恢复音量，而不是把 0 音的静音状态再翻一次
+   * （否则会出现“点了取消静音还是没声音”）。
+   */
   function toggleMute(): void {
-    muted.value = !muted.value;
-    if (audio) audio.muted = muted.value;
+    if (muted.value || volume.value === 0) {
+      volume.value =
+        lastAudibleVolume.value > 0 ? lastAudibleVolume.value : DEFAULT_AUDIBLE_VOLUME;
+      muted.value = false;
+    } else {
+      lastAudibleVolume.value = volume.value;
+      muted.value = true;
+    }
+    syncVolumeToAudio();
     persist();
   }
 
@@ -329,10 +358,9 @@ export const usePlayerStore = defineStore("player", () => {
       if (data.mode && PLAY_MODE_LABELS[data.mode]) mode.value = data.mode;
       if (typeof data.volume === "number") volume.value = Math.min(1, Math.max(0, data.volume));
       if (typeof data.muted === "boolean") muted.value = data.muted;
-      if (audio) {
-        audio.volume = volume.value;
-        audio.muted = muted.value;
-      }
+      // 存档里音量 > 0 就把它当作可恢复音量，静音后取消静音不会突然跳到默认值
+      if (volume.value > 0) lastAudibleVolume.value = volume.value;
+      syncVolumeToAudio();
     } catch {
       // 存档损坏（手改 / 旧版本）时忽略，用默认值继续
     }
@@ -346,6 +374,7 @@ export const usePlayerStore = defineStore("player", () => {
     mode,
     volume,
     muted,
+    lastAudibleVolume,
     progress,
     duration,
     notice,

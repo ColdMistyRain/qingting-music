@@ -191,12 +191,43 @@ describe("进度与音量（PL-03/04）", () => {
     expect(player.volume).toBe(0);
   });
 
-  it("toggleMute 来回切换", () => {
+  it("拖到 0 就是静音：muted 跟着置真（界面只存在一种“静音”说法）", () => {
     const player = usePlayerStore();
+    player.setVolume(0);
+    expect(player.volume).toBe(0);
+    expect(player.muted).toBe(true);
+    player.setVolume(0.3);
+    expect(player.muted).toBe(false);
+  });
+
+  it("toggleMute 来回切换，并记住“能听见”的音量", () => {
+    const player = usePlayerStore();
+    player.setVolume(0.6);
     player.toggleMute();
+    expect(player.muted).toBe(true);
+    expect(player.volume).toBe(0.6);
+    expect(player.lastAudibleVolume).toBe(0.6);
+    player.toggleMute();
+    expect(player.muted).toBe(false);
+    expect(player.volume).toBe(0.6);
+  });
+
+  it("音量为 0 时再点静音键 = 恢复音量，而不是再翻一次 muted", () => {
+    const player = usePlayerStore();
+    player.setVolume(0.5);
+    player.setVolume(0);
     expect(player.muted).toBe(true);
     player.toggleMute();
     expect(player.muted).toBe(false);
+    expect(player.volume).toBe(0.5);
+  });
+
+  it("始终没调过音量时，从 0 恢复不会停在 0（用默认可听音量兜底）", () => {
+    const player = usePlayerStore();
+    player.setVolume(0);
+    player.toggleMute();
+    expect(player.muted).toBe(false);
+    expect(player.volume).toBeGreaterThan(0);
   });
 });
 
@@ -363,6 +394,11 @@ describe("与 audio 元素的接线", () => {
 
     const element = FakeAudio.instances[0]!;
     expect(element.volume).toBe(0.4);
+    expect(element.muted).toBe(true);
+
+    // 拉到 0 也等同于静音，audio 侧同样要静下来
+    player.setVolume(0);
+    expect(element.volume).toBe(0);
     expect(element.muted).toBe(true);
   });
 });

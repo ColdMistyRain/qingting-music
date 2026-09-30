@@ -324,6 +324,8 @@ async function removeSelected(): Promise<void> {
 
 /* 列：勾选 / 封面 / 曲目 / 大小 / 上传时间 / 操作 */
 .sg {
+  /* 分隔线用伪元素画，需要定位上下文 */
+  position: relative;
   display: grid;
   grid-template-columns: 24px 40px minmax(0, 1fr) 90px 148px auto;
   align-items: center;
@@ -338,11 +340,16 @@ async function removeSelected(): Promise<void> {
   background: var(--hover);
 }
 
-/* 数据行之间用极淡分割线：集合型列表（曲目、曲库）用线，
-   任务型列表（上传队列，行有状态底色）用间距 + 行块，两者不混用（v4.29 定稿）。
-   表头不加，否则标题与首行会断开。 */
-.sg:not(.sg--head) + .sg:not(.sg--head) {
-  border-top: 1px solid var(--glass-border);
+/* 数据行之间用极淡直线分隔（同上：不用 border-top，避开圆角末端的弧）。
+   集合型列表用线、任务型列表（上传队列，行带状态底色）用间距 + 行块，两者不混用。 */
+.sg:not(.sg--head) + .sg:not(.sg--head)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--glass-border);
 }
 
 .sg--head {

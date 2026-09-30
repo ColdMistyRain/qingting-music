@@ -67,6 +67,8 @@ const isPlaying = computed(() => props.active && props.playing);
 
 <style scoped>
 .row {
+  /* 分隔线用伪元素画，需要定位上下文 */
+  position: relative;
   display: grid;
   /* 最后一列放开：纯浏览场景（音乐库）不显示移除按钮，列宽自动收窄 */
   grid-template-columns: 44px 1fr 64px 56px auto;
@@ -83,11 +85,17 @@ const isPlaying = computed(() => props.active && props.playing);
   background: var(--hover);
 }
 
-/* 相邻两行用一条极淡分割线分隔（不用斑马纹：圆角行 + 没有列分隔线时，
-   斑马纹看着像"残留的悬浮态"，v4.29 实拍对比过）。行本身够高（62px），
-   细线不会显挤；悬浮/选中仍是圆角底色块。 */
-.row + .row {
-  border-top: 1px solid var(--glass-border);
+/* 相邻两行之间的极淡分隔线：用伪元素画**直线**，不用 border-top——
+   行有 12px 圆角，border-top 会沿着圆角拐下去，两端各留一小段弧（用户一眼就看出来了）。
+   行本身够高（62px），细线不会显挤。 */
+.row + .row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--glass-border);
 }
 
 .row--active {

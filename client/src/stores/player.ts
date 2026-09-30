@@ -13,6 +13,8 @@ import {
 const STORAGE_KEY = "qt-player";
 /** PL-02：播放超过该秒数后按"上一首"回到本曲开头 */
 const RESTART_THRESHOLD_SECONDS = 3;
+/** 播放条提示的存活时间：瞬时信息（自动播放被拦、加载失败）不该长期占用位置 */
+export const NOTICE_TTL_MS = 8000;
 
 interface PersistedPlayer {
   mode: PlayMode;
@@ -41,6 +43,33 @@ export const usePlayerStore = defineStore("player", () => {
   const seekTarget = ref(0);
 
   let audio: HTMLAudioElement | null = null;
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 粘性提示（如"加载失败已跳到下一首"）不会被"播放成功"清掉，但仍受超时限制 */
+  let noticeSticky = false;
+
+  /**
+   * 设置播放条提示；传空串即清除，非空则在 NOTICE_TTL_MS 后自动消失。
+   * sticky 用于跨事件的提示：加载失败的提示必须在自动跳到下一首后仍然看得见。
+   */
+  function notify(text: string, sticky = false): void {
+    notice.value = text;
+    noticeSticky = sticky && text !== "";
+    if (noticeTimer !== null) {
+      clearTimeout(noticeTimer);
+      noticeTimer = null;
+    }
+    if (!text) return;
+    noticeTimer = setTimeout(() => {
+      notice.value = "";
+      noticeSticky = false;
+      noticeTimer = null;
+    }, NOTICE_TTL_MS);
+  }
+
+  /** 播放真的起来了：清掉"点一下即可"这类瞬时提示，粘性提示保留 */
+  function clearTransientNotice(): void {
+    if (!noticeSticky) notify("");
+  }
 
   const currentTrack = computed<Track | null>(() => queue.value[currentIndex.value] ?? null);
   const hasTrack = computed(() => currentTrack.value !== null);
@@ -62,8 +91,20 @@ export const usePlayerStore = defineStore("player", () => {
     audio.volume = volume.value;
     audio.muted = muted.value;
     // 挂进文档（隐藏）：便于在开发者工具里查看状态，后续 Media Session（RT-04）也依赖它在文档中
-    audio.style.display = "none";
-    document.body.appendChild(audio);
+    if (typeof document !== "undefined" && document.body) {
+      audio.style.display = "none";
+      document.body.appendChild(audio);
+    }
+
+    // playing 以 audio 元素的实际状态为准：
+    // 光靠命令式赋值会在"play() 被拦后音频又被放行"这类情况下与真实状态脱节
+    audio.addEventListener("play", () => {
+      playing.value = true;
+      clearTransientNotice();
+    });
+    audio.addEventListener("pause", () => {
+      playing.value = false;
+    });
 
     audio.addEventListener("timeupdate", () => {
       if (!seeking.value) progress.value = audio?.currentTime ?? 0;
@@ -74,10 +115,11 @@ export const usePlayerStore = defineStore("player", () => {
     audio.addEventListener("ended", () => {
       handleEnded();
     });
-    // PL-09：加载失败提示并自动跳下一曲，不打断整张列表的播放
+    // PL-09：加载失败提示并自动跳下一曲，不打断整张列表的播放。
+    // 先跳转再提示——playAt 会重置提示，反过来的话这条提示会被立刻清掉。
     audio.addEventListener("error", () => {
-      notice.value = "这首歌加载失败，已自动跳到下一首";
       next();
+      notify("这首歌加载失败，已自动跳到下一首", true);
     });
     return audio;
   }
@@ -98,16 +140,17 @@ export const usePlayerStore = defineStore("player", () => {
     try {
       await element.play();
       playing.value = true;
-      notice.value = "";
+      // 只清"点一下即可"这类瞬时提示；加载失败的粘性提示要留着让用户看见
+      clearTransientNotice();
     } catch {
       // 浏览器自动播放策略（iOS 尤其严格）：需要一次用户手势
       playing.value = false;
-      notice.value = "浏览器阻止了自动播放，点一下播放按钮即可";
+      notify("浏览器阻止了自动播放，点一下播放按钮即可");
     }
   }
 
   function pause(): void {
-    audio?.pause();
+    if (audio) audio.pause();
     playing.value = false;
   }
 
@@ -127,7 +170,7 @@ export const usePlayerStore = defineStore("player", () => {
     currentIndex.value = index;
     progress.value = 0;
     duration.value = track.duration ?? 0;
-    notice.value = "";
+    notify("");
 
     const element = ensureAudio();
     if (!element) return;
@@ -254,7 +297,7 @@ export const usePlayerStore = defineStore("player", () => {
     currentIndex.value = -1;
     progress.value = 0;
     duration.value = 0;
-    notice.value = "";
+    notify("");
     pause();
     if (audio) audio.removeAttribute("src");
   }
@@ -317,6 +360,7 @@ export const usePlayerStore = defineStore("player", () => {
     play,
     pause,
     toggle,
+    notify,
     playAt,
     next,
     prev,

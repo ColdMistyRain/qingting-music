@@ -7,60 +7,16 @@ import {
   toLocalTrack,
 } from "./localFiles";
 
-describe("parseLocalFileName", () => {
-  it("按「歌手 - 歌名」拆分（LC-03）", () => {
-    expect(parseLocalFileName("周杰伦 - 晴天.mp3")).toEqual({ title: "晴天", artist: "周杰伦" });
-    expect(parseLocalFileName("林晚 - 夜行.flac")).toEqual({ title: "夜行", artist: "林晚" });
-  });
-
-  it("破折号与长破折号同样识别", () => {
-    expect(parseLocalFileName("陈屿 – 夏日终结.mp3").artist).toBe("陈屿");
-    expect(parseLocalFileName("星野 — 焰火.mp3").artist).toBe("星野");
-  });
-
-  it("剥掉曲序前缀再取歌手与歌名", () => {
-    expect(parseLocalFileName("01. 周杰伦 - 晴天.mp3")).toEqual({ title: "晴天", artist: "周杰伦" });
-    expect(parseLocalFileName("12_ 蓝溪 - 深海信笺.wav")).toEqual({ title: "深海信笺", artist: "蓝溪" });
-  });
-
-  it("识别不出歌手时整段作歌名、歌手记为未知", () => {
-    expect(parseLocalFileName("夜行.mp3")).toEqual({ title: "夜行", artist: "未知歌手" });
-    expect(parseLocalFileName("track01")).toEqual({ title: "track01", artist: "未知歌手" });
-  });
-
-  it("不吃掉名字里的连字符（A-Lin 这类）", () => {
-    expect(parseLocalFileName("A-Lin.mp3")).toEqual({ title: "A-Lin", artist: "未知歌手" });
-  });
-
-  it("支持无空格连字符命名（真实曲库习惯：歌手-歌名.mp3）", () => {
-    expect(parseLocalFileName("BEYOND-海阔天空.mp3")).toEqual({ title: "海阔天空", artist: "BEYOND" });
+/**
+ * 文件名回退解析（LC-03）已提到 shared：规则用例统一放在 server/test/shared.test.ts
+ * （服务端 LB-03 的回退用的是同一份实现），这里不再重复一份。
+ */
+describe("parseLocalFileName（shared 的别名）", () => {
+  it("客户端调用点拿到的就是 shared 的实现", () => {
     expect(parseLocalFileName("A-Lin-给我一个理由忘记.mp3")).toEqual({
       title: "给我一个理由忘记",
       artist: "A-Lin",
     });
-    expect(parseLocalFileName("G.E.M. 邓紫棋-光年之外.mp3")).toEqual({
-      title: "光年之外",
-      artist: "G.E.M. 邓紫棋",
-    });
-    expect(parseLocalFileName("AURORA-Cure For Me.flac")).toEqual({
-      title: "Cure For Me",
-      artist: "AURORA",
-    });
-  });
-
-  it("按最后一个连字符拆，保留歌手名里的连字符", () => {
-    expect(parseLocalFileName("Jake Miller&HOYO-MiX-WHITE NIGHT.mp3")).toEqual({
-      title: "WHITE NIGHT",
-      artist: "Jake Miller&HOYO-MiX",
-    });
-    expect(parseLocalFileName("伍佰 & China Blue-挪威的森林.mp3")).toEqual({
-      title: "挪威的森林",
-      artist: "伍佰 & China Blue",
-    });
-  });
-
-  it("空文件名不崩", () => {
-    expect(parseLocalFileName("")).toEqual({ title: "", artist: "未知歌手" });
   });
 });
 

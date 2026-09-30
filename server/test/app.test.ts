@@ -41,16 +41,16 @@ describe("GET /api/health", () => {
 });
 
 describe("GET /api/config", () => {
-  it("未配置音源时 onlineEnabled = false（ON-04）", async () => {
+  it("未配置音源时 onlineEnabled = false（ON-04），并给出上传上限（LB-02）", async () => {
     const res = await request(createApp(testConfig())).get("/api/config");
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ onlineEnabled: false });
+    expect(res.body.data).toEqual({ onlineEnabled: false, maxUploadSize: 1024 });
   });
 
   it("配置音源后 onlineEnabled = true", async () => {
     const app = createApp(testConfig({ neteaseApiBase: "http://localhost:4000", onlineEnabled: true }));
     const res = await request(app).get("/api/config");
-    expect(res.body.data).toEqual({ onlineEnabled: true });
+    expect(res.body.data).toEqual({ onlineEnabled: true, maxUploadSize: 1024 });
   });
 });
 

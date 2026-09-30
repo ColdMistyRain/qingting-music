@@ -8,7 +8,11 @@ export function createConfigRouter(config: AppConfig): Router {
   const router = Router();
 
   router.get("/", (_req, res) => {
-    const data: ClientConfig = { onlineEnabled: config.onlineEnabled };
+    const data: ClientConfig = {
+      onlineEnabled: config.onlineEnabled,
+      // 上传页据此提示“单个最大 xx MB”（LB-02）；字段可缺省，前端有兑底值
+      maxUploadSize: config.maxUploadSize,
+    };
     sendOk(res, data);
   });
 

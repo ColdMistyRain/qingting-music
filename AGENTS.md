@@ -59,8 +59,9 @@ shared/src/index.ts       前后端共享类型与纯函数（Track/Song/Playlis
 server/src/config.ts      环境变量 → AppConfig（PRD 5.5 全量清单，含 parseSize/parseTtl）
 server/src/http.ts        统一响应 sendOk/sendFail + errorHandler
 server/src/services/auth.ts  签名 Cookie 签发/验签、密码比对、密钥持久化
+server/src/services/       storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退）、range（Range 解析）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
-server/src/routes/        auth（status/login/logout）、config；后续 songs/playlists/online/stats
+server/src/routes/        auth、config、songs（列表/上传/删除/重建索引）、audio（/audio + /covers）、stats
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen
 client/src/styles/        tokens.css（令牌 + OKLCH 取色核心）、global.css（玻璃拟态外壳 + 材质/投放区配方）
 client/src/layouts/       PlayerLayout（侧栏+内容+播放条，含空格键快捷键）、ConsoleLayout（控制台独立布局）
@@ -75,9 +76,9 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 ## 当前进度
 
-**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~05，含 ID3 标签与内嵌封面）**；前后端类型检查、生产构建、**120 个单测**全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）浏览器实测播放。
+**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~05，含 ID3 标签与内嵌封面）** + **云端曲库前后端（LB-01~06/10/11、AD-01~04）**：上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放（206/416）、删除连同文件、索引重建、存储统计；前后端类型检查、生产构建、**221 个单测**全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）浏览器实测播放与上传。
 
-**下一步**（建议顺序）：云端曲库上传/列表/删除/Range 流播（3.4 + 3.12）→ 沉浸式播放页与歌词（3.7 / VS-03/09）→ 播放队列弹层（PL-06）与曲目级持久化（PL-07）。
+**下一步**（建议顺序）：沉浸式播放页与歌词（3.7 / VS-03/09）→ 播放队列弹层（PL-06）与曲目级持久化（PL-07）→ 歌单（3.6）与在线音源（3.5）。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 

@@ -3,8 +3,11 @@ import express, { type Express } from "express";
 import type { AppConfig } from "./config.js";
 import { apiNotFound, errorHandler, sendOk } from "./http.js";
 import { attachRole } from "./middleware/auth.js";
+import { createAudioRouter, createCoversRouter } from "./routes/audio.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createConfigRouter } from "./routes/config.js";
+import { createSongsRouter } from "./routes/songs.js";
+import { createStatsRouter } from "./routes/stats.js";
 
 /** GET /api/health 的返回体 */
 export interface HealthInfo {
@@ -38,6 +41,11 @@ export function createApp(config: AppConfig): Express {
 
   app.use("/api/config", createConfigRouter(config));
   app.use("/api/auth", createAuthRouter(config));
+  app.use("/api/songs", createSongsRouter(config));
+  app.use("/api/stats", createStatsRouter(config));
+  // 音频流与封面走非 /api 前缀（PRD 5.6）：可直接当 <audio>/<img> 的 src
+  app.use("/audio", createAudioRouter(config));
+  app.use("/covers", createCoversRouter(config));
 
   app.use("/api", apiNotFound);
   app.use(errorHandler);

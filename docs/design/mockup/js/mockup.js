@@ -104,6 +104,29 @@ function setTheme(t) {
 }
 
 /* ---------- 取色模拟（VS-02）：切换歌曲 → 全站换色 ---------- */
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+/** hex(#rrggbb) → HSL(0~1) */
+function hexToHsl(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, l];
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return [h, s, l];
+}
+
+/** 封面里挑出的颜色常偏灰/偏暗，只留色相，把饱和度和明度收进
+    既铺得开盘面、又压得住按钮的区间（与定稿实现一致） */
+function tuneTheme([h, s, l]) {
+  return [h, clamp(s * 1.5, 0.55, 0.9), clamp(l, 0.55, 0.68)];
+}
+
 function applyPalette(song) {
   const r = document.documentElement.style;
   r.setProperty("--accent", song.accent);
@@ -113,6 +136,12 @@ function applyPalette(song) {
   r.setProperty("--glow2", song.glow2);
   r.setProperty("--cv1", song.c1);
   r.setProperty("--cv2", song.c2);
+  // 主题色三变量：彩胶盘体 conic 漩涡与外圈光晕由它派生，
+  // @property 注册过，换歌时整页平滑过渡而非硬切
+  const [h, s, l] = tuneTheme(hexToHsl(song.c1));
+  r.setProperty("--theme-h", String(Math.round(h * 360)));
+  r.setProperty("--theme-s", Math.round(s * 100) + "%");
+  r.setProperty("--theme-l", Math.round(l * 100) + "%");
 }
 
 /* ---------- 模拟播放引擎 ---------- */

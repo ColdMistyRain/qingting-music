@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from "vue";
-import { computed, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import IconArrowRight from "~icons/ph/arrow-right";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
@@ -15,6 +15,7 @@ import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
 import { usePlayerStore } from "@/stores/player";
 import { formatTime } from "@/utils/format";
+import { marqueeDuration } from "@/utils/marquee";
 import type { PlayMode } from "@/utils/player";
 
 /**
@@ -63,6 +64,43 @@ function onPointerMove(event: PointerEvent): void {
 function onVolumeInput(event: Event): void {
   player.setVolume(Number((event.target as HTMLInputElement).value));
 }
+
+/* 长歌名：量出溢出宽度，溢出时才允许悬浮滚动（短标题不滚） */
+const titleRef = ref<HTMLElement | null>(null);
+const titleOverflow = ref(0);
+const titleDuration = computed(() => `${marqueeDuration(titleOverflow.value)}s`);
+const titleStyle = computed(() =>
+  titleOverflow.value > 0
+    ? { "--marquee-shift": `-${titleOverflow.value}px`, "--marquee-duration": titleDuration.value }
+    : undefined,
+);
+
+function measureTitle(): void {
+  const element = titleRef.value;
+  titleOverflow.value = element
+    ? Math.max(0, Math.round(element.scrollWidth - element.clientWidth))
+    : 0;
+}
+
+let titleObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  measureTitle();
+  // 容器宽度会随侧栏折叠/窗口缩放变化（那不是 window resize），用 RO 更可靠
+  if (typeof ResizeObserver !== "undefined" && titleRef.value) {
+    titleObserver = new ResizeObserver(measureTitle);
+    titleObserver.observe(titleRef.value);
+  }
+});
+
+onUnmounted(() => titleObserver?.disconnect());
+
+// 换歌后等 DOM 更新完再量（flush: post）
+watch(
+  () => player.currentTrack?.title,
+  () => measureTitle(),
+  { flush: "post" },
+);
 </script>
 
 <template>
@@ -73,7 +111,14 @@ function onVolumeInput(event: Event): void {
         <IconMusicNotes v-else class="icon" />
       </div>
       <div style="min-width: 0">
-        <div class="pb-title">{{ player.currentTrack?.title ?? "尚未播放" }}</div>
+        <div
+          ref="titleRef"
+          class="pb-title"
+          :class="{ 'pb-title--scrollable': titleOverflow > 0 }"
+          :style="titleStyle"
+        >
+          <span class="pb-title__text">{{ player.currentTrack?.title ?? "尚未播放" }}</span>
+        </div>
         <div class="pb-artist">
           {{
             player.currentTrack
@@ -167,6 +212,37 @@ function onVolumeInput(event: Event): void {
 </template>
 
 <style scoped>
+/* ---------- 长歌名：悬浮横向滚动 ----------
+   只在真正溢出时启用（JS 量出 titleOverflow 后加 .pb-title--scrollable），
+   短标题不滚、也不会出现“滑出空白”的现象。 */
+.pb-title__text {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* 滚动期间不要再叠一个省略号（省略号由全局 .pb-title 提供） */
+.pb-left:hover .pb-title--scrollable {
+  text-overflow: clip;
+}
+
+.pb-left:hover .pb-title--scrollable .pb-title__text {
+  animation: pb-title-marquee var(--marquee-duration, 8s) linear infinite;
+}
+
+@keyframes pb-title-marquee {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  50%,
+  62% {
+    transform: translateX(var(--marquee-shift, 0));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
 /* ---------- 音量：悬浮/聚焦展开的竖向音量条（PL-04） ----------
    玻璃令牌 + 主题色填充，与全站一套视觉语言；纯 CSS 控制显隐（含键盘 focus-within），
    无需 JS 状态，触摸设备上仍可直接点按钮静音。 */

@@ -40,7 +40,7 @@ const isPlaying = computed(() => props.active && props.playing);
       <IconMusicNotes v-else class="icon" />
     </div>
 
-    <div class="row__main">
+    <div class="row__main" :title="track.title">
       <div class="row__title">{{ track.title }}</div>
       <div class="row__artist">{{ track.artist }}</div>
     </div>

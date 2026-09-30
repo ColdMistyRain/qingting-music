@@ -95,7 +95,7 @@ const marqueeActive = computed(() => player.playing || hovering.value);
         <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
         <IconMusicNotes v-else class="icon" />
       </div>
-      <div style="min-width: 0">
+      <div class="pb-info">
         <ScrollingText class="pb-title" :text="titleText" :active="marqueeActive" />
         <ScrollingText class="pb-artist" :text="subtitleText" :active="marqueeActive" />
         <div v-if="player.notice" class="pb-notice">{{ player.notice }}</div>

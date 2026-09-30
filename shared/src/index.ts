@@ -43,8 +43,7 @@ export interface Song {
   uploadedAt: string;
 }
 
-/** 歌单内的一条曲目引用（跨来源） */
-export interface PlaylistItem {
+/** 歌单内的一条曲目引用（跨来源） */export interface PlaylistItem {
   source: TrackSource;
   /** source = server 时为 Song.id；online 为 "provider:id"；local 仅记文件名 */
   refId?: string;
@@ -61,6 +60,16 @@ export interface Playlist {
   createdAt: string;
   updatedAt: string;
 }
+
+/** GET /api/songs 的返回（LB-04）：列表一次拿全，过滤/排序在客户端做（LB-07） */
+export interface SongListResult {
+  songs: Song[];
+  /** 全部曲目占用空间（字节），概览统计用（LB-10 / AD-03） */
+  totalSize: number;
+}
+
+/** 业务码：重复文件（同名 + 同大小），前端据此给“跳过 / 覆盖”分支（LB-02） */
+export const SONG_DUPLICATE_CODE = 1001;
 
 /** GET /api/auth/status 的返回（PRD 3.11 认证 API 草案） */
 export interface AuthStatus {

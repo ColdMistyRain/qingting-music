@@ -11,12 +11,17 @@ import { formatTime } from "@/utils/format";
  * 通用曲目行（PRD 3.8 歌曲行结构）。
  * 本地列表、音乐库、在线搜索共用一套行视觉；行交互交给父组件决定。
  */
-const props = defineProps<{
-  track: Track;
-  index: number;
-  active: boolean;
-  playing: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    track: Track;
+    index: number;
+    active: boolean;
+    playing: boolean;
+    /** 纯浏览场景（如音乐库）不给移除按钮，删除入口统一在控制台（LB-05 / AD-02） */
+    removable?: boolean;
+  }>(),
+  { removable: true },
+);
 
 const emit = defineEmits<{
   play: [index: number];
@@ -53,7 +58,7 @@ const isPlaying = computed(() => props.active && props.playing);
         <IconPause v-if="isPlaying" class="icon" />
         <IconPlay v-else class="icon" />
       </button>
-      <button class="ctl" title="从列表移除" @click.stop="emit('remove', index)">
+      <button v-if="removable" class="ctl" title="从列表移除" @click.stop="emit('remove', index)">
         <IconX class="icon" />
       </button>
     </div>
@@ -63,7 +68,8 @@ const isPlaying = computed(() => props.active && props.playing);
 <style scoped>
 .row {
   display: grid;
-  grid-template-columns: 44px 1fr 64px 56px 76px;
+  /* 最后一列放开：纯浏览场景（音乐库）不显示移除按钮，列宽自动收窄 */
+  grid-template-columns: 44px 1fr 64px 56px auto;
   align-items: center;
   gap: 14px;
   height: 56px;

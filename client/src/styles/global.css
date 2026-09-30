@@ -96,6 +96,75 @@ select {
   box-shadow: var(--card-shadow);
 }
 
+/* ---------- 工具栏：搜索 / 排序 / 批量操作一行排开（音乐库与曲库管理共用） ---------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.toolbar__spacer {
+  margin-left: auto;
+}
+
+/* ---------- 搜索框：岛内控件，保持与卡片同底，不用玻璃叠玻璃 ---------- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--text-3);
+  transition: border-color 0.18s;
+}
+
+.search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.search input::placeholder {
+  color: var(--text-3);
+}
+
+.search .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------- 细进度条：上传队列等处的进度指示 ---------- */
+.bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fill-track);
+  overflow: hidden;
+}
+
+.bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.18s linear;
+}
+
+.bar__fill--danger {
+  background: var(--danger);
+}
+
 /* ---------- 通用工具类 ---------- */
 .sr-only {
   position: absolute;
@@ -288,7 +357,10 @@ select {
   grid-column: 1 / 3;
   grid-row: 2;
   display: grid;
-  grid-template-columns: minmax(180px, 240px) 1fr minmax(140px, 180px);
+  /* 左侧（封面 + 歌曲信息）用**固定宽度**：不要让列宽随窗口/侧栏变，
+     否则同一首歌有时溢得出、有时溢不出，长文本要不要滚动无法预期（用户定稿）。 */
+  --pb-left-width: 240px;
+  grid-template-columns: var(--pb-left-width) 1fr minmax(140px, 180px);
   align-items: center;
   padding: 0 18px;
   gap: 16px;
@@ -300,6 +372,12 @@ select {
   gap: 12px;
   min-width: 0;
   cursor: pointer;
+}
+
+/* 歌曲信息块：铺满固定列宽剩下的固定空间（封面 52 + 间隔 12 → 文字区 176） */
+.pb-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .pb-left .cover {
@@ -590,5 +668,7 @@ select {
 
   .playerbar {
     grid-column: 1;
+    /* 窄屏缩小左侧固定宽度，给中间控制键留位置 */
+    --pb-left-width: 168px;
   }
 }

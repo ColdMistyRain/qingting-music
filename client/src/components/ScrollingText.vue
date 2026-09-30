@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
-  isTextOverflowing,
   marqueeDuration,
   measureTextWidth,
+  shouldMarquee,
   type MeasureHost,
 } from "@/utils/marquee";
 
@@ -34,9 +34,7 @@ const textWidth = ref(0);
 /** 间隔的像素值 = 字号 × MARQUEE_GAP_EM（随字号自适应） */
 const gapPx = ref(0);
 
-const scrolling = computed(
-  () => props.active && isTextOverflowing(textWidth.value, boxWidth.value),
-);
+const scrolling = computed(() => props.active && shouldMarquee(textWidth.value, boxWidth.value));
 
 /** 位移距离 = 一份副本（文字 + 间隔），按恒定速度换算成一圈秒数 */
 const trackStyle = computed(() =>
@@ -86,7 +84,13 @@ watch(() => props.text, measure, { flush: "post" });
 </script>
 
 <template>
-  <div ref="boxRef" class="st" :class="{ 'st--scrolling': scrolling }" :style="trackStyle">
+  <div
+    ref="boxRef"
+    class="st"
+    :class="{ 'st--scrolling': scrolling }"
+    :style="trackStyle"
+    :title="scrolling ? undefined : text"
+  >
     <span v-if="!scrolling" class="st__static">{{ text }}</span>
     <span v-else class="st__track">
       <span class="st__text">{{ text }}</span>
@@ -117,6 +121,25 @@ watch(() => props.text, measure, { flush: "post" });
   white-space: nowrap;
   will-change: transform;
   animation: st-marquee var(--marquee-duration, 12s) linear infinite;
+}
+
+/* 滚动时两端渐隐：接缝处新进来的字是“淡入”而不是硬切，看着是有意为之
+   （硬切的半截字会被当成渲染 bug，v4.24 用户报过） */
+.st--scrolling {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 18px,
+    #000 calc(100% - 18px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 18px,
+    #000 calc(100% - 18px),
+    transparent 100%
+  );
 }
 
 .st__text {

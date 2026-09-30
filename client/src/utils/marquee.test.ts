@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  isTextOverflowing,
   marqueeDuration,
   measureTextWidth,
+  shouldMarquee,
   MARQUEE_MAX_SECONDS,
+  MARQUEE_MIN_OVERFLOW_PX,
   MARQUEE_MIN_SECONDS,
   type MeasureHost,
 } from "./marquee";
@@ -31,21 +32,27 @@ describe("marqueeDuration", () => {
   });
 });
 
-describe("isTextOverflowing", () => {
-  it("文字比容器宽就算溢出", () => {
-    expect(isTextOverflowing(300, 200)).toBe(true);
-    expect(isTextOverflowing(200, 300)).toBe(false);
+describe("shouldMarquee", () => {
+  it("溢出量达到阈值（24px）才值得滚", () => {
+    expect(shouldMarquee(300, 200)).toBe(true);
+    expect(shouldMarquee(224, 200)).toBe(true);
+    expect(shouldMarquee(223, 200)).toBe(false);
   });
 
-  it("小于 1px 的差当作没溢出（避开亚像素四舍五入的假溢出）", () => {
-    expect(isTextOverflowing(200.5, 200)).toBe(false);
-    expect(isTextOverflowing(202, 200)).toBe(true);
+  it("只溢出一点点就不滚（滚起来像渲染坏了，改省略号 + 悬浮提示）", () => {
+    expect(shouldMarquee(204, 200)).toBe(false);
+    expect(shouldMarquee(212, 200)).toBe(false);
   });
 
-  it("容器还没布局（宽度 0）或数值非法时一律不溢出", () => {
-    expect(isTextOverflowing(300, 0)).toBe(false);
-    expect(isTextOverflowing(Number.NaN, 200)).toBe(false);
-    expect(isTextOverflowing(300, Number.NaN)).toBe(false);
+  it("容器还没布局（宽度 0）或数值非法时一律不滚", () => {
+    expect(shouldMarquee(300, 0)).toBe(false);
+    expect(shouldMarquee(Number.NaN, 200)).toBe(false);
+    expect(shouldMarquee(300, Number.NaN)).toBe(false);
+  });
+
+  it("阈值可调（紧凑场景可以放宽）", () => {
+    expect(shouldMarquee(210, 200, 8)).toBe(true);
+    expect(MARQUEE_MIN_OVERFLOW_PX).toBe(24);
   });
 });
 

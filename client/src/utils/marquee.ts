@@ -9,6 +9,13 @@ export const MARQUEE_MIN_SECONDS = 8;
 export const MARQUEE_MAX_SECONDS = 30;
 
 /**
+ * 触发滚动所需的最小溢出量（像素）。
+ * 只溢出一两个字时滚动反而像渲染坏了（长时停在断层上，用户报过 bug），
+ * 这种情况宁可省略号截断 + 悬浮提示（title）让人看到全文。
+ */
+export const MARQUEE_MIN_OVERFLOW_PX = 24;
+
+/**
  * 由"一份副本的宽度"（循环一次要走的距离，含副本之间的间隔）算出单圈秒数。
  * 距离为 0 / 非法时返回下限，便于调用方统一处理。
  */
@@ -21,12 +28,16 @@ export function marqueeDuration(distancePx: number, speed = MARQUEE_SPEED_PX_PER
 }
 
 /**
- * 判断文字是否真的溢出容器（留 1px 容差，避开亚像素四舍五入导致的假溢出）。
- * 容器宽度为 0（还没布局）时视为不溢出。
+ * 是否值得滚动：溢出量要超过阈值（默认 24px）
+ * 容器还没布局（宽度 0）或数值非法时一律不滚。
  */
-export function isTextOverflowing(textWidth: number, boxWidth: number, tolerance = 1): boolean {
+export function shouldMarquee(
+  textWidth: number,
+  boxWidth: number,
+  minOverflowPx = MARQUEE_MIN_OVERFLOW_PX,
+): boolean {
   if (!Number.isFinite(textWidth) || !Number.isFinite(boxWidth) || boxWidth <= 0) return false;
-  return textWidth - boxWidth > tolerance;
+  return textWidth - boxWidth >= minOverflowPx;
 }
 
 /** 离屏测宽所需的宿主能力（注入以便单测，无需真实 DOM） */

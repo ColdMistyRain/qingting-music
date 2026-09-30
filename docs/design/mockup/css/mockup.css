@@ -53,6 +53,12 @@
   padding: 0;
 }
 
+/* 兜底：author 级 display 规则（如 .btn）会盖过 UA 的 [hidden]，
+   没有这条 hidden 属性形同虚设 */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -671,23 +677,83 @@ body.paused .eq i {
   font-size: 12.5px;
 }
 
+/* 上传队列面板（AD-01，玻璃拟态与全站一致） */
+.up-panel {
+  max-width: 980px;
+  margin: 18px auto 0;
+  padding: 14px 18px 16px;
+}
+
+.up-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 10px;
+}
+
+.up-head b { font-size: 14px; }
+
+.up-count { color: var(--text-3); font-size: 12px; }
+
+.up-head .btn { margin-left: auto; }
+
+.up-list {
+  max-height: 380px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.up-empty {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 12.5px;
+  padding: 26px 0 18px;
+}
+
 .up-item {
   display: grid;
-  grid-template-columns: 130px 1fr 46px;
+  grid-template-columns: 34px minmax(180px, 1fr) minmax(120px, 1.2fr) 84px;
   gap: 14px;
   align-items: center;
-  padding: 10px 14px;
+  padding: 9px 12px;
   font-size: 12.5px;
   border-radius: 10px;
   background: var(--row-alt);
   margin-bottom: 8px;
+  transition: opacity 0.5s;
 }
+
+.up-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.up-meta { min-width: 0; }
 
 .up-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text-1);
 }
+
+.up-sub {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.up-item.dup .up-sub { color: #f59e0b; }
+
+.up-item.skipped { opacity: 0.45; }
 
 .up-bar {
   height: 6px;
@@ -708,10 +774,20 @@ body.paused .eq i {
   text-align: right;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .up-item.done .up-fill {
   background: #4ade80;
+}
+
+.up-item.done .up-sub { color: var(--text-3); }
+
+.btn-xs {
+  padding: 2px 9px;
+  font-size: 11px;
+  border-radius: 7px;
+  margin-left: 4px;
 }
 
 .adminrow {

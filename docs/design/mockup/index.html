@@ -326,7 +326,16 @@
           <div class="dz-main">拖入音频文件 / 文件夹，或点击选择</div>
           <div class="dz-sub">单文件 ≤ 300MB · 重复文件提示跳过/覆盖 · <u id="btn-fake-upload" style="cursor:pointer">点我模拟一次上传</u></div>
         </div>
-        <div id="up-list" style="max-width:640px;margin:0 auto"></div>
+        <div class="up-panel glass">
+          <div class="up-head">
+            <b>上传队列</b>
+            <span class="up-count" id="up-count">0 个任务</span>
+            <button class="btn btn-sm" id="up-clear" hidden>清空已完成</button>
+          </div>
+          <div id="up-list" class="up-list">
+            <div class="up-empty" id="up-empty">暂无上传任务 · 拖入音频文件，或点击上方「点我模拟一次上传」</div>
+          </div>
+        </div>
       </section>
     </main>
   </div>

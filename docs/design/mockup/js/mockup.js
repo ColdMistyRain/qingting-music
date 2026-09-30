@@ -855,24 +855,71 @@ function bind() {
   $("#online-go").addEventListener("click", renderOnline);
   $("#online-kw").addEventListener("keydown", (e) => { if (e.key === "Enter") renderOnline(); });
 
-  // 管理台：模拟上传（AD-01）
+  // 管理台：模拟上传（AD-01）——队列面板：文件/大小/状态/进度，
+  // 25% 概率模拟「库内已存在同名文件」→ 跳过/覆盖（AD-01 重复策略演示）
+  function updateUpCount() {
+    const items = $$("#up-list .up-item");
+    $("#up-count").textContent = `${items.length} 个任务 · ${items.filter((i) => !i.classList.contains("done") && !i.classList.contains("skipped")).length} 个进行中`;
+    $("#up-clear").hidden = !items.some((i) => i.classList.contains("done"));
+    if (!items.length && !$("#up-empty")) {
+      $("#up-list").innerHTML = '<div class="up-empty" id="up-empty">暂无上传任务 · 拖入音频文件，或点击上方「点我模拟一次上传」</div>';
+    }
+  }
+
   $("#btn-fake-upload").addEventListener("click", () => {
     const name = `新歌曲 ${String(Math.floor(Math.random() * 90) + 10)}.mp3`;
+    const size = `${(Math.random() * 40 + 4).toFixed(1)} MB`;
+    $("#up-empty")?.remove();
     const item = document.createElement("div");
     item.className = "up-item";
-    item.innerHTML = `<span class="up-name">${name}</span><div class="up-bar"><div class="up-fill"></div></div><span class="up-pct">0%</span>`;
+    item.innerHTML = `<span class="up-ico">♪</span><div class="up-meta"><div class="up-name">${name}</div><div class="up-sub"></div></div><div class="up-bar"><div class="up-fill"></div></div><span class="up-pct">0%</span>`;
     $("#up-list").prepend(item);
-    let p = 0;
-    const t = setInterval(() => {
-      p = Math.min(100, p + Math.random() * 14);
-      item.querySelector(".up-fill").style.width = p + "%";
-      item.querySelector(".up-pct").textContent = Math.floor(p) + "%";
-      if (p >= 100) {
-        clearInterval(t);
-        item.classList.add("done");
-        item.querySelector(".up-pct").textContent = "✓";
-      }
-    }, 160);
+    const sub = item.querySelector(".up-sub");
+    const fill = item.querySelector(".up-fill");
+    const pct = item.querySelector(".up-pct");
+    const start = () => {
+      sub.textContent = `${size} · 上传中`;
+      let p = 0;
+      const t = setInterval(() => {
+        p = Math.min(100, p + Math.random() * 12);
+        fill.style.width = p + "%";
+        pct.textContent = Math.floor(p) + "%";
+        if (p >= 100) {
+          clearInterval(t);
+          item.classList.add("done");
+          sub.textContent = `${size} · 已完成`;
+          pct.textContent = "✓";
+          updateUpCount();
+        }
+      }, 160);
+    };
+    if (Math.random() < 0.25) {
+      // 重复文件：暂停并给出 跳过 / 覆盖（AD-01）
+      item.classList.add("dup");
+      sub.textContent = `${size} · 库内已存在同名文件`;
+      pct.innerHTML = '<button class="btn btn-xs" data-act="skip">跳过</button><button class="btn btn-xs" data-act="cover">覆盖</button>';
+      item.querySelector('[data-act="skip"]').addEventListener("click", () => {
+        item.classList.remove("dup");
+        item.classList.add("skipped");
+        sub.textContent = `${size} · 已跳过`;
+        pct.textContent = "—";
+        updateUpCount();
+        setTimeout(() => { item.remove(); updateUpCount(); }, 800);
+      });
+      item.querySelector('[data-act="cover"]').addEventListener("click", () => {
+        item.classList.remove("dup");
+        pct.textContent = "0%";
+        start();
+      });
+    } else {
+      start();
+    }
+    updateUpCount();
+  });
+
+  $("#up-clear").addEventListener("click", () => {
+    $$("#up-list .up-item").forEach((i) => { if (i.classList.contains("done") || i.classList.contains("skipped")) i.remove(); });
+    updateUpCount();
   });
 
   $("#btn-reindex").addEventListener("click", function () {

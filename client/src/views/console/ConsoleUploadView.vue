@@ -329,7 +329,7 @@ function clearFinished(): void {
 /* 控制台内容岛很宽，超宽卡片里的居中文字会显得空：正文区限宽 */
 .dropzone,
 .queue {
-  max-width: 900px;
+  max-width: var(--content-width);
 }
 
 .queue__head {

@@ -318,6 +318,7 @@ async function removeSelected(): Promise<void> {
 }
 
 .songs {
+  max-width: var(--content-width);
   padding: 6px 10px 10px;
 }
 

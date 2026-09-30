@@ -191,7 +191,7 @@ function playAt(index: number): void {
 }
 
 .library {
-  max-width: 1080px;
+  max-width: var(--content-width);
 }
 </style>
 

@@ -77,11 +77,14 @@ const isPlaying = computed(() => props.active && props.playing);
      最后一列固定宽：auto 会随“本行有几个操作键”变化，表头对不上（见 global.css）。 */
   grid-template-columns: var(--row-grid);
   align-items: center;
-  gap: 14px;
-  /* 歌名 + 歌手两行字需要呼吸：62px 在深色下看着拥挤（用户反馈），v4.42 上调到 68px/
-     上下 10px：封面 40px 居中后上下各余 14px，行与行之间才不贴着。 */
-  min-height: 68px;
-  padding: 10px 12px;
+  /* 列间距与表头共享同一令牌：两边读同一份，列才对得上 */
+  gap: var(--row-gap);
+  /* 歌名 + 歌手两行字需要呼吸：62px 时封面与两行字挤在一起（用户两次反馈“拥挤”），
+     v4.43 上调到 76px / 上下 12px，封面同步放大到 44px（正好填满封面列）。
+     行内呼吸和行高是两回事：上一轮只加了行高，行内 3px 的行间距/14px 的列间距
+     依旧挤，所以这次一起放开。 */
+  min-height: 76px;
+  padding: 12px;
   border-radius: var(--radius-row);
   transition: background 0.15s;
 }
@@ -109,8 +112,8 @@ const isPlaying = computed(() => props.active && props.playing);
 }
 
 .row__cover {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-cover);
   display: grid;
   place-items: center;
@@ -126,8 +129,8 @@ const isPlaying = computed(() => props.active && props.playing);
 }
 
 .row__cover .icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .row__main {
@@ -149,7 +152,8 @@ const isPlaying = computed(() => props.active && props.playing);
 .row__artist {
   font-size: 11.5px;
   color: var(--text-3);
-  margin-top: 3px;
+  /* 歌名与歌手不要黏在一起：3px 看着挤（用户反馈），放到 5px */
+  margin-top: 5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

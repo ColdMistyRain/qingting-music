@@ -303,9 +303,11 @@ select {
    不再各写一份 grid-template-columns。
    最后一列用**固定宽**而不是 auto：auto 会让“有操作键的行”把 fr 列挤窄、
    表头（空单元格）则按自己算，两边列宽就分叉了（实测差 27~46px）。
+   行列间距（--row-gap）也共享：表头与行的 gap 必须同值，否则列对不上。
    窄屏把专辑列让出来，两边同断点。 */
 :root {
   --row-grid: 44px minmax(0, 1.5fr) minmax(0, 1fr) 64px 56px 56px;
+  --row-gap: 20px;
 }
 
 @media (max-width: 1024px) {
@@ -325,7 +327,7 @@ select {
   display: grid;
   grid-template-columns: var(--row-grid);
   align-items: center;
-  gap: 14px;
+  gap: var(--row-gap);
   height: 34px;
   /* 标签与第一行之间留白：贴着的话两行字会黏成一块（v4.42） */
   margin-bottom: 6px;

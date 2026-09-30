@@ -107,48 +107,10 @@ function setTheme(t) {
   $("#th-light")?.classList.toggle("active", !dark);
 }
 
-/* ---------- 取色模拟（VS-02）：切换歌曲 → 全站换色 ---------- */
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-
-/** hex(#rrggbb) → HSL(0~1) */
-function hexToHsl(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const l = (max + min) / 2, d = max - min;
-  if (!d) return [0, 0, l];
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let h;
-  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-  else if (max === g) h = ((b - r) / d + 2) / 6;
-  else h = ((r - g) / d + 4) / 6;
-  return [h, s, l];
-}
-
-/** 归一化 + 感知补偿（单一档位，忠实封面原色）。
-    - 只收区间、不做饱和度提升：预设色是鲜活设计色，提升会全部撞死
-      上限霓虹化，也会破坏晨雾这类刻意低饱和的配色；
-    - 真实照片采样同样只收区间：照片取出的颜色本来就反映封面观感
-      （2026-09-30 用户定稿：淡蓝封面就该配浅蓝天蓝盘，QQ 音乐的
-      「提饱和+压明度」压深策略试过，用户觉得不如忠实原色好看，
-      已回退——M1 若想做可加 deep 参数：s×1.5 收 0.55~0.78、
-      l-0.04 收 0.36~0.52）；
-    - HSL 明度不是感知均匀的，同 L 下绿黄观感远亮于蓝（Rec.601
-      luma 权重 g.59/r.30/b.11），按色相压暗亮色系防止过曝。 */
-function tuneTheme([h, s, l]) {
-  const hue = h * 360;
-  const bias =
-    hue >= 70 && hue < 170 ? -0.1 :  // 黄→绿：观感最亮，压最狠
-    hue >= 170 && hue < 210 ? -0.05 : // 青
-    hue >= 20 && hue < 70 ? -0.05 :   // 橙→黄
-    hue >= 300 || hue < 20 ? -0.03 :  // 品红→红
-    0;                                 // 蓝、紫
-  return [h, clamp(s, 0.5, 0.75), clamp(l + bias, 0.4, 0.6)];
-}
-
-const hsl = (t) =>
-  `hsl(${Math.round(t[0] * 360)} ${Math.round(t[1] * 100)}% ${Math.round(t[2] * 100)}%)`;
-
+/* ---------- 取色（VS-02）：切换歌曲 → 全站换色 ----------
+   JS 只负责选出颜色源（预设调色板的 c1/c2，或封面提取的桶平均色），
+   一切调校在 CSS 完成：OKLCH 相对颜色语法直接钳 Tone/Chroma
+   （见 mockup.css「感知调校核心」），感知均匀、无偏置表、平滑过渡。 */
 function applyPalette(song) {
   const r = document.documentElement.style;
   r.setProperty("--accent", song.accent);
@@ -156,25 +118,15 @@ function applyPalette(song) {
   r.setProperty("--accent-soft", song.soft);
   r.setProperty("--glow1", song.glow1);
   r.setProperty("--glow2", song.glow2);
-  // 封面模拟色同样过 tuneTheme：中心标签/播放条小图/库内迷你盘共用，
-  // 原始 c1/c2 对亮色系（绿黄）会亮得像霓虹，感知压暗后才是「封面」的观感
-  r.setProperty("--cv1", hsl(tuneTheme(hexToHsl(song.c1))));
-  r.setProperty("--cv2", hsl(tuneTheme(hexToHsl(song.c2))));
-  applyThemeTriple(tuneTheme(hexToHsl(song.c1)));
-}
-
-/** 主题色三变量统一入口（预设色与真实取色共用），@property 注册过换色即平滑过渡 */
-function applyThemeTriple([h, s, l]) {
-  const r = document.documentElement.style;
-  r.setProperty("--theme-h", String(Math.round(h * 360)));
-  r.setProperty("--theme-s", Math.round(s * 100) + "%");
-  r.setProperty("--theme-l", Math.round(l * 100) + "%");
+  // 原始色源交给 CSS：中心标签/播放条小图/库内迷你盘/彩胶盘/光晕全部派生自它
+  r.setProperty("--cover-src", song.c1);
+  r.setProperty("--cover-src-2", song.c2);
 }
 
 /* ---------- 封面真实取色（VS-02 完整管线，与定稿实现同思路） ----------
    封面缩到 64x64，按色相分 24 桶，权重 = 饱和度 × 明度居中度，
    丢弃灰白黑与过暗过亮像素；最高权重桶即主题色相，其余高频色相
-   留作备选。候选色最后过 tuneTheme 感知收束再上场。 */
+   留作备选。返回原始桶平均色 hex——调校交给 CSS 的 OKLCH 钳制。 */
 const HUE_BUCKETS = 24;
 const HUE_GAP = 0.11; // 备选色之间至少差 ~40°，避免挤在同一色系
 
@@ -191,12 +143,15 @@ function rgbToHsl(r, g, b) {
   return [h, s, l];
 }
 
+const rgbToHex = ([r, g, b]) =>
+  "#" + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, "0")).join("");
+
 const hueDiff = (a, b) => {
   const d = Math.abs(a - b);
   return Math.min(d, 1 - d);
 };
 
-/** 返回调好的候选主题色 [[h,s,l],...]；读不到像素（画布污染/加载失败）返回 [] */
+/** 返回原始候选色 hex 列表；读不到像素（画布污染/加载失败）返回 [] */
 function extractThemes(img) {
   const SIZE = 64;
   const canvas = document.createElement("canvas");
@@ -224,16 +179,16 @@ function extractThemes(img) {
 
   const ranked = bins
     .filter((b) => b.w > 0)
-    .map((b) => ({ w: b.w, hsl: rgbToHsl(b.r / b.w, b.g / b.w, b.b / b.w) }))
+    .map((b) => ({ w: b.w, h: rgbToHsl(b.r / b.w, b.g / b.w, b.b / b.w)[0], hex: rgbToHex([b.r / b.w, b.g / b.w, b.b / b.w]) }))
     .sort((a, b) => b.w - a.w);
 
   const themes = [];
   for (const item of ranked) {
-    if (themes.some((t) => hueDiff(t[0], item.hsl[0]) < HUE_GAP)) continue;
-    themes.push(item.hsl);
+    if (themes.some((t) => hueDiff(t.h, item.h) < HUE_GAP)) continue;
+    themes.push(item.hex);
     if (themes.length === 4) break;
   }
-  return themes.map(tuneTheme);
+  return themes;
 }
 
 /* 提取结果按图片地址缓存，来回切歌不重算 */
@@ -245,8 +200,7 @@ function loadThemes(src) {
     const img = new Image();
     img.onload = () => {
       const themes = extractThemes(img);
-      console.log("[取色]", src, "→ 候选:",
-        themes.map((t) => `${Math.round(t[0] * 360)}°/${Math.round(t[1] * 100)}%/${Math.round(t[2] * 100)}%`).join(" | "));
+      console.log("[取色]", src, "→ 候选:", themes.join(" | "));
       themeCache.set(src, themes);
       resolve(themes);
     };
@@ -255,15 +209,12 @@ function loadThemes(src) {
   });
 }
 
-/** 真实取色落地：覆盖主题三变量与封面模拟色；提取失败保留预设调色板 */
+/** 真实取色落地：原始候选色交给 CSS 调校；提取失败保留预设调色板 */
 function applyExtracted(themes) {
   if (!themes.length) return;
-  const t1 = themes[0];
-  const t2 = themes[1] || [t1[0], t1[1] * 0.7, Math.min(0.72, t1[2] + 0.08)];
   const r = document.documentElement.style;
-  applyThemeTriple(t1);
-  r.setProperty("--cv1", hsl(t1));
-  r.setProperty("--cv2", hsl(t2));
+  r.setProperty("--cover-src", themes[0]);
+  r.setProperty("--cover-src-2", themes[1] || themes[0]);
 }
 
 /** 中心标签接真实封面（正式版形态预览）；无封面歌回落取色渐变 */
@@ -303,7 +254,7 @@ function playSong(id, autoplay = true) {
   $("#im-title-b").textContent = song.title;
   $("#im-title-s").textContent = `${song.artist} · ${song.album}`;
   $("#pb-t2").textContent = $("#im-t2").textContent = fmt(song.dur);
-  // 彩胶颜色由 CSS 变量 --cv1/--cv2 驱动（applyPalette 已注入），不写内联 background
+  // 盘面颜色由 CSS 从 --cover-src 派生（OKLCH 调校），不写内联 background
   renderLyrics(song);
   markPlayingRows();
   renderQueue();

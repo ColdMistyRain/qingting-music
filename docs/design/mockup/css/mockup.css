@@ -27,8 +27,9 @@
   --accent-soft: rgba(124, 140, 255, 0.14);
   --glow1: rgba(91, 124, 250, 0.26);
   --glow2: rgba(139, 92, 246, 0.2);
-  --cv1: #5b7cfa;
-  --cv2: #8b5cf6;
+  /* 封面颜色源：JS 只写原始色，调校统一在下方 OKLCH 相对色完成 */
+  --cover-src: #5b7cfa;
+  --cover-src-2: #8b5cf6;
 }
 
 :root[data-theme="light"] {
@@ -2108,7 +2109,8 @@ body:not(.paused) .immersive.layout-poster .vinyl-assembly {
   width: calc(var(--vinyl-d) * 1.4);
   aspect-ratio: 1;
   pointer-events: none;
-  background: hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) + 4%));
+  background: var(--cv1);
+  background: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
   -webkit-mask: url("../img/vinyl/glow.png") center / contain no-repeat;
   mask: url("../img/vinyl/glow.png") center / contain no-repeat;
   animation: disc-spin 32s linear infinite, vinyl-breathe 3.4s ease-in-out infinite;
@@ -2131,41 +2133,46 @@ body:not(.paused) .immersive.layout-poster .v-glow {
   background: var(--vinyl-gradient);
 }
 
-/* ---------- 主题色三变量：@property 注册后可平滑过渡 ---------- */
-@property --theme-h {
-  syntax: "<number>";
+/* ---------- 感知调校核心：OKLCH 相对颜色（Monet/HCT 思路的 CSS 原生实现） ----------
+   JS 只注入原始颜色源 --cover-src / --cover-src-2（预设 c1/c2 或提取桶平均色），
+   一切调校在此完成：OKLCH 的 L（Tone）感知均匀，clamp 即统一盘面深度，
+   绿黄不再过曝、低饱和封面不被提艳，无需 HSL 偏置表；
+   C（Chroma）钳制 0.07~0.15 防过艳防过灰。
+   每个派生都先写一条降级声明——不支持相对色语法的浏览器保留上一条。 */
+@property --cover-src {
+  syntax: "<color>";
   inherits: true;
-  initial-value: 215;
+  initial-value: #5b7cfa;
 }
 
-@property --theme-s {
-  syntax: "<percentage>";
+@property --cover-src-2 {
+  syntax: "<color>";
   inherits: true;
-  initial-value: 72%;
-}
-
-@property --theme-l {
-  syntax: "<percentage>";
-  inherits: true;
-  initial-value: 60%;
+  initial-value: #8b5cf6;
 }
 
 :root {
-  --theme-h: 215;
-  --theme-s: 72%;
-  --theme-l: 60%;
-  transition: --theme-h 0.5s ease, --theme-s 0.5s ease, --theme-l 0.5s ease;
+  /* 主/次封面色 */
+  --cv1: var(--cover-src);
+  --cv1: oklch(from var(--cover-src) clamp(0.4, l, 0.62) clamp(0.07, c, 0.15) h);
+  --cv2: var(--cover-src-2);
+  --cv2: oklch(from var(--cover-src-2) clamp(0.4, l, 0.62) clamp(0.07, c, 0.15) h);
+  /* 深色派生：标签描边环用（Tone 0.30 压底） */
+  --cover-deep: var(--cover-src);
+  --cover-deep: oklch(from var(--cover-src) 0.3 clamp(0.07, c, 0.15) h);
+  transition: --cover-src 0.5s ease, --cover-src-2 0.5s ease;
 
-  /* 彩胶盘面：同一主题色只做明度/饱和度漩涡，就是彩胶的质感 */
+  /* 彩胶盘面：同一源色只做 Tone 漩涡，就是彩胶的质感 */
+  --vinyl-gradient: conic-gradient(from 140deg, var(--cover-src), var(--cover-src));
   --vinyl-gradient: conic-gradient(
     from 140deg,
-    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 5%)),
-    hsl(var(--theme-h), calc(var(--theme-s) - 8%), calc(var(--theme-l) + 12%)),
-    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 14%)),
-    hsl(var(--theme-h), calc(var(--theme-s) - 14%), calc(var(--theme-l) + 6%)),
-    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 8%)),
-    hsl(var(--theme-h), calc(var(--theme-s) - 5%), calc(var(--theme-l) - 16%)),
-    hsl(var(--theme-h), var(--theme-s), calc(var(--theme-l) - 5%))
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.03), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l + 0.07), 0.62) clamp(0.07, calc(c - 0.01), 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.08), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l + 0.04), 0.62) clamp(0.07, calc(c - 0.02), 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.05), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.1), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.03), 0.62) clamp(0.07, c, 0.15) h)
   );
 }
 
@@ -2186,9 +2193,9 @@ body:not(.paused) .immersive.layout-poster .v-glow {
   background: radial-gradient(circle at 40% 36%, var(--cv1), var(--cv2) 78%);
   box-shadow:
     0 0 0 2px rgba(255, 255, 255, 0.5),
-    0 0 0 3.5px hsl(var(--theme-h) 55% 22% / 0.2),
+    0 0 0 3.5px color-mix(in oklab, var(--cover-deep) 20%, transparent),
     0 0 0 5px rgba(255, 255, 255, 0.34),
-    0 8px 22px -8px hsl(var(--theme-h) 55% 18% / 0.5);
+    0 8px 22px -8px color-mix(in oklab, var(--cover-deep) 50%, transparent);
 }
 
 /* 有真实封面的歌：标签内直接铺封面图（正式版形态） */

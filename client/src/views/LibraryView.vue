@@ -6,6 +6,7 @@ import IconMagnifyingGlass from "~icons/ph/magnifying-glass";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import EmptyState from "@/components/EmptyState.vue";
+import TrackListHead from "@/components/TrackListHead.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useLibraryStore } from "@/stores/library";
@@ -111,6 +112,7 @@ function playAt(index: number): void {
       <p v-else-if="isSearching && tracks.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
 
       <div v-else class="library">
+        <TrackListHead />
         <TrackRow
           v-for="(track, index) in tracks"
           :key="track.id"

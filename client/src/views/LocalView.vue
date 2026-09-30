@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import IconFolderOpen from "~icons/ph/folder-open";
 import IconShieldCheck from "~icons/ph/shield-check";
 import IconTrash from "~icons/ph/trash";
 import IconUploadSimple from "~icons/ph/upload-simple";
+import TrackListHead from "@/components/TrackListHead.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import { usePlayerStore } from "@/stores/player";
 import { collectFilesFromEntries, type EntryLike } from "@/utils/fileSystem";
@@ -20,6 +21,8 @@ const player = usePlayerStore();
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const dragging = ref(false);
+/** “清空列表”是否已进入待确认态 */
+const confirmingClear = ref(false);
 /** 被过滤掉的非音频数量与正在探测时长的曲目数，用于给用户一句反馈 */
 const skipped = ref(0);
 const probing = ref(0);
@@ -90,6 +93,8 @@ function filesFromDataTransfer(dataTransfer: DataTransfer | null): void {
 
 /* 拖拽整页可用（LC-01）：并阻止浏览器默认"打开文件"行为 */
 function onWindowDragOver(event: DragEvent): void {
+  // 只接管"拖文件进来"，别影响页内以后的拖拽（如排序）
+  if (!event.dataTransfer?.types.includes("Files")) return;
   event.preventDefault();
   dragging.value = true;
 }
@@ -100,6 +105,7 @@ function onWindowDragLeave(event: DragEvent): void {
 }
 
 function onWindowDrop(event: DragEvent): void {
+  if (!event.dataTransfer?.types.includes("Files")) return;
   event.preventDefault();
   dragging.value = false;
   filesFromDataTransfer(event.dataTransfer);
@@ -122,6 +128,20 @@ function onRowPlay(index: number): void {
   if (index === player.currentIndex) player.toggle();
   else player.playAt(index);
 }
+
+/** 清空是不可逆的批量动作：先问一句，确认后才真清（LC-06） */
+function clearAll(): void {
+  confirmingClear.value = false;
+  player.clear();
+}
+
+// 列表被逐首移除到空时，别把“待确认”留给下一次进来
+watch(
+  () => player.queue.length,
+  (length) => {
+    if (length === 0) confirmingClear.value = false;
+  },
+);
 </script>
 
 <template>
@@ -137,21 +157,32 @@ function onRowPlay(index: number): void {
           }}
         </div>
       </h1>
-      <button v-if="hasTracks" class="btn" @click="player.clear()">
-        <IconTrash class="icon" />
-        清空列表
-      </button>
+      <!-- 有曲目时"添加"并入页头：投放区不再单独占一行（v4.37） -->
+      <div v-if="hasTracks" class="page-head__actions">
+        <button class="btn" title="支持 MP3 · FLAC · WAV · OGG · M4A · OPUS" @click="pickFiles">
+          <IconFolderOpen class="icon" />
+          选择文件
+        </button>
+        <template v-if="confirmingClear">
+          <span class="confirm-hint">确定清空这 {{ player.queue.length }} 首？</span>
+          <button class="btn btn-quiet" @click="confirmingClear = false">取消</button>
+          <button class="btn btn-danger" @click="clearAll">清空</button>
+        </template>
+        <button v-else class="btn btn-danger" @click="confirmingClear = true">
+          <IconTrash class="icon" />
+          清空列表
+        </button>
+      </div>
     </div>
 
-    <div class="stage" :class="hasTracks ? 'stage--fixed' : 'stage--center'">
-      <div
-        class="dropzone"
-        :class="{ 'dropzone--drag': dragging, 'dropzone--compact': hasTracks }">
+    <!-- 空列表才需要这张投放卡（它的作用是说明 + 隐私承诺，不是常驻工具条） -->
+    <div v-if="!hasTracks" class="stage">
+      <div class="dropzone" :class="{ 'dropzone--drag': dragging }">
         <span class="dz-badge"><IconUploadSimple class="icon" /></span>
-        <div class="dz-title">{{ hasTracks ? "继续添加音乐" : "拖入音乐文件或文件夹" }}</div>
+        <div class="dz-title">拖入音乐文件或文件夹</div>
         <div class="dz-sub">支持 MP3 · FLAC · WAV · OGG · M4A · OPUS</div>
         <div class="dropzone__actions">
-          <button class="btn" :class="{ 'btn-primary': !hasTracks }" @click="pickFiles">
+          <button class="btn btn-primary" @click="pickFiles">
             <IconFolderOpen class="icon" />
             选择文件
           </button>
@@ -160,19 +191,24 @@ function onRowPlay(index: number): void {
           <IconShieldCheck class="icon" />
           文件只在你的浏览器里播放，不上传、不留存
         </div>
-        <input
-          ref="fileInput"
-          class="sr-only"
-          type="file"
-          multiple
-          accept=".mp3,.flac,.wav,.ogg,.m4a,.aac,.opus,audio/*"
-          @change="onFileInput"
-        />
       </div>
     </div>
 
-    <!-- 只有列表滚动：页头与投放区固定在上部（方案 A） -->
+    <input
+      ref="fileInput"
+      class="sr-only"
+      type="file"
+      multiple
+      accept=".mp3,.flac,.wav,.ogg,.m4a,.aac,.opus,audio/*"
+      @change="onFileInput"
+    />
+
+    <!-- 拖入提示：投放卡不在时用一层浮层告诉用户"松手就落进来"（不挤动列表） -->
+    <div v-if="dragging && hasTracks" class="drag-veil">松手就加入本地列表</div>
+
+    <!-- 只有列表滚动：页头固定在上部（方案 A） -->
     <div v-if="hasTracks" class="local__list page-frame__scroll">
+      <TrackListHead />
       <p v-if="skipped > 0" class="local__hint">已忽略 {{ skipped }} 个非音频文件</p>
       <p v-if="probing > 0" class="local__hint">正在读取歌曲信息…</p>
       <TrackRow
@@ -191,49 +227,15 @@ function onRowPlay(index: number): void {
 
 <style scoped>
 /* 空列表：投放卡在帧里居中，页面不显得空 */
-.stage--center {
+.stage {
   flex: 1;
   min-height: 0;
   display: grid;
   place-items: center;
 }
 
-.stage--center .dropzone {
+.stage .dropzone {
   width: min(100%, 560px);
-}
-
-/* 已有曲目：投放区收成一条，固定在上部（方案 A：上部不动，只有列表滚动） */
-.stage--fixed {
-  flex: none;
-}
-
-.dropzone__actions {
-  margin-top: 14px;
-}
-
-/* 已有曲目时：投放区收成一条，把版面留给列表 */
-.dropzone--compact {
-  flex-direction: row;
-  justify-content: center;
-  gap: 12px;
-  padding: 16px 24px;
-  margin-bottom: 14px;
-}
-
-.dropzone--compact .dz-badge,
-.dropzone--compact .dz-sub,
-.dropzone--compact .dz-note {
-  display: none;
-}
-
-.dropzone--compact .dz-title {
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-2);
-}
-
-.dropzone--compact .dropzone__actions {
-  margin-top: 0;
 }
 
 .local__list {

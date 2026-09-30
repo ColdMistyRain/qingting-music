@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
 import IconCheckCircle from "~icons/ph/check-circle";
 import IconFolderOpen from "~icons/ph/folder-open";
@@ -57,6 +57,10 @@ let running = false;
 const controllers = new Map<string, AbortController>();
 
 const limitLabel = computed(() => (config.maxUploadSize ? formatSize(config.maxUploadSize, 0) : "300 MB"));
+/** 格式与上限只说一处：空态里写进投放卡，队列非空时挂在"选择文件"的 tooltip 上 */
+const formatHint = computed(
+  () => `支持 MP3 · FLAC · WAV · OGG · M4A · OPUS · 单个最大 ${limitLabel.value}`,
+);
 const doneCount = computed(() => items.value.filter((item) => item.status === "done").length);
 const duplicateCount = computed(() => items.value.filter((item) => item.status === "duplicate").length);
 const failedCount = computed(() => items.value.filter((item) => item.status === "failed").length);
@@ -116,9 +120,34 @@ function onFileInput(event: Event): void {
 }
 
 function onDrop(event: DragEvent): void {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
   dragging.value = false;
-  if (event.dataTransfer?.files.length) addFiles(event.dataTransfer.files);
+  if (event.dataTransfer.files.length) addFiles(event.dataTransfer.files);
 }
+
+/* 拖拽监听挂在 window 上：队列非空时投放卡不渲染，但整页仍可拖入（v4.37） */
+function onWindowDragOver(event: DragEvent): void {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  dragging.value = true;
+}
+
+function onWindowDragLeave(event: DragEvent): void {
+  if (event.relatedTarget === null) dragging.value = false;
+}
+
+onMounted(() => {
+  window.addEventListener("dragover", onWindowDragOver);
+  window.addEventListener("dragleave", onWindowDragLeave);
+  window.addEventListener("drop", onDrop);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("dragover", onWindowDragOver);
+  window.removeEventListener("dragleave", onWindowDragLeave);
+  window.removeEventListener("drop", onDrop);
+});
 
 function statusText(item: UploadItem): string {
   if (item.status === "uploading") return `${STATUS_LABELS.uploading} ${Math.round(item.progress * 100)}%`;
@@ -216,36 +245,40 @@ function clearFinished(): void {
         上传导入
         <div class="sub">音乐会上传到你的服务器，手机浏览器也能听</div>
       </h1>
+      <!-- 队列非空时"添加"并入页头：投放卡不再单独占一行（v4.37） -->
+      <button v-if="items.length > 0" class="btn" :title="formatHint" @click="pickFiles">
+        <IconFolderOpen class="icon" />
+        选择文件
+      </button>
     </div>
 
-    <div
-      class="dropzone"
-      :class="{ 'dropzone--drag': dragging, 'dropzone--compact': items.length > 0 }"
-      @dragover.prevent="dragging = true"
-      @dragleave.prevent="dragging = false"
-      @drop.prevent="onDrop"
-    >
+    <!-- 空队列才摆开投放卡（它承载格式、上限与重名规则说明） -->
+    <div v-if="items.length === 0" class="dropzone" :class="{ 'dropzone--drag': dragging }">
       <span class="dz-badge"><IconUploadSimple class="icon" /></span>
       <div class="dz-title">把音频文件拖到这里</div>
-      <div class="dz-sub">支持 MP3 · FLAC · WAV · OGG · M4A · OPUS · 单个最大 {{ limitLabel }}</div>
+      <div class="dz-sub">{{ formatHint }}</div>
       <div class="dropzone__actions">
-        <button class="btn" :class="{ 'btn-primary': items.length === 0 }" @click="pickFiles">
+        <button class="btn btn-primary" @click="pickFiles">
           <IconFolderOpen class="icon" />
           选择文件
         </button>
       </div>
       <div class="dz-note">重名文件会先提示，可选择跳过或覆盖；某个文件失败不影响其他文件</div>
-      <input
-        ref="fileInput"
-        class="sr-only"
-        type="file"
-        multiple
-        accept=".mp3,.flac,.wav,.ogg,.m4a,.aac,.opus,audio/*"
-        @change="onFileInput"
-      />
     </div>
 
-    <!-- 只有队列滚动（方案 A）：页头与投放区固定在上部 -->
+    <input
+      ref="fileInput"
+      class="sr-only"
+      type="file"
+      multiple
+      accept=".mp3,.flac,.wav,.ogg,.m4a,.aac,.opus,audio/*"
+      @change="onFileInput"
+    />
+
+    <!-- 拖入提示：投放卡不在时用一层浮层告诉用户"松手就落进来"（不挤动队列） -->
+    <div v-if="dragging && items.length > 0" class="drag-veil">松手就加入上传队列</div>
+
+    <!-- 只有队列滚动（方案 A）：页头固定在上部 -->
     <div class="page-frame__scroll">
     <div class="queue card">
       <div class="queue__head">

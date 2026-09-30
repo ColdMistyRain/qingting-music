@@ -115,6 +115,7 @@ select {
 }
 
 .page-frame {
+  position: relative; /* 拖拽浮层的定位基准 */
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -272,6 +273,62 @@ select {
   background: var(--accent-soft);
 }
 
+.dropzone__actions {
+  margin-top: 12px;
+}
+
+/* 拖拽浮层（v4.37）：列表已有内容时不再让投放区占一行，改为拖入时盖一层提示。
+   pointer-events: none 很重要：它不能吞掉拖拽事件（监听挂在 window 上）。 */
+.drag-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--radius-panel);
+  background: var(--accent-soft);
+  backdrop-filter: blur(4px);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* ---------- 曲目列表：表头与行共用一套栅格（v4.38） ----------
+   表头列宽必须与行**完全一致**，否则滚动时列会“错位”；两处都读 --row-grid，
+   不再各写一份 grid-template-columns。
+   最后一列用**固定宽**而不是 auto：auto 会让“有操作键的行”把 fr 列挤窄、
+   表头（空单元格）则按自己算，两边列宽就分叉了（实测差 27~46px）。
+   窄屏把专辑列让出来，两边同断点。 */
+:root {
+  --row-grid: 44px minmax(0, 1.5fr) minmax(0, 1fr) 64px 56px 56px;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --row-grid: 44px minmax(0, 1fr) 64px 56px 56px;
+  }
+}
+
+/* 曲目表头：随列表吸顶（与曲库管理表头同规格） */
+.list-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: none;
+  display: grid;
+  grid-template-columns: var(--row-grid);
+  align-items: center;
+  gap: 14px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  /* 让滚过去的行被挡在下面：半透明底会露出字符残影 */
+  background: var(--island-solid);
+}
+
 /* ---------- 应用外壳 ---------- */
 .app {
   position: relative;
@@ -322,6 +379,19 @@ select {
   font-size: 12px;
   margin-top: 4px;
   font-weight: 400;
+}
+
+/* 页头右侧动作组：同一层的动作并排，不各占一行 */
+.page-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 二次确认提示：破坏性动作统一“就地改写按钮区”，不弹模态（与曲库管理删除同一套） */
+.confirm-hint {
+  font-size: 12.5px;
+  color: var(--danger);
 }
 
 /* ---------- 基础控件 ---------- */

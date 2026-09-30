@@ -72,9 +72,10 @@ const isPlaying = computed(() => props.active && props.playing);
   /* 分隔线用伪元素画，需要定位上下文 */
   position: relative;
   display: grid;
-  /* 最后一列放开：纯浏览场景（音乐库）不显示移除按钮，列宽自动收窄。
-     第 3 列放专辑：行填满岛宽时，中间那块空间用真实信息吃掉，不留大洞（v4.34）。 */
-  grid-template-columns: 44px minmax(0, 1.5fr) minmax(0, 1fr) 64px 56px auto;
+  /* 列宽与行保持一致：与表头（TrackListHead）读同一份 --row-grid（v4.38）。
+     第 3 列放专辑：行填满岛宽时，中间那块空间用真实信息吃掉，不留大洞（v4.34）。
+     最后一列固定宽：auto 会随“本行有几个操作键”变化，表头对不上（见 global.css）。 */
+  grid-template-columns: var(--row-grid);
   align-items: center;
   gap: 14px;
   /* 歌名 + 歌手两行字需要呼吸：56px 那样塞两行会显得紧凑（v4.28 统一行节奏） */
@@ -169,12 +170,9 @@ const isPlaying = computed(() => props.active && props.playing);
   text-overflow: ellipsis;
 }
 
-/* 窄屏：专辑列优先让位（窗口不宽时宁可少一列信息，也不把歌名挤没） */
+/* 窄屏：专辑列优先让位（窗口不宽时宁可少一列信息，也不把歌名挤没）。
+   栅格由全局 --row-grid 的同断点覆盖，表头与这里保持同一套。 */
 @media (max-width: 1024px) {
-  .row {
-    grid-template-columns: 44px minmax(0, 1fr) 64px 56px auto;
-  }
-
   .row__album {
     display: none;
   }

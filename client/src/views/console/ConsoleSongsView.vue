@@ -364,7 +364,7 @@ async function removeSelected(): Promise<void> {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--glass-bg-strong);
+  background: var(--island-solid);
   height: 34px;
   border-bottom: 1px solid var(--glass-border);
   border-radius: 0;

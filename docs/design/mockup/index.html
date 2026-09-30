@@ -331,16 +331,6 @@
     </main>
   </div>
 
-  <!-- ═══════════ 彩胶实时调参面板（临时工具） ═══════════ -->
-  <div id="tuner" class="tuner glass">
-    <b>彩胶调参（临时）</b>
-    <label>直径 <input type="range" id="t-d" min="30" max="110" value="58"><span id="t-dv">58vh</span></label>
-    <label>顶部 <input type="range" id="t-t" min="-40" max="20" value="-6"><span id="t-tv">-6vh</span></label>
-    <label>右侧 <input type="range" id="t-r" min="-30" max="10" value="-6"><span id="t-rv">-6vw</span></label>
-    <label>光晕强度 <input type="range" id="t-g" min="0" max="100" value="75"><span id="t-gv">75%</span></label>
-    <button class="btn btn-sm" id="t-copy">复制参数</button>
-  </div>
-
   <!-- ═══════════ 播放队列弹层（PL-06） ═══════════ -->
   <div id="queue-pop" class="queue-pop glass hidden">
     <div class="q-head"><b>当前播放</b><span id="q-count"></span><button class="btn btn-sm" id="q-clear">清空</button></div>
@@ -357,6 +347,7 @@
     <div class="im-body">
       <div class="im-cover-wrap">
         <!-- 彩胶：主题色彩胶盘体 + 大理石纹理 + 中心标签，整体旋转；外圈光晕与固定高光不随盘转 -->
+        <div class="v-glow" aria-hidden="true"></div>
         <div class="vinyl-assembly" id="im-cover">
           <div class="v-vinyl"></div>
           <div class="v-texture"></div>

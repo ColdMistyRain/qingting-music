@@ -2072,21 +2072,56 @@ kbd {
   inset: 0;
   display: block;
   z-index: 0;
+  /* 盘面基准位（2026-09-29 校准）：光晕/盘体/高光三层共用 */
+  --vinyl-t: -27vh;
+  --vinyl-r: -19vw;
+  --vinyl-d: min(90vh, 90vw);
 }
 
-/* 彩胶：QQ 音乐官方分层资源组装（光晕→基底→封面取色→纹理→压印），整体旋转 */
+/* 彩胶：QQ 音乐官方分层资源组装（光晕→基底→纹理→压印），整体旋转
+   裁剪成圆 + isolate：纹理 overlay 只在盘内混合，不漏到页面背景上 */
 .immersive.layout-poster .vinyl-assembly {
   position: absolute;
   top: -27vh;
   right: -19vw;
   width: min(90vh, 90vw);
   aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
   animation: disc-spin 32s linear infinite;
   animation-play-state: paused;
 }
 
 body:not(.paused) .immersive.layout-poster .vinyl-assembly {
   animation-play-state: running;
+}
+
+/* 层 -1：外圈光晕 —— 官方 background@2x 本身是浅灰的，灰色没有意义，
+   有意义的是 alpha 分层：拿它当 mask、填主题色，才得到跟着封面配色走的
+   有机柔光（box-shadow 做不出这种不规则衰减）。
+   比盘体大 1.4 倍居中铺开，随盘旋转 + 呼吸，暂停时一起停在最亮帧 */
+.v-glow {
+  position: absolute;
+  top: calc(var(--vinyl-t) - var(--vinyl-d) * 0.2);
+  right: calc(var(--vinyl-r) - var(--vinyl-d) * 0.2);
+  width: calc(var(--vinyl-d) * 1.4);
+  aspect-ratio: 1;
+  pointer-events: none;
+  background: hsl(var(--theme-h), var(--theme-s), 62%);
+  -webkit-mask: url("../img/vinyl/glow.png") center / contain no-repeat;
+  mask: url("../img/vinyl/glow.png") center / contain no-repeat;
+  animation: disc-spin 32s linear infinite, vinyl-breathe 3.4s ease-in-out infinite;
+  animation-play-state: paused, paused;
+}
+
+body:not(.paused) .immersive.layout-poster .v-glow {
+  animation-play-state: running, running;
+}
+
+@keyframes vinyl-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
 }
 
 /* 彩胶盘体：主题色漩涡（conic 彩虹胶面，QQ 音乐同款结构） */
@@ -2160,9 +2195,9 @@ body:not(.paused) .immersive.layout-poster .vinyl-assembly {
    overlay 混合才凑得出完整盘面光泽；不随盘旋转（光源固定） */
 .v-gloss {
   position: absolute;
-  top: var(--vinyl-t, -6vh);
-  right: var(--vinyl-r, -6vw);
-  width: var(--vinyl-d, min(58vh, 42vw));
+  top: var(--vinyl-t, -27vh);
+  right: var(--vinyl-r, -19vw);
+  width: var(--vinyl-d, min(90vh, 90vw));
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;

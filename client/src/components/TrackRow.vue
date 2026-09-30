@@ -78,9 +78,10 @@ const isPlaying = computed(() => props.active && props.playing);
   grid-template-columns: var(--row-grid);
   align-items: center;
   gap: 14px;
-  /* 歌名 + 歌手两行字需要呼吸：56px 那样塞两行会显得紧凑（v4.28 统一行节奏） */
-  min-height: 62px;
-  padding: 8px 12px;
+  /* 歌名 + 歌手两行字需要呼吸：62px 在深色下看着拥挤（用户反馈），v4.42 上调到 68px/
+     上下 10px：封面 40px 居中后上下各余 14px，行与行之间才不贴着。 */
+  min-height: 68px;
+  padding: 10px 12px;
   border-radius: var(--radius-row);
   transition: background 0.15s;
 }

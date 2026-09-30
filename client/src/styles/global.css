@@ -10,6 +10,14 @@
   padding: 0;
 }
 
+/* 站点内的链接（导航项、按钮样式的 RouterLink）不该带浏览器默认的下划线/蓝色；
+   颜色一律由所在组件决定。将来真需要“正文链接”的观感（如下划线的外链），
+   给那个链接单独加类，不要把这行改回去。 */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
 html,
 body,
 #app {

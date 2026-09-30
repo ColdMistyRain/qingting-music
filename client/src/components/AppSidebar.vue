@@ -111,7 +111,7 @@ const navItems = computed<NavItem[]>(() => {
   font-size: 13.5px;
   text-align: left;
   position: relative;
-  text-decoration: none;
+  /* text-decoration 已由全局 reset 统一处理（global.css 的 a 规则） */
   transition:
     background 0.15s,
     color 0.15s;

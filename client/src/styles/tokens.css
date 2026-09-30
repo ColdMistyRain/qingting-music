@@ -50,6 +50,10 @@
 
   /* 内容岛水平内边距：滚动区要用它做负边距补偿，让滚动条贴在岛边 */
   --island-pad-x: 26px;
+
+  /* 滚动条宽度：固定层用它把“滚动区内外的宽度”对齐，所以必须是个确定的数
+     （下面 *::-webkit-scrollbar 的宽高读的就是它） */
+  --scrollbar-size: 10px;
 }
 
 /* ---------- 令牌：浅色（VS-08） ---------- */
@@ -208,15 +212,25 @@ input[type="checkbox"]:checked::after {
   outline-offset: 2px;
 }
 
-/* ---------- 滚动条（令牌化） ---------- */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--glass-border) transparent;
+/* ---------- 滚动条（令牌化） ----------
+   **两个引擎不能同时给**：Chromium 里只要设了 scrollbar-color，它就会改用原生滚动条，
+   并忽略 ::-webkit-scrollbar 的宽高（实测宽度变成平台默认的 16px，而不是令牌的 10px），
+   而固定层要靠这个宽度把“滚动区内外的宽度”对齐。所以：Chromium 只走 webkit 伪元素，
+   Firefox 走 scrollbar-width/color。 */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--glass-border) transparent;
+  }
 }
 
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 *::-webkit-scrollbar-thumb {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import IconFolderOpen from "~icons/ph/folder-open";
 import IconShieldCheck from "~icons/ph/shield-check";
 import IconTrash from "~icons/ph/trash";
@@ -7,6 +7,7 @@ import IconUploadSimple from "~icons/ph/upload-simple";
 import TrackList from "@/components/TrackList.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
 import { usePlayerStore } from "@/stores/player";
+import { confirmAction } from "@/utils/confirm";
 import { collectFilesFromEntries, type EntryLike } from "@/utils/fileSystem";
 import { formatTime } from "@/utils/format";
 import { pickAudioFiles, probeDuration, toLocalTrack } from "@/utils/localFiles";
@@ -21,8 +22,6 @@ const player = usePlayerStore();
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const dragging = ref(false);
-/** “清空列表”是否已进入待确认态 */
-const confirmingClear = ref(false);
 /** 被过滤掉的非音频数量与正在探测时长的曲目数，用于给用户一句反馈 */
 const skipped = ref(0);
 const probing = ref(0);
@@ -132,19 +131,12 @@ function onRowPlay(index: number): void {
   else player.playAt(index);
 }
 
-/** 清空是不可逆的批量动作：先问一句，确认后才真清（LC-06） */
-function clearAll(): void {
-  confirmingClear.value = false;
+/** 清空是不可逆的批量动作：先问一句，确认后才真清（LC-06）。
+    确认统一走 confirmAction（当前是原生对话框占位，将来换成应用内弹窗只改那一处）。 */
+async function clearAll(): Promise<void> {
+  if (!(await confirmAction(`确定清空这 ${player.queue.length} 首？`))) return;
   player.clear();
 }
-
-// 列表被逐首移除到空时，别把“待确认”留给下一次进来
-watch(
-  () => player.queue.length,
-  (length) => {
-    if (length === 0) confirmingClear.value = false;
-  },
-);
 </script>
 
 <template>
@@ -166,12 +158,7 @@ watch(
           <IconFolderOpen class="icon" />
           选择文件
         </button>
-        <template v-if="confirmingClear">
-          <span class="confirm-hint">确定清空这 {{ player.queue.length }} 首？</span>
-          <button class="btn btn-quiet" @click="confirmingClear = false">取消</button>
-          <button class="btn btn-danger" @click="clearAll">清空</button>
-        </template>
-        <button v-else class="btn btn-danger" @click="confirmingClear = true">
+        <button class="btn btn-danger" @click="clearAll">
           <IconTrash class="icon" />
           清空列表
         </button>

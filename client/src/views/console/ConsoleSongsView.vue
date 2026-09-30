@@ -9,12 +9,13 @@ import IconTrash from "~icons/ph/trash";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import EmptyState from "@/components/EmptyState.vue";
 import { useLibraryStore } from "@/stores/library";
+import { confirmAction } from "@/utils/confirm";
 import { formatDateTime, formatSize } from "@/utils/format";
 import { filterSongs, sortSongs, type SongSortKey, type SortDirection } from "@/utils/library";
 
 /**
  * 控制台 · 曲库管理（AD-02 / LB-04~05）。
- * 搜索与排序都走 `utils/library` 的纯函数；删除都要二次确认（单曲就地确认、批量在工具条上确认）。
+ * 搜索与排序都走 `utils/library` 的纯函数；删除都要二次确认，确认统一走 `confirmAction`。
  */
 const SORT_OPTIONS: { value: SongSortKey; label: string }[] = [
   { value: "uploadedAt", label: "上传时间" },
@@ -30,8 +31,6 @@ const keyword = ref("");
 const sortKey = ref<SongSortKey>("uploadedAt");
 const direction = ref<SortDirection>("desc");
 const selected = ref<Set<string>>(new Set());
-const confirmId = ref("");
-const confirmingBatch = ref(false);
 const busy = ref(false);
 const actionError = ref("");
 
@@ -56,6 +55,12 @@ function toggleDirection(): void {
   direction.value = direction.value === "asc" ? "desc" : "asc";
 }
 
+/** 单曲删除：先问一句（带歌名，别让用户猜删的是哪首） */
+async function askRemoveOne(id: string, title: string): Promise<void> {
+  if (!(await confirmAction(`确定删除《${title}》？`))) return;
+  await removeOne(id);
+}
+
 async function removeOne(id: string): Promise<void> {
   busy.value = true;
   actionError.value = "";
@@ -66,7 +71,6 @@ async function removeOne(id: string): Promise<void> {
     actionError.value = error instanceof Error ? error.message : "删除失败";
   } finally {
     busy.value = false;
-    confirmId.value = "";
   }
 }
 
@@ -77,7 +81,14 @@ function toggleSelectIfSelected(id: string): void {
   selected.value = next;
 }
 
-/** 批量删除：逐个来，失败的留在选中里方便重试，不因为一首失败就中断整批 */
+/** 批量删除先问一句；逐个来，失败的留在选中里方便重试，不因为一首失败就中断整批 */
+async function askRemoveSelected(): Promise<void> {
+  const count = selectedCount.value;
+  if (count === 0) return;
+  if (!(await confirmAction(`确定删除选中的 ${count} 首？`))) return;
+  await removeSelected();
+}
+
 async function removeSelected(): Promise<void> {
   const ids = [...selected.value];
   if (ids.length === 0) return;
@@ -94,7 +105,6 @@ async function removeSelected(): Promise<void> {
   }
   selected.value = new Set(failed);
   busy.value = false;
-  confirmingBatch.value = false;
   if (failed.length > 0) actionError.value = `${failed.length} 首没能删掉（已保留选中，可重试）`;
 }
 </script>
@@ -156,12 +166,7 @@ async function removeSelected(): Promise<void> {
           {{ rows.length === library.songs.length ? `共 ${rows.length} 首` : `找到 ${rows.length} 首` }}
         </span>
 
-        <template v-if="confirmingBatch">
-          <span class="confirm-hint">确定删除选中的 {{ selectedCount }} 首？</span>
-          <button class="btn btn-danger" :disabled="busy" @click="removeSelected">确认删除</button>
-          <button class="btn btn-quiet" :disabled="busy" @click="confirmingBatch = false">取消</button>
-        </template>
-        <button v-else class="btn btn-danger" :disabled="selectedCount === 0" @click="confirmingBatch = true">
+        <button class="btn btn-danger" :disabled="selectedCount === 0" @click="askRemoveSelected">
           <IconTrash class="icon" />
           批量删除{{ selectedCount > 0 ? `（${selectedCount}）` : "" }}
         </button>
@@ -231,11 +236,12 @@ async function removeSelected(): Promise<void> {
           <div class="sg__num">{{ formatDateTime(song.uploadedAt) }}</div>
 
           <div class="sg__actions">
-            <template v-if="confirmId === song.id">
-              <button class="btn btn-danger" :disabled="busy" @click="removeOne(song.id)">确认</button>
-              <button class="btn btn-quiet" :disabled="busy" @click="confirmId = ''">取消</button>
-            </template>
-            <button v-else class="ctl" title="删除这首歌" @click="confirmId = song.id">
+            <button
+              class="ctl"
+              :disabled="busy"
+              title="删除这首歌"
+              @click="askRemoveOne(song.id, song.title)"
+            >
               <IconTrash class="icon" />
             </button>
           </div>
@@ -256,11 +262,6 @@ async function removeSelected(): Promise<void> {
 .count {
   font-size: 12px;
   color: var(--text-3);
-}
-
-.confirm-hint {
-  font-size: 12.5px;
-  color: var(--danger);
 }
 
 .sort select {

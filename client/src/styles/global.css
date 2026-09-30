@@ -419,12 +419,6 @@ select {
   gap: 8px;
 }
 
-/* 二次确认提示：破坏性动作统一“就地改写按钮区”，不弹模态（与曲库管理删除同一套） */
-.confirm-hint {
-  font-size: 12.5px;
-  color: var(--danger);
-}
-
 /* ---------- 基础控件 ---------- */
 .input {
   background: var(--glass-bg);

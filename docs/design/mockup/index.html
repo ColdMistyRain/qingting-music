@@ -340,6 +340,23 @@
     </main>
   </div>
 
+  <!-- ═══════════ 歌曲元信息编辑弹窗（AD-02：上传后管理元数据） ═══════════ -->
+  <div id="meta-modal" class="modal-mask hidden">
+    <div class="meta-card glass">
+      <div class="meta-head"><b id="meta-head-t">编辑歌曲信息</b><button class="ctl" id="meta-close">✕</button></div>
+      <div class="meta-body">
+        <label>歌名 <input id="mf-title" class="input" placeholder="与文件名不同时可自行命名"></label>
+        <label>歌手 <input id="mf-artist" class="input" placeholder="未知歌手"></label>
+        <label>专辑 <input id="mf-album" class="input" placeholder="单曲"></label>
+        <div class="meta-note">封面取色与歌词可在入库后补充（M1 接入封面提取与 LRC 解析）</div>
+      </div>
+      <div class="meta-foot">
+        <button class="btn" id="meta-cancel">取消</button>
+        <button class="btn btn-primary" id="meta-save">保存并入库</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════════ 播放队列弹层（PL-06） ═══════════ -->
   <div id="queue-pop" class="queue-pop glass hidden">
     <div class="q-head"><b>当前播放</b><span id="q-count"></span><button class="btn btn-sm" id="q-clear">清空</button></div>

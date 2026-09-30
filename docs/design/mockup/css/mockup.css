@@ -790,6 +790,59 @@ body.paused .eq i {
   margin-left: 4px;
 }
 
+/* ---------- 歌曲元信息编辑弹窗（AD-02） ---------- */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 12, 20, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.meta-card {
+  width: min(430px, 92vw);
+  padding: 18px 22px 20px;
+  border-radius: 16px;
+}
+
+.meta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.meta-head b { font-size: 15px; }
+
+.meta-body { display: grid; gap: 10px; }
+
+.meta-body label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.meta-note { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
+
+.meta-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn-primary:hover { filter: brightness(1.08); }
+
 .adminrow {
   display: grid;
   grid-template-columns: 26px 44px 1fr 90px 110px 76px;

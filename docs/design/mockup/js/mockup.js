@@ -451,14 +451,22 @@ function renderAdmin() {
       <input type="checkbox" aria-label="选择">
       <div class="cover" style="${coverStyle(s)}">${noteSVG}</div>
       <div class="s-meta"><div class="s-title">${s.title}.mp3</div><div class="s-artist">${s.artist}</div></div>
-      <div class="s-dur">${sizes[i]}</div>
-      <div class="s-dur">${dates[i]}</div>
-      <div style="text-align:right"><button class="btn btn-danger btn-sm">删除</button></div>
+      <div class="s-dur">${sizes[i] ?? "8.0MB"}</div>
+      <div class="s-dur">${dates[i] ?? "刚刚"}</div>
+      <div style="text-align:right"><button class="btn btn-sm" data-act="edit">编辑</button><button class="btn btn-danger btn-sm">删除</button></div>
     </div>`).join("");
-  $("#list-admin").addEventListener("change", updateSelCount);
-  $("#list-admin").addEventListener("click", (e) => {
-    if (e.target.classList.contains("btn-danger")) e.target.closest(".adminrow").remove();
-  });
+  if (!renderAdmin._bound) {
+    // 监听只绑一次（renderAdmin 会在入库/编辑后重渲染）
+    renderAdmin._bound = true;
+    $("#list-admin").addEventListener("change", updateSelCount);
+    $("#list-admin").addEventListener("click", (e) => {
+      if (e.target.dataset.act === "edit") {
+        const s = byId(e.target.closest(".adminrow").dataset.id);
+        openMeta({ id: s.id, title: s.title, artist: s.artist, album: s.album });
+      }
+      if (e.target.classList.contains("btn-danger")) e.target.closest(".adminrow").remove();
+    });
+  }
 }
 
 /* ---------- 播放队列（PL-06） ---------- */
@@ -844,7 +852,11 @@ function bind() {
   $("#im-close").addEventListener("click", () => imShow(false));
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); togglePlay(); }
-    if (e.code === "Escape") imShow(false);
+    if (e.code === "Escape") {
+      // 元信息弹窗打开时 Esc 只关弹窗
+      if (!$("#meta-modal").classList.contains("hidden")) $("#meta-modal").classList.add("hidden");
+      else imShow(false);
+    }
   });
 
   // 初始：播放条封面注册为共享元素（首次展开沉浸页可形变）
@@ -888,7 +900,10 @@ function bind() {
           clearInterval(t);
           item.classList.add("done");
           sub.textContent = `${size} · 已完成`;
-          pct.textContent = "✓";
+          // 上传完成 → 引导填写元信息（AD-02）
+          pct.innerHTML = '<button class="btn btn-xs" data-act="meta">填写信息</button>';
+          item.querySelector('[data-act="meta"]').addEventListener("click", () =>
+            openMeta({ name: name.replace(/\.mp3$/, ""), size, item }));
           updateUpCount();
         }
       }, 160);
@@ -921,6 +936,65 @@ function bind() {
     $$("#up-list .up-item").forEach((i) => { if (i.classList.contains("done") || i.classList.contains("skipped")) i.remove(); });
     updateUpCount();
   });
+
+  /* ---------- 歌曲元信息管理（AD-02）：上传后填写 / 曲库行编辑 ---------- */
+  const META_PALETTES = [
+    ["#f97316", "#fb923c"], ["#22c55e", "#4ade80"], ["#0ea5e9", "#38bdf8"],
+    ["#a855f7", "#c084fc"], ["#f43f5e", "#fb923c"], ["#64748b", "#94a3b8"],
+  ];
+
+  function openMeta(opt = {}) {
+    $("#meta-head-t").textContent = opt.id ? "编辑歌曲信息" : "填写歌曲信息";
+    $("#mf-title").value = opt.title ?? opt.name ?? "";
+    $("#mf-artist").value = opt.artist ?? "";
+    $("#mf-album").value = opt.album ?? "";
+    $("#meta-save").textContent = opt.id ? "保存修改" : "保存并入库";
+    const modal = $("#meta-modal");
+    modal.dataset.songId = opt.id || "";
+    modal._item = opt.item || null;
+    modal.classList.remove("hidden");
+    $("#mf-title").focus();
+  }
+
+  $("#meta-save").addEventListener("click", () => {
+    const modal = $("#meta-modal");
+    const title = $("#mf-title").value.trim() || "未命名歌曲";
+    const artist = $("#mf-artist").value.trim() || "未知歌手";
+    const album = $("#mf-album").value.trim() || "单曲";
+    const songId = modal.dataset.songId;
+    if (songId) {
+      // 编辑已有歌曲
+      const s = byId(songId);
+      s.title = title; s.artist = artist; s.album = album;
+    } else {
+      // 新歌入库：进 SONGS（音乐库/曲库管理/概览联动）
+      const [c1, c2] = META_PALETTES[SONGS.length % META_PALETTES.length];
+      SONGS.unshift({
+        id: "up" + Date.now(), title, artist, album,
+        dur: Math.floor(Math.random() * 120 + 180),
+        c1, c2, accent: c1,
+        soft: `color-mix(in srgb, ${c1} 14%, transparent)`,
+        glow1: `color-mix(in srgb, ${c1} 24%, transparent)`,
+        glow2: `color-mix(in srgb, ${c2} 20%, transparent)`,
+        lyrics: ["（暂无歌词，可在曲库管理补充）"],
+      });
+      state.queue.push(SONGS[0].id);
+      renderQueue();
+      const b = document.querySelector("#cs-overview .stat b");
+      // 概览曲目总数在原型基准值上累加（SONGS 数组不含未入库的展示曲目）
+      if (b && /^\d+$/.test(b.textContent.trim())) b.textContent = String(parseInt(b.textContent) + 1);
+      const item = modal._item;
+      if (item) {
+        const sub = item.querySelector(".up-sub");
+        sub.textContent = sub.textContent.split(" · ")[0] + ` · 已入库「${title}」`;
+      }
+    }
+    renderAdmin();
+    renderLibrary("");
+    modal.classList.add("hidden");
+  });
+  $("#meta-cancel").addEventListener("click", () => $("#meta-modal").classList.add("hidden"));
+  $("#meta-close").addEventListener("click", () => $("#meta-modal").classList.add("hidden"));
 
   $("#btn-reindex").addEventListener("click", function () {
     this.textContent = "⟳ 重建中…";

@@ -497,20 +497,19 @@ html[data-vt-dir="out"] {
   opacity: var(--vt-new-opacity, 1);
 }
 
-/* 海报布局（彩胶）在过渡期间把**旋转与呼吸停住**（v5.22）：
+/* 海报布局（彩胶）在过渡期间把**盘停住**（v5.22）：
    快照是一张冻结的图，而盘还在转 —— 8s/圈 下过渡的 420ms 就是 19°，落地那一下
    标签会明显跳一下；停住后快照与实况是同一个角度，落地即无缝接上。
    两个要点：
    ① 用 `animation-play-state` 而**不是**撤掉动画（`:hover` 式的 `animation: none` 会让它
       回到 0 相位）。实测：过渡期间 `currentTime` 冻在 1512ms 不动，撤掉 `data-vt` 后
       从 1512 继续（而不是回 0）——「停住→接着转」才是转盘该有的语义。
-      呼吸（`::before` 的暗帧）同理：它平时**故意**不用 play-state 暂停（组件里那条注释：
-      暂停会停在呼吸到一半的暗帧），但过渡只是一瞬的冻结、随后从同一相位接着呼吸，不会留暗帧。
+      （光晕的呼吸**不用**管了：v5.23 把它挪出了共享元素的子树，它压根不在快照里，
+      照常跟着页面淡化／淡入。）
    ② 这条规则要压过组件自己的 `.poster.is-playing .v-disc { animation-play-state: running }`
       （scoped 后是 (0,4,0)）。写成 `html[data-vt="on"] .poster.is-playing .v-disc` 是 (0,4,1)，
       刚好压得住——实测过渡中读到 `paused`、过渡结束读出 `running`；**别再往选择器里减层级**。 */
-html[data-vt="on"] .poster.is-playing .v-disc,
-html[data-vt="on"] .poster.is-playing .vinyl-assembly::before {
+html[data-vt="on"] .poster.is-playing .v-disc {
   animation-play-state: paused;
 }
 

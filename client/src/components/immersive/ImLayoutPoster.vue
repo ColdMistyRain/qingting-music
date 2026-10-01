@@ -27,13 +27,15 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 <template>
   <div class="poster" :class="{ 'is-playing': playing }">
-    <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内。
+    <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内；
+         光晕是装配的**兄弟节点** .vinyl-glow（比盘大 40%，要溢出盘外）——理由见下方样式。
          飞入/飞出的**共享元素取外壳 .vinyl-assembly**（v5.22），不要取中心标签或旋转盘：
          外壳不转，捕获到的四角永远是正的；旋转盘与标签跟着盘一起转，点击那一刻的角度是
          任意的，拿它们当共享元素会看到封面“边飞边转”，落地还差出 8s/圈 → 420ms 的 19°。
          盘本身在过渡期间要停住（不然快照是冻的、实况在转，落地会跳一下）——
          见 global.css 里 `html[data-vt="on"] .poster.is-playing .v-disc` 那条（暂停而非撤掉动画）。 -->
     <div class="poster__art" aria-hidden="true">
+      <div class="vinyl-glow"></div>
       <div class="vinyl-assembly vt-cover">
         <div class="v-disc">
           <div class="v-vinyl"></div>
@@ -65,10 +67,14 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 }
 
 /* ---------- 彩胶装配 ----------
-   DOM 对齐 PRD v4.2 定稿：外壳 .vinyl-assembly（不转、不裁剪——光晕是它的 ::before，
-   要溢出到盘外 1.4 倍；边缘环是 ::after）> 旋转盘 .v-disc（转 + 圆形裁剪，纹理的
+   DOM 对齐 PRD v4.2 定稿：外壳 .vinyl-assembly（不转、不裁剪——边缘环是它的 ::after，
+   所以共享元素过渡捕获到的就是“盘”本身）> 旋转盘 .v-disc（转 + 圆形裁剪，纹理的
    overlay 混合只在盘内生效）> 盘体/纹理/标签；高光 .v-gloss 挂外壳内、压在盘上，
    因为**光源固定**，它不跟着盘转。
+   光晕 .vinyl-glow 是装配的**兄弟节点**（v5.23 从外壳的 ::before 挪出来）：共享元素过渡
+   只快照“带名字那个元素”的盒子，而光晕要溢出盘外 20% —— 留在外壳里会被方形盒子硬裁成
+   一圈方边（实测：飞行末段盘外出现可见方形残影，落地才消失）。挪出来之后，飞行中的
+   快照只剩圆盘（盒子四角本就透明），光晕照常跟着页面淡化／淡入，两边互不干扰。
 
    定位三变量收敛在 .poster__art 上，只用来摆外壳。**三者必须同源**：先由窗口算出
    盘径，两个偏移再从盘径派生——否则窗口一变三方各按各的缩放率漂移，就是需求方看到的
@@ -103,13 +109,15 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   isolation: isolate;
 }
 
-/* ::before = 外圈光晕。官方素材本身是浅灰的——灰色没有意义，有意义的是它的 alpha 分层：
-   当 mask 用、再填色，才得到跟着封面配色走的**有机**柔光（box-shadow 做不出这种不规则衰减）。 */
-.vinyl-assembly::before {
-  content: "";
+/* 外圈光晕。官方素材本身是浅灰的——灰色没有意义，有意义的是它的 alpha 分层：
+   当 mask 用、再填色，才得到跟着封面配色走的**有机**柔光（box-shadow 做不出这种不规则衰减）。
+   位置与尺寸全部从盘径派生（与外壳同源），比盘大 40% —— 它就是那个“要溢出”的东西。 */
+.vinyl-glow {
   position: absolute;
-  inset: -20%;
-  z-index: -1;
+  top: calc(var(--vinyl-t) - var(--vinyl-d) * 0.2);
+  right: calc(var(--vinyl-r) - var(--vinyl-d) * 0.2);
+  width: calc(var(--vinyl-d) * 1.4);
+  aspect-ratio: 1;
   background: var(--cv1);
   background: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
   -webkit-mask: url("../../assets/vinyl/glow.png") center / contain no-repeat;
@@ -118,7 +126,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 /* 呼吸只在播放时挂上：**暂停时没有动画 = opacity 回到 1（最亮帧）**。
    若改成 animation-play-state: paused，暂停会停在呼吸到一半的暗帧（PRD 3.9 动效表要求）。 */
-.poster.is-playing .vinyl-assembly::before {
+.poster.is-playing .vinyl-glow {
   animation: v-breathe 3.4s ease-in-out infinite;
 }
 
@@ -253,7 +261,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 @media (prefers-reduced-motion: reduce) {
   .v-disc,
-  .poster.is-playing .vinyl-assembly::before {
+  .poster.is-playing .vinyl-glow {
     animation: none;
   }
 }

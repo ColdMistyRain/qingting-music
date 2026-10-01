@@ -174,8 +174,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   right: 0;
   bottom: 0;
   z-index: 96;
-  /* 下半屏 */
-  height: 50vh;
+  /* 高度自适应（v5.41）：**最多**半屏 —— 队列只有一两首时贴着底部收短，不空着半屏
+     需要它去盖走带键（需求方定：“可以”）。用 max-height + 内容撑：
+     行多时正好顶到 50vh，列表（`flex: 1` + `min-height: 0`）自己滚；
+     行少时盒子跟着内容收短。 */
+  max-height: 50vh;
+  height: auto;
   display: flex;
   flex-direction: column;
   padding: 0 var(--q-pad) calc(10px + env(safe-area-inset-bottom));

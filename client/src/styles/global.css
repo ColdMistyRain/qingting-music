@@ -945,6 +945,19 @@ select {
   min-width: 32px;
 }
 
+/* 两枚时间都要**贴着进度条**排：这里的 min-width 是给 "4:43" 这种 4 位数留位的，
+   而文字默认左对齐，多出来的空隙就全堆在“时间 ↔ 进度条”之间 ——
+   实测桌面播放条左边 21px / 右边 10px（沉浸页同一个毛病），需求方实拍：
+   “进度条左右时间和进度条之间缝隙宽度不一致”。
+   靠右之后两侧都是 10px，两枚时间到行边缘的留白也从 0/11 变成 11/11。 */
+.time:first-child {
+  text-align: right;
+}
+
+.time:last-child {
+  text-align: left;
+}
+
 .progress {
   flex: 1;
   height: 5px;

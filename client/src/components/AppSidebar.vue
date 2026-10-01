@@ -124,8 +124,11 @@ const navItems = useNavItems();
    原来还改了 nav-item 的 padding/justify-center、分隔线外边距、分组标题的 justify ——
    那些都是“点一下就地换布局”，每一项都会跳一下（图标、分隔线、加号按钮）。
    现在折叠态几何与展开态一致：图标停在 12+12=24（恰好也是窄栏的居中位置，
-   因为 68/2 − 19/2 = 24.5），高亮与分隔线跟着面板宽度滑。 */
-.app.collapsed .sb-inner {
+   因为 68/2 − 19/2 = 24.5），高亮与分隔线跟着面板宽度滑。
+   ⚠️ 四条折叠态规则都带 `> .sidebar`：外壳可能是折叠态，而**手机上抽屉里渲染的是同一个
+   AppSidebar** —— 不加这一层限定，“外壳折叠”就会跨进去把抽屉里的标签/新建按钮也藏了
+   （与 global.css 里 `.app > .sidebar` 同一条教训，v5.43）。 */
+.app.collapsed > .sidebar .sb-inner {
   width: 68px;
 }
 
@@ -269,14 +272,14 @@ const navItems = useNavItems();
   transition: transform 0.25s;
 }
 
-.app.collapsed .icon--collapse {
+.app.collapsed > .sidebar .icon--collapse {
   transform: rotate(180deg);
 }
 
 /* 折叠态：纯图标窄栏，状态由 PlayerLayout 记忆（原型 v2.7）。
    改品牌标记后这里**不再改字号**了：标记是定高图片，字号只影响已被藏起来的标签
    （原来把字号提到 20px 是为了让 ♫ 在窄栏里更有存在感）。 */
-.app.collapsed .lbl {
+.app.collapsed > .sidebar .lbl {
   display: none;
 }
 
@@ -284,7 +287,7 @@ const navItems = useNavItems();
    它的位置由 `.sb-section-head` 的 space-between 决定 —— 标签一藏，它就只剩一个孩子、
    被推到最左边，于是在点击那一帧横跳 161px（实测 199 → 38）。
    shadcn 的 SidebarGroupAction 在 icon 态也是直接 hidden；何况它现在还是 disabled 的。 */
-.app.collapsed .sb-add {
+.app.collapsed > .sidebar .sb-add {
   display: none;
 }
 </style>

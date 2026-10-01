@@ -193,6 +193,15 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   -webkit-backdrop-filter: none;
 }
 
+/* 内容层的宽度要**跟着宿主走**：`.sb-inner` 写死了展开态宽度 224px（那是桌面外壳的列宽），
+   抽屉的内宽只有 208 —— 写死的宽度会溢出去 16px，被 `.sidebar` 的 overflow:hidden 裁掉。
+   表现就是需求方说的“选中这块背景右侧被分割”：行的右圆角与 12px 内缩全被切平
+   （实测：项 26~226 宽 200，而岛只到 222 → 右边 0px 内缩、左边 12px）。
+   抽屉不会折叠（`collapsed` 恒为 false），所以这里不再需要那两档固定宽度。 */
+.nav-drawer :deep(.sb-inner) {
+  width: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-drawer,
   .nav-scrim {

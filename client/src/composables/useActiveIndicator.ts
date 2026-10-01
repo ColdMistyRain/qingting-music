@@ -13,9 +13,10 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
  *          不算“读过这个变量”，会被 `noUnusedLocals` 判成未使用）；
  *          `rect` 是选中项的位置尺寸（写成哪几个 CSS 变量由调用方定，“怎么用”留在 CSS）；
  *          `ready` 在首帧量完之后才为 true（用它开过渡，否则开页时指示条会从 0 滑到第一格，是个假动画）；
- *          `sync` 供切换 / 列表变化时手动重量。
+ *          `sync` 供切换 / 列表变化时手动重量；
+ *          第二个参数 `keepInView`：容器能横向滚动时（设置页的 Tab），把选中项滚回可视区。
  */
-export function useActiveIndicator(activeSelector: string) {
+export function useActiveIndicator(activeSelector: string, options?: { keepInView?: boolean }) {
   const rootRef = ref<HTMLElement | null>(null);
   const rect = ref({ x: 0, y: 0, w: 0, h: 0 });
   const ready = ref(false);
@@ -29,6 +30,9 @@ export function useActiveIndicator(activeSelector: string) {
     const el = rootRef.value?.querySelector<HTMLElement>(activeSelector);
     if (!el) return;
     rect.value = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+    // 容器可能横向滚动（窄屏的 Tab 条）：让选中项自己回到可视区，别让下划线留在视口外。
+    // ⚠️ block: "nearest" 不能省 —— 默认会把整个页面也滚一下，而这里只要横向。
+    if (options?.keepInView) el.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   onMounted(async () => {

@@ -1103,19 +1103,39 @@ select {
    .tabs-wrap 必须 position: relative —— 它同时是 offsetParent，量出来的坐标才是相对它的。 */
 .tabs-wrap {
   position: relative;
+  /* 窄屏上 Tab 排不下时**横向滚动**，而不是把标签挤成竖排（v5.47 需求方实拍：“在线音源”
+     被压成一字一行）。用滚动而不是换行：① 下划线是一根横线，只能描述“单行里的位置”，
+     换行后它就没有意义了；② 换行会让页头高度忽高忽低。
+     ⚠️ 底部这 20px 原本写在内层 .tabs 上 —— 外层一旦成为滚动容器（BFC），内层下外边距就
+     **不再与外层合并**，指示条的 bottom: 0 会跟着往下掉 20px（那根发丝线就与它错开了）。 */
+  margin-bottom: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* 不要横向滚动条：它只有几像素高，会压在标签下沿与下划线上、像一条断掉的边；
+     “还能滚”由最右边那个被切掉一半的 Tab 自己说。 */
+  scrollbar-width: none;
+}
+
+.tabs-wrap::-webkit-scrollbar {
+  display: none;
 }
 
 .tabs {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--glass-border);
-  margin-bottom: 20px;
+  /* 宽度由内容决定（但至少铺满容器：发丝线不能断在一半），超出部分交给 .tabs-wrap 滚 */
+  width: max-content;
+  min-width: 100%;
 }
 
 .tab {
   padding: 10px 16px;
   font-size: 13.5px;
   color: var(--text-2);
+  /* 不压缩、不换行：默认的 flex-shrink: 1 会把“在线音源”挤成一字一行 */
+  flex: none;
+  white-space: nowrap;
   /* 保留 2px 透明边框：它是“格子高度”的一部分，去掉会让整条 Tab 矮 2px */
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;

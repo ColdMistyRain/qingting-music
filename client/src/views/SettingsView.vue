@@ -52,7 +52,7 @@ const {
   rect: inkRect,
   ready: inkReady,
   sync: syncInk,
-} = useActiveIndicator('[role="tab"][data-state="active"]');
+} = useActiveIndicator('[role="tab"][data-state="active"]', { keepInView: true });
 
 const inkStyle = computed(() => ({
   "--ink-x": `${inkRect.value.x}px`,

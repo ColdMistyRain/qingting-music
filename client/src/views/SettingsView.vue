@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
+import IconSignIn from "~icons/ph/sign-in";
 import IconSignOut from "~icons/ph/sign-out";
 import SegmentedControl from "@/components/SegmentedControl.vue";
 import { useActiveIndicator } from "@/composables/useActiveIndicator";
@@ -25,16 +26,22 @@ const tabs = computed<SettingsTab[]>(() => {
   const list: SettingsTab[] = [
     { key: "appearance", label: "外观" },
     { key: "account", label: "账户" },
-    { key: "online", label: "在线音源" },
-    { key: "keys", label: "快捷键" },
-    { key: "fx", label: "音效" },
   ];
+  // 在线音源是**服务端**的事：未登录（仅本地播放，AC-01）时这个分组没有意义，直接不出现
+  if (auth.canUseServer) list.push({ key: "online", label: "在线音源" });
+  list.push({ key: "keys", label: "快捷键" }, { key: "fx", label: "音效" });
   if (auth.isAdmin) list.push({ key: "admin", label: "管理" });
   list.push({ key: "about", label: "关于" });
   return list;
 });
 
 const active = ref("appearance");
+
+// 身份变化会把分组抽走（退出登录后“在线音源”／“管理”消失）：
+// 当前选中的分组如果没了，退回“外观”—— 否则面板会停在一个不存在的值上（白屏）。
+watch(tabs, () => {
+  if (!tabs.value.some((t) => t.key === active.value)) active.value = "appearance";
+});
 
 /* 下划线指示条（v5.6）：“会滑过去”靠的是一条共享元素，所以得知道当前 Tab 在哪、多宽。
    量坐标这件事抽成了 `useActiveIndicator`（v5.9）—— 分段控件的选中底板干的是同一件事，
@@ -182,13 +189,26 @@ async function signOut(): Promise<void> {
             <span class="badge badge--accent">{{ roleLabel }}</span>
           </div>
           <div class="set-note">
-            未登录时只能播放本地文件；访客密码可听云端曲库与在线音源；管理员密码额外解锁管理控制台。
+            {{
+              auth.canUseServer
+                ? "未登录时只能播放本地文件；访客密码可听云端曲库与在线音源；管理员密码额外解锁管理控制台。"
+                : "未登录：只能用本地文件。登录后可听云端曲库与在线音源，管理员还会解锁管理控制台。"
+            }}
           </div>
           <div v-if="auth.authEnabled" class="set-actions">
-            <button class="btn" @click="signOut">
+            <button v-if="auth.canUseServer" class="btn" @click="signOut">
               <IconSignOut class="icon" />
               退出登录
             </button>
+            <!-- 未登录时给一个入口，登录后回到这一页（否则要自己去翻侧栏） -->
+            <RouterLink
+              v-else
+              class="btn btn-primary"
+              :to="{ name: 'login', query: { redirect: '/settings' } }"
+            >
+              <IconSignIn class="icon" />
+              去登录
+            </RouterLink>
           </div>
         </div>
       </TabsContent>

@@ -39,7 +39,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/PlaylistView.vue"),
         props: true,
       },
-      { path: "settings", name: "settings", component: () => import("@/views/SettingsView.vue") },
+      {
+        path: "settings",
+        name: "settings",
+        component: () => import("@/views/SettingsView.vue"),
+        // 设置页在**未登录**下也要能进（v5.20）：主题 / 沉浸页布局 / 快捷键 / 音效
+        // 都是纯本地偏好，而侧栏在未登录时同样会显示「设置」—— 以前点它会被守卫扔回登录页要
+        // 密码（需求方：“为什么点击设置需要密码？”）。服务端相关的分组（在线音源）
+        // 在页面里按角色隐藏；管理台仍由下面的 meta.admin 挡住。
+        meta: { anonymous: true },
+      },
     ],
   },
   {

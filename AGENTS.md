@@ -129,6 +129,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 16. **验证浏览器时别只收 `error`，`warning` 也要看（v5.42 实测）**：前几版的无头脚本只写 `if (m.type() === "error")`，于是一条 Reka 的无障碍告警（`Missing Description or aria-describedby … for DialogContent`）从 v5.40 起一直没被发现 —— 换到 VS Code 自带浏览器（`browser_console_messages` 会把 warning 单列出来）才看到。两条：① 弹层的 a11y 属性要配全（Reka 的 `Dialog` 对 `DialogTitle` **和** `DialogDescription` 都有要求，`Popover` 没有）；② 验证脚本把 warning 一并报出来。
 
+17. **同一组件在两处渲染时，别用通用选择器做布局开关（v5.34 埋、v5.43 才发现）**：手机端要藏“外壳里那条常驻侧栏”，写成了通用的 `.sidebar { display: none }` —— 而左侧抽屉（`NavDrawer`）里渲染的是**同一个** `AppSidebar`，于是抽屉里那份也被藏了：点 ☰ 之后只看到一层遮罩、什么都没有，再点也没反应（点到的其实是遮罩），因为抽屉面板自己没有底色（这个 bug 从 v5.34 活到 v5.43）。两条：① 布局开关要限定到宿主（`.app > .sidebar`），别按组件内部的类名通判；② 验证“抽屉/弹层打开了”不能只看它的 transform 或遮罩状态，要**量到里面的内容**（元素在不在、`display` 是不是 none、盒子多大）。
+
 ## 文档索引
 
 | 文档                                                         | 内容                                                                          |

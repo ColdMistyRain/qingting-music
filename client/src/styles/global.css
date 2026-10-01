@@ -1297,10 +1297,14 @@ kbd {
     grid-template-rows: 1fr auto;
   }
 
-  /* 侧栏收起，导航交给底部标签栏（RT-02）。
+  /* 侧栏收起，导航交给左侧抽屉（RT-02）。
+     ⚠️ 只藏**外壳里那条常驻侧栏**（`.app` 的直接子元素）。抽屉（NavDrawer）里渲染的是
+     同一个 `AppSidebar`（`.nav-drawer > .sidebar`），写通用的 `.sidebar` 会把抽屉里那份
+     一起藏掉 —— 表现是“点 ☰ 只有一层压暗、什么都没有，再点也没反应（点到的其实是遮罩）”，
+     因为抽屉面板自己没有底色（v5.43 实测，这一条从 v5.34 起就是坏的）。
      ⚠️ 别在 AppSidebar.vue 的 scoped 样式里写 display —— 那边选择器带 [data-v-x]，
      特异性更高，会把这行压掉（AppSidebar 里已记了这条）。 */
-  .sidebar {
+  .app > .sidebar {
     display: none;
   }
 

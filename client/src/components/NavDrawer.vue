@@ -155,8 +155,15 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   left: 0;
   z-index: 90;
   width: 236px;
-  /* 岛与视口留出与桌面外壳相同的 14px，抽屉拉出时侧栏仍是同一个“岛” */
-  padding: 14px;
+  /* 岛与视口留出与桌面外壳相同的 14px（抽屉里那层“岛”壳已撤，14px 现在是抽屉自己的内边距）；
+     底部再让出安全区：页脚那两行（设置 / 收起侧栏）是可点的，不能被全面屏的指示条压住。 */
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  /* 抽屉自己是一块**面**（v5.43）：背后是列表正文，而岛是玻璃 —— 不垫底时正文会直接从
+     抽屉里透出来（截图里能看到“搜索歌名…”“时长”两层字叠在一起）。
+     底色用 --bg-base 之后，抽屉里的岛与桌面外壳里的岛落在**同一种底**上，观感一致。 */
+  background: var(--bg-base);
+  border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
+  box-shadow: 14px 0 40px -18px rgba(20, 28, 60, 0.34);
   transform: translateX(-104%);
   visibility: hidden;
   transition:
@@ -164,14 +171,26 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
     visibility 0.28s;
 }
 
+:root[data-theme="dark"] .nav-drawer {
+  box-shadow: 14px 0 40px -18px rgba(0, 0, 0, 0.6);
+}
+
 .nav-drawer.is-open {
   transform: translateX(0);
   visibility: visible;
 }
 
-/* 侧栏自己不知道“我在抽屉里”，高度由这里给 */
+/* 侧栏自己不知道“我在抽屉里”，高度由这里给；
+   同时**去掉它那层“岛”壳**（背景/描边/投影/模糊全撤）：抽屉面板本身就是那块面，
+   再套一层卡就变成“面板里套卡”两层嵌套 —— 同一个层级只说一次（简约优先）。
+   导航项自己的悬浮/选中底色本来就是按页面底色标定的，落在抽屉上对比度一致。 */
 .nav-drawer :deep(.sidebar) {
   height: 100%;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

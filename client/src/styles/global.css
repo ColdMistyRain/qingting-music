@@ -490,7 +490,7 @@ select {
 .btn-primary {
   background: var(--accent);
   border-color: transparent;
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -821,7 +821,7 @@ select {
 
 .seg button.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* ---------- 移动端底线（RT-08）：不白屏、布局不崩 ---------- */

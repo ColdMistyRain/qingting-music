@@ -9,6 +9,7 @@ import {
   shouldRestartTrack,
   type PlayMode,
 } from "@/utils/player";
+import { applyCoverColors } from "@/utils/coverColor";
 
 const STORAGE_KEY = "qt-player";
 /** PL-02：播放超过该秒数后按"上一首"回到本曲开头 */
@@ -112,6 +113,18 @@ export const usePlayerStore = defineStore("player", () => {
   watch(currentIndex, () => {
     lyricsText.value = "";
   });
+
+  /**
+   * VS-02：切歌时把封面的两个**原始色源**写到 <html> 上——
+   * 页面环境光、彩胶盘体、主题色、逐字发光全部在 CSS 里从这两个值派生
+   * （铁律 3：JS 不写内联 background）。
+   * 曲目没有封面就撤掉变量、回到默认配色：按曲名去“编造”一个颜色是没有依据的。
+   */
+  watch(
+    () => currentTrack.value?.cover ?? null,
+    (url) => void applyCoverColors(url),
+    { immediate: true },
+  );
 
   function ensureAudio(): HTMLAudioElement | null {
     if (typeof Audio === "undefined") return null;
@@ -279,8 +292,7 @@ export const usePlayerStore = defineStore("player", () => {
    */
   function toggleMute(): void {
     if (muted.value || volume.value === 0) {
-      volume.value =
-        lastAudibleVolume.value > 0 ? lastAudibleVolume.value : DEFAULT_AUDIBLE_VOLUME;
+      volume.value = lastAudibleVolume.value > 0 ? lastAudibleVolume.value : DEFAULT_AUDIBLE_VOLUME;
       muted.value = false;
     } else {
       lastAudibleVolume.value = volume.value;

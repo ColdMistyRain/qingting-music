@@ -31,16 +31,30 @@
   --danger-bg: rgba(244, 63, 94, 0.14);
   --danger-border: rgba(244, 63, 94, 0.35);
 
-  /* 展示变量：由当前曲目封面取色写入（VS-02） */
+  /* 展示变量：由当前曲目封面取色写入（VS-02）——JS 只写下面两个**原始色源**，
+     主题色与光晕全部在这里派生（铁律 3）。亮度夹取分主题：深色主题要够亮才在深底上读得清。
+     彩度地板比彩胶（--cv1 的 0.07）高——**实测教训**：灰调封面（深色人像、暮片色）
+     按 0.06 取出来是一块暖灰，悬浮行/进度/主按钮全变成脏灰，整页丢掉颜色身份；
+     而彩胶那个大面积装饰色不该被强行提艳（PRD 的“晨雾不被强制提艳”），两者诉求不同。
+     地板 0.11 让主题色始终能读出“是个颜色”，上限 0.16 防荧光。 */
   --accent: #7c8cff;
+  --accent: oklch(from var(--cover-src) clamp(0.62, calc(l + 0.08), 0.8) clamp(0.11, c, 0.16) h);
   --accent-2: #8b5cf6;
-  /* 由 --accent 派生（原来是写死的 rgba(124,140,255,.14)——颜色值恰好对得上，
-     但 VS-02 取色管线接上后它不会跟着封面走，于是“同一套光”会分家）。 */
+  --accent-2: oklch(
+    from var(--cover-src-2) clamp(0.62, calc(l + 0.08), 0.8) clamp(0.11, c, 0.16) h
+  );
   --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
-  --glow1: rgba(91, 124, 250, 0.26);
-  --glow2: rgba(139, 92, 246, 0.2);
+  /* 填在主题色**底**上的文字颜色：不能写 white ——取色管道接上后主题色由封面决定，
+     白字压在亮色主题色上对比度实测只有 2.1:1（需求方实拍：暖色封面下主按钮发糊）。
+     用 --bg-base 就自动对了：它永远在主题色的另一端（深色主题近黑、浅色主题近白），
+     实测对比度 9.8:1。 */
+  --on-accent: var(--bg-base);
+  /* 背景光晕也由主题色派生（原来是写死的 rgba(91,124,250,.26)——取色管线接上后
+     它不会跟着封面走，“同一套光”就分家了） */
+  --glow1: color-mix(in srgb, var(--accent) 26%, transparent);
+  --glow2: color-mix(in srgb, var(--accent-2) 20%, transparent);
 
-  /* 封面颜色源：JS 只写原始色，调校在下方 OKLCH 相对色完成 */
+  /* 封面颜色源：JS 只写这两个原始色，调校在下方 OKLCH 相对色完成 */
   --cover-src: #5b7cfa;
   --cover-src-2: #8b5cf6;
 
@@ -83,6 +97,18 @@
   --row-alt: rgba(18, 24, 38, 0.03);
   --fill-track: rgba(18, 24, 38, 0.12);
 
+  /* 浅色主题：主题色要**压深**才在白底上读得清——取色管线接入后这条是必需的：
+     封面颜色不可控，黄色封面套深色那套夹取会变成一片看不清的亮黄。 */
+  --accent: #7c8cff;
+  --accent: oklch(from var(--cover-src) clamp(0.38, calc(l - 0.12), 0.54) clamp(0.11, c, 0.18) h);
+  --accent-2: #8b5cf6;
+  --accent-2: oklch(
+    from var(--cover-src-2) clamp(0.38, calc(l - 0.12), 0.54) clamp(0.11, c, 0.18) h
+  );
+  /* 深色主题下 --bg-base（近黑）压主题色是 9.2:1；浅色主题的底色是浅灰（240,240,242），
+     拿它当文字色只有 4.5:1——刚好压线，所以这里用纯白（5.2:1）。 */
+  --on-accent: #fff;
+
   /* 背景光晕按主题减弱：深色那套不透明度会直接把浅色页面染成一片淡紫，
      改为由主题色在 CSS 里派生（取色管线接入后 JS 也不必再写这两个变量） */
   --glow1: color-mix(in srgb, var(--accent) 9%, transparent);
@@ -120,21 +146,24 @@
 
   /* 彩胶盘面（VS-09 海报布局）：**同一个源色只做 Tone 漩涡**，那就是彩胶的质感。
      放在这里而不是组件里——它和 --cv1/--cv2 是同一条取色管线的产物，
-     VS-02 接上后整盘自动随封面换色。 */
+     VS-02 接上后整盘自动随封面换色。
+     亮度比 --cv1（夹到 0.62）**再沉一档**（上限 0.56）、彩度地板也高一档（0.09）：
+     盘面是**物体**不是**光**——实测暖色调低彩度封面（深色人像）下，盘体被夹到
+     0.62 后变成一圈奶白，与中间那张亮封面糊在一起，读不出“盘”。 */
   --vinyl-gradient: conic-gradient(from 140deg, var(--cover-src), var(--cover-src));
   --vinyl-gradient: conic-gradient(
     from 140deg,
-    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.03), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.34, calc(l - 0.03), 0.56) clamp(0.09, c, 0.15) h),
     oklch(
-      from var(--cover-src) clamp(0.4, calc(l + 0.07), 0.62) clamp(0.07, calc(c - 0.01), 0.15) h
+      from var(--cover-src) clamp(0.34, calc(l + 0.07), 0.56) clamp(0.09, calc(c - 0.01), 0.15) h
     ),
-    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.08), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.34, calc(l - 0.08), 0.56) clamp(0.09, c, 0.15) h),
     oklch(
-      from var(--cover-src) clamp(0.4, calc(l + 0.04), 0.62) clamp(0.07, calc(c - 0.02), 0.15) h
+      from var(--cover-src) clamp(0.34, calc(l + 0.04), 0.56) clamp(0.09, calc(c - 0.02), 0.15) h
     ),
-    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.05), 0.62) clamp(0.07, c, 0.15) h),
-    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.1), 0.62) clamp(0.07, c, 0.15) h),
-    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.03), 0.62) clamp(0.07, c, 0.15) h)
+    oklch(from var(--cover-src) clamp(0.34, calc(l - 0.05), 0.56) clamp(0.09, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.34, calc(l - 0.1), 0.56) clamp(0.09, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.34, calc(l - 0.03), 0.56) clamp(0.09, c, 0.15) h)
   );
 
   /* 光效（v4.67）：主题色柔光，只用在**可交互**（悬浮/聚焦）与**播放中/选中**两种状态上——

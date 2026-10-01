@@ -42,7 +42,9 @@
   --panel-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --panel-shadow:
     0 18px 44px -16px rgba(20, 28, 60, 0.34), 0 2px 8px rgba(20, 28, 60, 0.1),
-    0 0 34px -6px color-mix(in srgb, var(--accent) 50%, transparent);
+    /* 光晕只到“能看出这里浮着”就够了（v5.3 需求方：“光效再低一点”）——
+       浓度 50% → 30%、半径 34 → 30px、负 spread 再收一点，让它是一圈“暖边”而不是一团光。 */
+    0 0 30px -10px color-mix(in srgb, var(--accent) 30%, transparent);
   /* 实心面板色：flat 模式下岛用它 */
   --plane: #ffffff;
   /* 岛内卡片的面色。浅色下与岛同色（靠 --card-shadow 分出层次）；
@@ -57,7 +59,9 @@
   --panel-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   --panel-shadow:
     0 20px 46px -16px rgba(0, 0, 0, 0.66),
-    0 0 34px -6px color-mix(in srgb, var(--accent) 45%, transparent);
+    /* 光晕调弱（v5.3 需求方：“光效再低一点”）：45% → 25%、半径 34 → 30px；主题色亮时
+       （比如黄色封面）光晕看着比深色封面的浓很多，所以这里按“最亮的那档”来定浓度。 */
+    0 0 30px -10px color-mix(in srgb, var(--accent) 25%, transparent);
   --plane: #232326;
   --plane-2: #2b2b2f;
 }

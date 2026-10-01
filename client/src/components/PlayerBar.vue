@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Component } from "vue";
-import { computed, ref } from "vue";
+import { computed, ref, type Component } from "vue";
+import { useRouter } from "vue-router";
 import IconArrowRight from "~icons/ph/arrow-right";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
@@ -23,6 +23,13 @@ import type { PlayMode } from "@/utils/player";
  * 全部状态来自 player store；未选歌时整条退为"幽灵态"，不出现点不动的高亮主按钮。
  */
 const player = usePlayerStore();
+const router = useRouter();
+
+/** VS-03：点击播放条左侧（封面 / 歌曲信息）展开沉浸式播放页 */
+function openImmersive(): void {
+  if (!player.hasTrack) return;
+  router.push({ name: "now" });
+}
 
 const MODE_ICONS: Record<PlayMode, Component> = {
   seq: IconArrowRight,
@@ -90,7 +97,16 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
 <template>
   <footer class="playerbar glass" :class="{ 'is-idle': isIdle, 'is-playing': player.playing }">
-    <div class="pb-left" @mouseenter="hovering = true" @mouseleave="hovering = false">
+    <div
+      class="pb-left"
+      role="button"
+      :tabindex="player.hasTrack ? 0 : -1"
+      :title="player.hasTrack ? '展开沉浸式播放页' : undefined"
+      @click="openImmersive"
+      @keydown.enter="openImmersive"
+      @mouseenter="hovering = true"
+      @mouseleave="hovering = false"
+    >
       <div class="cover">
         <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
         <IconMusicNotes v-else class="icon" />

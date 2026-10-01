@@ -48,6 +48,9 @@
   --radius-control: 10px;
   --radius-cover: 9px;
 
+  /* iOS 同款减速曲线：弹层入场、歌词位移、沉浸页进出场共用一条，避免各写各的 */
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+
   /* 内容岛水平内边距：滚动区要用它做负边距补偿，让滚动条贴在岛边 */
   --island-pad-x: 26px;
 

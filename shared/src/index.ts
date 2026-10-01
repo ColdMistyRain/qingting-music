@@ -25,6 +25,12 @@ export interface Track {
   album: string;
   cover: string | null;
   duration: number | null;
+  /**
+   * 歌词原文（LR-02 的第一优先级：音频内嵌）。
+   * 只由客户端在读取本地标签时写入，服务端不下发这个字段，所以是可选的；
+   * 在线音源与手动 .lrc 两条来源不经 Track（由 player store 的 lyricsText 承载）。
+   */
+  lyrics?: string | null;
 }
 
 /** 服务端曲目记录（data/songs.json 的一条） */

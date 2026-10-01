@@ -10,6 +10,8 @@ export interface AudioTags {
   album: string | null;
   duration: number | null;
   picture: { data: Uint8Array; format: string } | null;
+  /** 内嵌歌词原文（LR-02 第一优先级）；没有就是 null，不去猜 */
+  lyrics: string | null;
 }
 
 /** music-metadata 解析结果里我们真正用到的那一小部分（便于单测用假对象构造） */
@@ -19,6 +21,7 @@ export interface RawMetadataLike {
     artist?: string;
     album?: string;
     picture?: readonly { data: Uint8Array | number[]; format?: string }[];
+    lyrics?: readonly { text?: string }[];
   };
   format?: { duration?: number };
 }
@@ -32,6 +35,8 @@ function readText(value: string | undefined): string | null {
 export function pickTags(metadata: RawMetadataLike): AudioTags {
   const duration = metadata.format?.duration;
   const picture = metadata.common?.picture?.[0];
+  // 内嵌歌词：取第一段有正文的（同一声明里偶尔会有多段，空白的忽略）
+  const lyrics = metadata.common?.lyrics?.find((entry) => entry.text?.trim())?.text?.trim() ?? null;
 
   return {
     title: readText(metadata.common?.title),
@@ -39,6 +44,7 @@ export function pickTags(metadata: RawMetadataLike): AudioTags {
     album: readText(metadata.common?.album),
     duration: typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? duration : null,
     picture: picture ? { data: Uint8Array.from(picture.data), format: picture.format || "image/jpeg" } : null,
+    lyrics,
   };
 }
 

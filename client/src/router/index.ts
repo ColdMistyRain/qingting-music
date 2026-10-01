@@ -7,6 +7,13 @@ const Blank = defineComponent({ name: "BlankView", render: () => h("div") });
 
 const routes: RouteRecordRaw[] = [
   {
+    // 沉浸式播放页（VS-03）：从播放条点开，整页覆盖主布局；只用本地播放能力，不需服务端权限
+    path: "/now",
+    name: "now",
+    component: () => import("@/views/ImmersiveView.vue"),
+    meta: { anonymous: true },
+  },
+  {
     path: "/login",
     name: "login",
     component: () => import("@/views/LoginView.vue"),

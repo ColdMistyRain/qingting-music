@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import type { Track } from "@qingting/shared";
 import {
   nextMode as nextPlayMode,
@@ -49,6 +49,11 @@ export const usePlayerStore = defineStore("player", () => {
   const notice = ref("");
   const seeking = ref(false);
   const seekTarget = ref(0);
+  /**
+   * 当前曲目的歌词原文（LR-02 的数据入口：内嵌 > 在线 > 手动上传，管线稍后接入）。
+   * 沉浸页只从这里取，不自己去找文件/接口——数据来源变了，页面不用动。
+   */
+  const lyricsText = ref("");
 
   let audio: HTMLAudioElement | null = null;
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -88,6 +93,24 @@ export const usePlayerStore = defineStore("player", () => {
     const total = duration.value;
     if (!(total > 0)) return 0;
     return Math.min(1, Math.max(0, displaySeconds.value / total));
+  });
+
+  /**
+   * 此刻的真实播放时间（秒）：沉浸页逐字填充要每帧取值，
+   * 而 timeupdate 只有 ~4Hz，直接用 progress 会一跳一跳。
+   */
+  function sampleTime(): number {
+    if (seeking.value) return seekTarget.value;
+    return audio?.currentTime ?? progress.value;
+  }
+
+  function setLyrics(text: string): void {
+    lyricsText.value = text;
+  }
+
+  /** 换曲即清空歌词：歌词永远属于当前曲目，留着会挂在新歌上 */
+  watch(currentIndex, () => {
+    lyricsText.value = "";
   });
 
   function ensureAudio(): HTMLAudioElement | null {
@@ -385,6 +408,9 @@ export const usePlayerStore = defineStore("player", () => {
     modeLabel,
     displaySeconds,
     displayRatio,
+    lyricsText,
+    sampleTime,
+    setLyrics,
     // 动作
     play,
     pause,

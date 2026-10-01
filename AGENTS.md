@@ -70,8 +70,10 @@ client/src/router/        路由表 + 守卫（身份决定可达页面）
 client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）
 client/src/utils/         player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format
-client/src/views/         login/local/library/online/playlist/settings + console/{overview,songs,upload}
-client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、TrackRow（通用曲目行）、EmptyState
+client/src/views/         login/local/library/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
+client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、TrackRow（通用曲目行）、EmptyState、
+                          immersive/{LyricsView,ImTitle,ImControls,ImLayoutDuo}（沉浸页：歌词引擎/标题/控制栏为共享件，
+                          布局只负责自己的版式与专属视觉层 - VS-09）
 client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 ```
 

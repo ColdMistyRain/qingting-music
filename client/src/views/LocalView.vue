@@ -68,6 +68,8 @@ function addFiles(files: readonly File[]): void {
           ...(tags.album ? { album: tags.album } : {}),
           ...(cover ? { cover } : {}),
           ...(tags.duration ? { duration: tags.duration } : {}),
+          // 内嵌歌词（LR-02）：挂到曲目上，沉浸页直接取，不必重新读文件
+          ...(tags.lyrics ? { lyrics: tags.lyrics } : {}),
         });
       })
       .finally(() => {

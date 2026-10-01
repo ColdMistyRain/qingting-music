@@ -39,6 +39,18 @@ describe("pickTags", () => {
     expect(tags.picture?.format).toBe("image/png");
   });
 
+  it("取第一段有正文的内嵌歌词（LR-02）", () => {
+    const tags = pickTags({
+      common: { lyrics: [{ text: "  " }, { text: "[00:01.00]第一句" }] },
+    });
+    expect(tags.lyrics).toBe("[00:01.00]第一句");
+  });
+
+  it("没有内嵌歌词时为 null（沉浸页走“暂无歌词”空态）", () => {
+    expect(pickTags({ common: { lyrics: [{}] } }).lyrics).toBeNull();
+    expect(pickTags({ common: { lyrics: [] } }).lyrics).toBeNull();
+  });
+
   it("解析结果为空对象时不崩", () => {
     expect(pickTags({})).toEqual({
       title: null,
@@ -46,6 +58,7 @@ describe("pickTags", () => {
       album: null,
       duration: null,
       picture: null,
+      lyrics: null,
     });
   });
 });

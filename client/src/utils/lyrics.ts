@@ -131,3 +131,35 @@ export function currentLineIndex(lines: readonly LyricLine[], time: number): num
 
   return found;
 }
+
+/**
+ * 逐字填充进度（LR-05）：返回当前句每个字的进度 0~1。
+ * 字自带时长时按它算（yrc）；没有时长就退化为"到下一个字就算满"——
+ * 宁可早亮也不要亮不起来（真实歌词里残缺的逐字时间轴很多）。
+ */
+export function wordFillProgress(line: LyricLine, time: number): number[] {
+  const words = line.words;
+  if (!words?.length) return [];
+  return words.map((word) => {
+    const span = word.duration > 0 ? word.duration : 0.001;
+    if (time >= word.start + span) return 1;
+    if (time <= word.start) return 0;
+    return (time - word.start) / span;
+  });
+}
+
+/**
+ * 行级进度 0~1（LR-05 的降级路径："仅行级数据时整句渐亮"）。
+ * 句子时长取"到下一句开始"——这是 LRC 唯一能给出的时长信息；
+ * 末句没有下一句，给一个兜底秒数免得整句瞬间满格（太小）或永远不满（太大）。
+ */
+export function lineProgress(lines: readonly LyricLine[], index: number, time: number): number {
+  const line = lines[index];
+  if (!line) return 0;
+  const next = lines[index + 1];
+  const span = Math.max((next ? next.time : line.time + LINE_FALLBACK_SECONDS) - line.time, 0.3);
+  return Math.min(1, Math.max(0, (time - line.time) / span));
+}
+
+/** 末句时长兜底（秒）：没有下一句可参照时的默认整句时长 */
+const LINE_FALLBACK_SECONDS = 6;

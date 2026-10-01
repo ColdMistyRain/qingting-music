@@ -120,6 +120,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 12. **`npx.ps1` 同样被拦截（v5.32）**：与第 1 条同源—— `npx -y <pkg>` 在 PowerShell 下会报“未对文件 npx.ps1 进行数字签名”，**一律用 `npx.cmd`**。
 
+13. **vitest 偶发 worker 崩（v5.38 实测一次）**：日志里是 `Worker exited unexpectedly with exit code 3221226505`（= `0xC0000409`）+ `Test Files 8 passed (9)`、`Errors 1 error`，**没有一个断言失败** —— 这是 worker 进程在系统层崩了，不是你的改动坏了代码（那次只改了 CSS 与文档）。判据：`Tests x passed (y)` 里 y 小于用例总数、且没有 `FAIL`/`AssertionError`。处理：**重跑一次** `npm.cmd run test` 即可（实测重跑全绿）；如果连续两次都在**同一个文件**崩，再去查那个文件的用例。
+
 ## 文档索引
 
 | 文档                                                         | 内容                                                                          |

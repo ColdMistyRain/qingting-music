@@ -6,6 +6,7 @@ import IconSignOut from "~icons/ph/sign-out";
 import { useAuthStore } from "@/stores/auth";
 import { useConfigStore } from "@/stores/config";
 import { useThemeStore, type ImLayout } from "@/stores/theme";
+import { tabSlideDirection } from "@/utils/tabs";
 
 /** 设置页（PRD 3.8）：顶部 Tab 形态，管理 Tab 仅管理员可见 */
 const auth = useAuthStore();
@@ -64,8 +65,20 @@ onMounted(async () => {
 
 onBeforeUnmount(() => inkObserver?.disconnect());
 
+// 切换时内容往哪边滑（v5.7）：与下划线“往哪边滑”同一个方向——
+// 选中项在列表里向后移就是从右边进来，向前移就从左边进来。
+// 写成 CSS 变量挂在 TabsRoot 上（只写原始值 ±1，具体滑多少在 CSS）。
+const dir = ref(1);
+
 // 点／键盘切换、以及“管理”Tab 因身份变化而出现时，都要重量一次
-watch(active, () => void nextTick(syncInk));
+watch(active, (to, from) => {
+  dir.value = tabSlideDirection(
+    tabs.value.map((t) => t.key),
+    to,
+    from,
+  );
+  void nextTick(syncInk);
+});
 watch(tabs, () => void nextTick(syncInk));
 
 /** VS-09：三种沉浸页布局，设置页用**缩略图卡片**让需求方先看到版式再选（不是只给个名字） */
@@ -100,7 +113,7 @@ async function signOut(): Promise<void> {
          样式仍然全是我们自己的（global.css 的 .tabs/.tab，选中态挂 data-state="active"）。
          aria-label 得自己给：Reka 会给 tablist 角色，但不会替你起名字（v5.4 实测补上）——
          没有名字时屏幕阅读器只会念“标签列表”，不知道这组标签是干什么的。 -->
-    <TabsRoot v-model="active">
+    <TabsRoot v-model="active" :style="{ '--panel-dir': dir }">
       <div ref="tabsWrapRef" class="tabs-wrap" :class="{ 'is-ready': inkReady }">
         <TabsList class="tabs" aria-label="设置分组">
           <TabsTrigger v-for="tab in tabs" :key="tab.key" :value="tab.key" class="tab">

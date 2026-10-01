@@ -891,8 +891,8 @@ select {
     transform: scale(1);
     will-change: auto;
   }
-  /* 切 Tab 时内容也不做淡入，直接出现 */
-  .tabs ~ [role="tabpanel"] > * {
+  /* 切 Tab 时内容也不做滑入，直接出现 */
+  .tabs-wrap ~ [role="tabpanel"] > * {
     animation: none;
   }
   /* 下划线不滑，直接到位 */
@@ -967,23 +967,33 @@ select {
     width 0.25s var(--ease-ios);
 }
 
-/* 切 Tab 时面板内容淡入一点点（v5.5 需求方：“那为什么没有动画过渡”）。
+/* 切 Tab 时面板内容滑入 + 淡入（v5.5 首版只做淡入，v5.7 需求方：“tabs 内容切换能有过渡效果吗”
+   → 加上方向，与下划线“往哪边滑”同一个方向，两个动效说的是同一件事）。
    为什么之前没有：Reka 的面板是**懒挂载**的——非活动面板只剩一个 hidden 的空壳
    （aria-controls 要指得到，所以壳必须在），内容每次切换都是重新创建，
-   于是它“无中生有”地出现，而标签本身本来就有 0.15s 的颜色/下划线过渡。
+   于是它“无中生有”地出现，而标签本身本来就有 0.15s 的颜色过渡。
    所以动画要挂在**内容**上：挂在面板壳上不会播（壳一直存在、不重新挂载）。
-   只做 opacity + 2px 位移、0.18s：目的是让眼睛知道“内容换了”，不是让它跳舞。
-   选择器用 `.tabs ~` 限定在这一组 Tab 上（全站目前只有设置页有 Tab）。 */
-.tabs ~ [role="tabpanel"] > * {
-  animation: tab-panel-in 0.18s ease-out;
+   只做 opacity + 10px 位移、0.2s ease-out：目的是让眼睛知道“内容从哪边来的”。
+   方向来自 --panel-dir（±1，JS 只写这个原始值）。
+   选择器用 `.tabs-wrap ~` 限定在这一组 Tab 上 —— 注意 v5.6 给 TabsList 裹了 .tabs-wrap 之后，
+   面板变成 .tabs-wrap 的兄弟、不再是 .tabs 的兄弟，原来的 `.tabs ~ [role="tabpanel"]`
+   于是一夜之间永不匹配（内容淡入静默失效，需求方 v5.7：“tabs 内容切换能有过渡效果吗”）。
+   教训：靠 DOM 结构写的选择器，动结构后要回头验证旧的那条还在不在。 */
+.tabs-wrap ~ [role="tabpanel"] > * {
+  animation: tab-panel-in 0.2s ease-out;
 }
 
 @keyframes tab-panel-in {
   from {
     opacity: 0;
-    transform: translateY(2px);
+    transform: translateX(calc(var(--panel-dir, 1) * 10px));
   }
 }
+
+/* 为什么不做“旧内容淡出 + 新内容淡入”的真交叉淡入：懒挂载下旧内容会立刻被卸掉，
+   想两边同时在只能 forceMount + 把非活动面板脱离文档流（absolute），
+   而各页高度差很多——要么高度“啪啪”跳，要么容器永远跟最高那页一样高（下面留一大块空）。
+   用方向一致的滑入，能让人看出“换了、从哪边换的”，代价却只有一行关键帧。 */
 
 /* ---------- 设置卡片 ---------- */
 .set-card {

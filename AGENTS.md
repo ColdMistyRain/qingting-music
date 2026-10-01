@@ -140,6 +140,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 19. **`transition: visibility <时长>` 会让弹层“打开后前半个时长仍然是 hidden”（v5.53 实测）**：Reka 弹层用 `force-mount` + `visibility: hidden` 表达关闭态（为什么不能用 `opacity: 0` 见第 18 条）。但 `visibility` 是**离散属性**，现代引擎按“过渡过半才翻转”处理 —— 写 `transition: opacity .2s, visibility .2s` 时，打开后的前 100ms 元素仍然 hidden：渐变看着正常（`opacity` 在动），但**对 hidden 元素调 `focus()` 会静默失败**。症状是“焦点还留在背后的触发按钮上”（后果：回车把弹层又调一遍），时间线上 0ms / 16ms 两次聚焦都没产生 focusin，100ms 后手动聚焦才成功。写法：关闭态 `visibility 0s <时长>`（先播完淡出再隐藏）、打开态 `visibility 0s`（立即可见）；`opacity` / `transform` 照旧。
 
+20. **删文件类命令先 dry-run，别把 `storedName` 当曲目 id（v5.60 血的教训）**：曲库索引里 `id` 与 `storedName` 是**各自独立生成的 nanoid**（`services/storage.ts` 里写明了“id 给前端引用、落盘名另外生成”），两者长度与字符集一样，肉眼分不出。我曾用“文件名 basename 不在 id 列表里”当孤儿判定去清 `uploads/`，结果把 **14 个音频全删了**（索引还在、文件没了，界面上就是一排点不动的鬼影）。两条：① 任何批量删除先只**打印**要删的清单，确认无误再执行；② “这个文件属于哪条曲目”必须用 `storedName` 字段对齐，不要拿 `id` 或 basename 猜。恢复办法（本项目特有）：索引里记着 `originalName` + `size`，可以从原始曲库目录按“名字 + 体积”精确拷回 `uploads/<storedName>`（实测 14/14 恢复，206 流式播放与封面全部正常）。
+
 ## 文档索引
 
 | 文档                                                         | 内容                                                                          |

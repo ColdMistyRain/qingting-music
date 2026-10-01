@@ -24,13 +24,17 @@
   /* 浮层材质：所有"盖在内容之上"的临时层共用（播放条、音量弹层、沉浸页浮件） */
   --chrome-bg: rgba(245, 245, 247, 0.55);
   --chrome-blur: blur(16px) saturate(2.2);
-  /* 实心面板色：flat 模式下岛/卡片用它 */
+  /* 实心面板色：flat 模式下岛用它 */
   --plane: #ffffff;
+  /* 岛内卡片的面色。浅色下与岛同色（靠 --card-shadow 分出层次）；
+     深色下投影几乎不可见，卡片比岛**略亮一档**才看得出来（v4.56）。 */
+  --plane-2: #ffffff;
 }
 
 :root[data-theme="dark"] {
   --chrome-bg: rgba(38, 38, 40, 0.6);
   --plane: #232326;
+  --plane-2: #2b2b2f;
 }
 
 /* ---------- flat：浅色 ---------- */
@@ -38,11 +42,12 @@
   /* 中性底色：去掉封面光晕，颜色只留给封面与状态（需求方 v4.30 定调） */
   --bg-base: #f0f0f2;
   --plane: #ffffff;
+  --plane-2: #ffffff;
   --glow1: transparent;
   --glow2: transparent;
-  /* 扁平模式不靠投影拉层次 */
+  /* 只撤页面级的岛投影（"岛浮在页面上"的语言在平坦模式里不成立）；
+     **岛内卡片投影保留**：它说的是"这张卡片是表面上的一个分组"，与岛浮不浮无关。 */
   --shadow: none;
-  --card-shadow: none;
   --glass-border: rgba(0, 0, 0, 0.1);
 }
 
@@ -50,10 +55,10 @@
 :root[data-material="flat"][data-theme="dark"] {
   --bg-base: #191919;
   --plane: #232326;
+  --plane-2: #2b2b2f;
   --glow1: transparent;
   --glow2: transparent;
   --shadow: none;
-  --card-shadow: none;
   --glass-border: rgba(255, 255, 255, 0.11);
 }
 
@@ -69,13 +74,15 @@
   box-shadow: none;
 }
 
-/* 岛内卡片：底色与岛面相同（同一材质，不再用玻璃叠玻璃），分组只留**一条细线**，
-   投影撤掉。曾经把描边也撤掉过——洞：岛面与卡片都是白的，卡片直接消失、
-   设置页只剩一串文字（自评时发现并改回）。 */
+/* 岛内卡片：同一材质的面，分组靠**投影**说（不要用描边代替——用线代替影
+   是装饰性线条，违反简约优先；v4.56 修正）。
+   - 浅色：白卡 + --card-shadow（与 islands 模式同一套："白卡片 + 白岛面"
+     分不出层次时，当年就是靠它解决的）；
+   - 深色：投影几乎不可见，由 --plane-2 把卡面提亮一档来分。 */
 :root[data-material="flat"] .card {
-  background: var(--plane);
-  border: 1px solid var(--glass-border);
-  box-shadow: none;
+  background: var(--plane-2);
+  border: none;
+  box-shadow: var(--card-shadow);
 }
 
 /* 播放条是唯一常驻"浮在内容之上"的层 → 换成真正的 chrome 玻璃（无边无影），
@@ -85,10 +92,5 @@
   backdrop-filter: var(--chrome-blur);
   -webkit-backdrop-filter: var(--chrome-blur);
   border: none;
-  box-shadow: none;
-}
-
-/* 投放区是交互目标不是装饰：细描边留着，只去掉投影 */
-:root[data-material="flat"] .dropzone {
   box-shadow: none;
 }

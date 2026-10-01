@@ -262,9 +262,11 @@ function askClear(): void {
   color: var(--accent);
 }
 
-.q-item.current .q-main {
+/* 当前曲目：底色铺在**整行**上，宽度与悬浮态一致（需求方：“正在播放的和悬浮选中的
+   长度要一样”）。原来铺在 .q-main 上 —— 那里不含右侧删除键那块，看着就比悬浮态短一截。
+   写在 .q-item 上、且排在 :hover 之后，保证“播放中的行”悬停时仍然是主题色。 */
+.q-item.current {
   background: var(--accent-soft);
-  border-radius: var(--radius-row);
 }
 
 @media (prefers-reduced-motion: reduce) {

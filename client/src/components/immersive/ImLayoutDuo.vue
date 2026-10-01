@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref } from "vue";
 import IconMusicNotes from "~icons/ph/music-notes";
 import ImTitle from "@/components/immersive/ImTitle.vue";
 import LyricsView from "@/components/immersive/LyricsView.vue";
@@ -7,8 +8,12 @@ import type { LyricLine } from "@/utils/lyrics";
 /**
  * 布局一：经典双栏（封面左 · 标题/歌词右，VS-03 的主形态）。
  *
- * 本组件只负责**版式与专属视觉层**（VS-09）：栅格、封面造型与呼吸动效（VS-04）；
+ * 本组件只负责**版式与专属视觉层**（VS-09）：栅格与封面造型；
  * 标题块与歌词引擎是共享子组件，这里只是摆放。
+ *
+ * 封面动效（v4.71 需求方定稿）：**卡片式 3D 倾斜**，静置时微微斜侧，
+ * 鼠标悬浮跟着指针改方位；原来的“呼吸浮动”按需求方意见去掉。
+ * VS-04 的“缓慢旋转”仍是彩胶盘（海报布局）的形态。
  */
 defineProps<{
   title: string;
@@ -20,12 +25,65 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{ seek: [seconds: number] }>();
+
+/* 封面倾斜：JS 只写**原始指针位置**（--mx/--my ∈ 0~1），角度在 CSS 里派生——
+   与取色管线同一条原则（JS 注原始值，调校留在 CSS）。 */
+const wrapRef = ref<HTMLElement | null>(null);
+const mx = ref(0.5);
+const my = ref(0.5);
+let frame = 0;
+/** 最新的指针位置（0~1，已夹取）；rAF 只负责“应用”，不负责“取值” */
+let pending: { x: number; y: number } | null = null;
+
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+function onPointerMove(event: PointerEvent): void {
+  // 系统开了“减少动态效果”就不跟指针（静置的斜侧姿态仍保留）
+  if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches)
+    return;
+  const rect = wrapRef.value?.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) return;
+  // **先记下最新位置，再节流**：把取值放进 rAF 回调会丢掉同一帧内的最后一次移动，
+  // 表现是“指针已经移到别处、卡片还停在旧方位”（实测：移到 85% 处只读到 0.33）。
+  pending = {
+    x: clamp01((event.clientX - rect.left) / rect.width),
+    y: clamp01((event.clientY - rect.top) / rect.height),
+  };
+  if (frame) return;
+  frame = requestAnimationFrame(() => {
+    frame = 0;
+    if (!pending) return;
+    mx.value = pending.x;
+    my.value = pending.y;
+    pending = null;
+  });
+}
+
+/** 指针离开回到静置姿态（平滑回去交给 CSS 的 transition） */
+function onPointerLeave(): void {
+  if (frame) {
+    cancelAnimationFrame(frame);
+    frame = 0;
+  }
+  pending = null;
+  mx.value = 0.5;
+  my.value = 0.5;
+}
+
+onBeforeUnmount(() => {
+  if (frame) cancelAnimationFrame(frame);
+});
 </script>
 
 <template>
   <div class="duo">
-    <div class="cover-wrap">
-      <div class="cover" :class="{ 'is-playing': playing }">
+    <div
+      ref="wrapRef"
+      class="cover-wrap"
+      @pointermove="onPointerMove"
+      @pointerleave="onPointerLeave"
+    >
+      <div class="cover" :style="{ '--mx': mx, '--my': my }">
         <img v-if="coverUrl" :src="coverUrl" :alt="`${title} 封面`" />
         <IconMusicNotes v-else class="icon" />
       </div>
@@ -53,6 +111,8 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 .cover-wrap {
   display: grid;
   place-items: center;
+  /* 3D 倾斜需要透视：没有它 rotateX/Y 只会被压扁，不是“斜侧” */
+  perspective: 1000px;
 }
 
 .cover {
@@ -67,6 +127,15 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   background: radial-gradient(circle at 32% 30%, var(--cv1), var(--cv2) 78%);
   color: rgba(255, 255, 255, 0.7);
   box-shadow: 0 24px 60px -22px rgba(0, 0, 0, 0.55);
+  /* 静置姿态（-5deg 微微斜侧）+ 指针带来的偏移。角度在 CSS 里派生：
+     - rotateX 为正时**下边靠向观看者**，所以抬头要取负；
+     - rotateY 为正时**右边转进去**，所以指针在右要取负。
+     系数小（10~12deg）是为了“像一张卡片轻轻侧着”，不是炫技。 */
+  --dx: calc((0.5 - var(--mx, 0.5)) * 12deg);
+  --dy: calc((var(--my, 0.5) - 0.5) * 10deg);
+  transform: rotateX(calc(1.5deg + var(--dy))) rotateY(calc(-5deg + var(--dx)));
+  transition: transform 0.45s var(--ease-ios);
+  will-change: transform;
 }
 
 .cover .icon {
@@ -78,22 +147,6 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-/* VS-04 封面动效：方形封面用**呼吸浮动**而不是旋转（转一块方图不好看），
-   播放中才动、暂停即停（animation-play-state），并遵循 prefers-reduced-motion。 */
-.cover.is-playing {
-  animation: cover-breathe 4.5s ease-in-out infinite;
-}
-
-@keyframes cover-breathe {
-  0%,
-  100% {
-    transform: translateY(-6px) scale(1);
-  }
-  50% {
-    transform: translateY(6px) scale(1.012);
-  }
 }
 
 .right {
@@ -111,8 +164,9 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cover.is-playing {
-    animation: none;
+  /* 静置的斜侧姿态保留（它只是“摆法”），但不跟指针、不改动 */
+  .cover {
+    transition: none;
   }
 }
 

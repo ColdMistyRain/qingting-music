@@ -477,6 +477,14 @@ onBeforeUnmount(() => {
 .ly-view {
   position: relative;
   height: 100%;
+  /* 裁剪框**左右各外扩一截**（负外边距 + 等量内边距，内容位置分毫不动）：
+     行有景深模糊（blur 1.1~3.3px），模糊出来的灰边本来是软的；裁剪边界正好压在文字左端时
+     那圈软边会被齐着切掉。实测这点差别只有 ~2px（A/B 探针截图对比过），肉眼几乎看不出，
+     属于预防性处理：**带模糊/发光的内容配 overflow 裁剪时，裁剪框要比内容宽出一圈**。
+     （需求方说的“歌词左边没有过渡”不是它——见 v4.88 的定案。） */
+  --ly-bleed-x: 24px;
+  margin-inline: calc(-1 * var(--ly-bleed-x));
+  padding-inline: var(--ly-bleed-x);
   overflow: hidden;
   /* 上下渐隐带（LR-04：让歌词"从雾里进出"而不是被硬切）。**上缘那一条按需开关**
      （`--ly-fade-top` 由 JS 写）：列表没被推起时，顶上本来就没有正在离场的行，
@@ -516,6 +524,9 @@ onBeforeUnmount(() => {
    过冲，跳转时换慢速参数也不会甩——这些过渡都做不到（v4.85 移植、v4.86 改为自研实现）。 */
 .ly-list {
   will-change: transform;
+  /* 列内横向留白：与标题共用 --im-text-pad-x，保证整条文字列只有一条左边界（v4.88）。
+     注意 measure() 会写内联的 padding-top/bottom（自动居中的行程），不冲突。 */
+  padding-inline: var(--im-text-pad-x);
 }
 
 /* ---------- LR-07：手动浏览时的“回到当前句” ----------

@@ -19,6 +19,8 @@ defineProps<{
 <style scoped>
 .im-tb {
   min-width: 0;
+  /* 与歌词共用同一条横向留白：标题与歌词的左边界必须落在同一个 x（v4.88） */
+  padding-inline: var(--im-text-pad-x);
 }
 
 .im-tb b {

@@ -34,7 +34,9 @@
   /* 展示变量：由当前曲目封面取色写入（VS-02） */
   --accent: #7c8cff;
   --accent-2: #8b5cf6;
-  --accent-soft: rgba(124, 140, 255, 0.14);
+  /* 由 --accent 派生（原来是写死的 rgba(124,140,255,.14)——颜色值恰好对得上，
+     但 VS-02 取色管线接上后它不会跟着封面走，于是“同一套光”会分家）。 */
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
   --glow1: rgba(91, 124, 250, 0.26);
   --glow2: rgba(139, 92, 246, 0.2);
 
@@ -120,7 +122,9 @@
      它承载信息（"这里能点" / "正在放"），不是装饰（需求方 v4.30：颜色只用于表达状态）。
      全部由 --accent 派生，VS-02 取色管线接上后自动跟着封面走。 */
   --glow-ring: color-mix(in srgb, var(--accent) 16%, transparent);
-  --glow-halo: color-mix(in srgb, var(--accent) 38%, transparent);
+  /* 柔光浓度要能**看出是主题色**：38% 在浅色底上会被洗成淡紫灰（需求方：“光效颜色
+     应该是主题色”），提到 55%；光圈保持 16%——它只是 1px 的边界，再亮就抢画面。 */
+  --glow-halo: color-mix(in srgb, var(--accent) 55%, transparent);
 
   transition:
     --cover-src 0.5s ease,

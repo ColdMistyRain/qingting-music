@@ -29,14 +29,17 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   <div class="poster" :class="{ 'is-playing': playing }">
     <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内；
          光晕是装配的**兄弟节点** .vinyl-glow（比盘大 40%，要溢出盘外）——理由见下方样式。
-         飞入/飞出的**共享元素取外壳 .vinyl-assembly**（v5.22），不要取中心标签或旋转盘：
-         外壳不转，捕获到的四角永远是正的；旋转盘与标签跟着盘一起转，点击那一刻的角度是
-         任意的，拿它们当共享元素会看到封面“边飞边转”，落地还差出 8s/圈 → 420ms 的 19°。
-         盘本身在过渡期间要停住（不然快照是冻的、实况在转，落地会跳一下）——
-         见 global.css 里 `html[data-vt="on"] .poster.is-playing .v-disc` 那条（暂停而非撤掉动画）。 -->
+         **本布局不参与封面共享元素过渡（不加 .vt-cover）**：过渡只能形变盒子、不换位图，
+         而这里两端不是同一张画——彩胶是圆唱片 + 中心小标签，播放条是满幅方形封面。
+         飞起来要么在盘外露出方框残影，要么在落地那一帧硬切（v5.22~v5.24 连着修了三轮，
+         最后按需求方“做不到完美就退回普通过渡”撤掉）。彩胶只走整页交叉淡化；封面飞入留给
+         双栏布局（那里两端确实是同一张画）。
+         想接回来：给 .vinyl-assembly 加回 `vt-cover`，并把 global.css 里那条
+         `html[data-vt="on"] .poster.is-playing .v-disc { animation-play-state: paused }`
+         一并加回（快照是冻结帧，实况不停会在落地时差出角）。 -->
     <div class="poster__art" aria-hidden="true">
       <div class="vinyl-glow"></div>
-      <div class="vinyl-assembly vt-cover">
+      <div class="vinyl-assembly">
         <div class="v-disc">
           <div class="v-vinyl"></div>
           <div class="v-texture"></div>

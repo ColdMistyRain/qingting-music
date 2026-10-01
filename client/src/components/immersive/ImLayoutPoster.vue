@@ -111,7 +111,9 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 /* 外圈光晕。官方素材本身是浅灰的——灰色没有意义，有意义的是它的 alpha 分层：
    当 mask 用、再填色，才得到跟着封面配色走的**有机**柔光（box-shadow 做不出这种不规则衰减）。
-   位置与尺寸全部从盘径派生（与外壳同源），比盘大 40% —— 它就是那个“要溢出”的东西。 */
+   位置与尺寸全部从盘径派生（与外壳同源），比盘大 40% —— 它就是那个“要溢出”的东西。
+   它**随盘旋转**（v5.24 按原型与 3.9 动效表补上漏掉的 disc-spin 那一半：素材形状不规则，
+   转起来才看得出）。旋转与盘同频同向（8s/圈），所以两者相对关系不变，只是那团柔光自己在缓慢流动。 */
 .vinyl-glow {
   position: absolute;
   top: calc(var(--vinyl-t) - var(--vinyl-d) * 0.2);
@@ -122,12 +124,19 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   background: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
   -webkit-mask: url("../../assets/vinyl/glow.png") center / contain no-repeat;
   mask: url("../../assets/vinyl/glow.png") center / contain no-repeat;
+  animation: v-spin 8s linear infinite;
+  /* 暂停＝停在当前角度（像真的转盘停下）——与 .v-disc 同一套语义 */
+  animation-play-state: paused;
 }
 
-/* 呼吸只在播放时挂上：**暂停时没有动画 = opacity 回到 1（最亮帧）**。
-   若改成 animation-play-state: paused，暂停会停在呼吸到一半的暗帧（PRD 3.9 动效表要求）。 */
+/* 呼吸只在播放时挂上：**暂停时没有呼吸动画 = opacity 回到 1（最亮帧）**。
+   若把呼吸也改成 animation-play-state: paused，暂停会停在呼吸到一半的暗帧（PRD 3.9 动效表要求）。
+   所以这里写两条 animation：旋转常驻（暂停时冻结），呼吸只随播放挂上。 */
 .poster.is-playing .vinyl-glow {
-  animation: v-breathe 3.4s ease-in-out infinite;
+  animation:
+    v-spin 8s linear infinite,
+    v-breathe 3.4s ease-in-out infinite;
+  animation-play-state: running, running;
 }
 
 /* ::after = 盘缘内阴影环：一圈白边 + 向内晕开的深色，给盘体厚度 */
@@ -261,6 +270,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 @media (prefers-reduced-motion: reduce) {
   .v-disc,
+  .vinyl-glow,
   .poster.is-playing .vinyl-glow {
     animation: none;
   }

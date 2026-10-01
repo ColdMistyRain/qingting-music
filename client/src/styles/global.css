@@ -460,41 +460,67 @@ select {
 }
 
 ::view-transition-group(qt-cover) {
-  animation-duration: 0.42s;
+  animation-duration: var(--vt-cover-dur, 0.42s);
   animation-timing-function: var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
 }
 
 ::view-transition-old(qt-cover),
 ::view-transition-new(qt-cover) {
-  animation: none;
   mix-blend-mode: normal;
   height: 100%;
   overflow: hidden;
 }
 
-/* 只留大位图那一侧快照：飞入（`in`）时旧状态是播放条那张 52px 小图，藏掉它；
-   飞出（`out`）时新状态才是小图，藏掉那一侧。方向由 utils/viewTransition.ts 写在 `<html>` 上。
-   （海报布局正是靠这一条才能参与：两侧都画的话，播放条小图会直接叠在彩胶上。）
-   ⚠️ 这里**必须走继承的自定义属性**，不能写后代选择器（v5.22 实测纠正两次）：
-   `::view-transition-*(名字)` 这些伪元素虽然跟 `<html>` 挂在同一棵伪元素树上，
-   但 `html[data-vt-dir="out"] ::view-transition-new(qt-cover)` 这种“从元素派生的后代”
-   匹配不上（实测：探针把两侧同时 `opacity: 0 !important` 时飞行的图会彻底消失，
-   说明写法本身有效；一旦加上方向前缀就再也不生效）。自定义属性是沿树继承的，
-   在 `html` 上设、在伪元素里读，两边都稳。 */
+/* 方向开关（v5.19 → v5.22 修好写法 → v5.24 改成“头部/尾部交叉淡化”）：
+   两端位图分辨率差 5 倍（播放条 52px / 沉浸页 ~254px），所以整段飞行只让**大位图那一侧**
+   唱主角：飞入时小图（旧）在开头 ~28% 内淡出，飞出时方形封面（新）在末尾 ~28% 内淡入。
+   中间那 ~70% 只有一张大位图 —— 既不会“两张半透明的图叠在一起”（原型那版几乎看不见封面），
+   也不会在落地那一帧把圆唱片硬切成方形封面（需求方第二条反馈就是这个硬切）。
+   ⚠️ 方向必须走**继承的自定义属性**，不能写 `html[data-vt-dir] ::view-transition-…` 后代选择器：
+   具名伪元素不在“元素后代”树里，那种写法永远匹配不到（v5.22 实测纠正：探针把两侧同时
+   `opacity: 0 !important` 时飞行的图会彻底消失 → 写法有效，问题只在方向前缀）。
+   自定义属性沿树继承，在 `html` 上设、在伪元素里读，两边都稳。 */
+html {
+  --vt-cover-dur: 0.42s;
+}
+
 html[data-vt-dir="in"] {
-  --vt-old-opacity: 0;
+  --vt-old-anim: vt-cover-head-out var(--vt-cover-dur) linear;
 }
 
 html[data-vt-dir="out"] {
-  --vt-new-opacity: 0;
+  --vt-new-anim: vt-cover-tail-in var(--vt-cover-dur) linear;
 }
 
 ::view-transition-old(qt-cover) {
-  opacity: var(--vt-old-opacity, 1);
+  animation: var(--vt-old-anim, none);
 }
 
 ::view-transition-new(qt-cover) {
-  opacity: var(--vt-new-opacity, 1);
+  animation: var(--vt-new-anim, none);
+}
+
+/* 头部淡出 / 尾部淡入：把“谁唱主角”的切换放在看不清的那一小段时间里 */
+@keyframes vt-cover-head-out {
+  0% {
+    opacity: 1;
+  }
+
+  28%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-cover-tail-in {
+  0%,
+  72% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 /* 海报布局（彩胶）在过渡期间把**盘停住**（v5.22）：

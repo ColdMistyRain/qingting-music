@@ -13,13 +13,7 @@ import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
-import {
-  HoverCardArrow,
-  HoverCardContent,
-  HoverCardPortal,
-  HoverCardRoot,
-  HoverCardTrigger,
-} from "reka-ui";
+import { HoverCardContent, HoverCardPortal, HoverCardRoot, HoverCardTrigger } from "reka-ui";
 import { usePlayerStore } from "@/stores/player";
 import ScrollingText from "@/components/ScrollingText.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
@@ -152,7 +146,7 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
         <!-- 音量：点击静音，悬浮/聚焦展开竖向音量条（PL-04）
              悬浮层交给 Reka 的 HoverCard：开合延迟与"悬浮到面板上算不算还在里面"
-             由它判定，所以那个 ::after 透明桥接补丁（以及 ::before 手写小三角）退役。 -->
+             由它判定，所以 ::after 透明桥接补丁已退役。 -->
         <HoverCardRoot :open-delay="120" :close-delay="140">
           <HoverCardTrigger as-child>
             <button
@@ -168,7 +162,7 @@ const marqueeActive = computed(() => player.playing || hovering.value);
             <HoverCardContent
               class="vol-pop"
               side="top"
-              :side-offset="10"
+              :side-offset="4"
               role="group"
               aria-label="音量调节"
             >
@@ -186,7 +180,6 @@ const marqueeActive = computed(() => player.playing || hovering.value);
                 />
               </div>
               <span class="vol-pop__value">{{ levelPercent }}</span>
-              <HoverCardArrow class="vol-pop__arrow" :width="10" :height="5" />
             </HoverCardContent>
           </HoverCardPortal>
         </HoverCardRoot>
@@ -229,19 +222,17 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
 <style scoped>
 /* 音量悬浮面板（PL-04）的样式在文件末尾的**非 scoped** 块里：
-   Reka 把面板 Teleport 到 body，scoped 属性会丢（见那里的说明）。 */
-
-@media (prefers-reduced-motion: reduce) {
-  .vol-pop {
-    animation: none;
-  }
-}
+   Reka 把面板 Teleport 到 body，scoped 属性会丢（见那里的说明）。
+   所以它的 prefers-reduced-motion 降级也写在那边，不要写在这里
+   —— 写在这里是**死代码**：选择器根本匹配不上（v4.61 清理）。 */
 </style>
 
 <style>
 /* ---------- 音量悬浮面板（PL-04） ----------
    开合、延迟、"鼠标从按钮移到面板上"的判定全部交给 Reka HoverCard（v4.60）：
-   原来的 ::after 透明桥接与 ::before 手写小三角已退役，箭头改用 HoverCardArrow。
+   原来的 ::after 透明桥接与 ::before 手写小三角已退役；
+   小三角（HoverCardArrow）也在 v4.61 按需求方意见拿掉了——面板底边离按钮只有 4px，
+   箭头反而多一层噪音。
    材质用**实底**而不是 chrome 玻璃：它浮在播放条上，背后是平坦底色，没有内容可模糊，
    玻璃在这只会变成"看不见的一圈描边"（实拍发现的回归）；
    队列弹层因为背后有滚动列表，仍然用 chrome 玻璃。
@@ -253,8 +244,10 @@ const marqueeActive = computed(() => player.playing || hovering.value);
   display: grid;
   justify-items: center;
   gap: 6px;
-  padding: 14px 10px 10px;
-  min-width: 60px;
+  /* 横向内边距与最小宽度都是“收窄面板”的旋钮：面板只需容下 18px 滑杆与
+     “100%”读数，宽出一截都是空白（v4.61 需求方：“音量条窄一点”）。 */
+  padding: 14px 8px 10px;
+  min-width: 46px;
   border-radius: var(--radius-control);
   background: var(--plane-2);
   border: 1px solid var(--glass-border);
@@ -268,10 +261,6 @@ const marqueeActive = computed(() => player.playing || hovering.value);
     opacity: 0;
     transform: translateY(4px) scale(0.96);
   }
-}
-
-.vol-pop__arrow {
-  fill: var(--plane-2);
 }
 
 .vol-pop__track {

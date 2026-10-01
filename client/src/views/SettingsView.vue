@@ -175,7 +175,15 @@ async function signOut(): Promise<void> {
         <div class="set-card card">
           <b>播放快捷键</b>
           <div class="set-row"><span>播放 / 暂停</span><kbd>空格</kbd></div>
-          <div class="set-note">快退 / 快进与音量调节随后续版本补上。</div>
+          <div class="set-row">
+            <span>快退 / 快进 5 秒</span><span><kbd>←</kbd><kbd>→</kbd></span>
+          </div>
+          <div class="set-row">
+            <span>音量 ±5%</span><span><kbd>↑</kbd><kbd>↓</kbd></span>
+          </div>
+          <div class="set-note">
+            随时随地可用（沉浸页也一样）。焦点在输入框里时不生效——那些键要留给输入框。
+          </div>
         </div>
       </TabsContent>
 

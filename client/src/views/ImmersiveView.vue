@@ -10,6 +10,7 @@ import ImLayoutPoster from "@/components/immersive/ImLayoutPoster.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
+import { handleShortcut } from "@/utils/shortcuts";
 
 /**
  * 沉浸式播放页（VS-03 + 3.7 歌词）。
@@ -44,6 +45,13 @@ const ambientStyle = computed(() =>
   current.value.ambient2 ? undefined : { "--im-glow-2": "transparent" },
 );
 const router = useRouter();
+
+/** PL-01 / PL-08：本页是独立路由（不挂主壳），快捷键自己接——但判定用共享的那一份 */
+const shortcuts = {
+  toggle: () => player.toggle(),
+  seekBy: (seconds: number) => player.seekTo(player.progress + seconds),
+  adjustVolume: (delta: number) => player.setVolume(player.volume + delta),
+};
 
 const track = computed(() => player.currentTrack);
 const titleText = computed(() => track.value?.title ?? "");
@@ -102,12 +110,15 @@ function close(): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") close();
-  // 空格在主页由 PlayerLayout 接管；本页是独立路由，得自己接
-  else if (event.code === "Space" && player.hasTrack && event.target === document.body) {
-    event.preventDefault();
-    player.toggle();
+  if (event.key === "Escape") {
+    close();
+    return;
   }
+  // 空格：只在没聚焦任何元素时接管——聚焦在按钮上时空格该按那个按钮，
+  // 否则会出现“既点了按钮又切了播放”的双动作。
+  // 方向键：按钮不吃方向键，所以焦点在哪都接管（输入框里由共享判定拦掉）。
+  if (event.target !== document.body && event.code === "Space") return;
+  if (handleShortcut(event, shortcuts)) event.preventDefault();
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown));

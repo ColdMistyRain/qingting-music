@@ -4,7 +4,7 @@ import AppSidebar from "@/components/AppSidebar.vue";
 import PlayerBar from "@/components/PlayerBar.vue";
 import { useConfigStore } from "@/stores/config";
 import { usePlayerStore } from "@/stores/player";
-import { isEditableTarget, type EditableLike } from "@/utils/keyboard";
+import { handleShortcut } from "@/utils/shortcuts";
 
 const STORAGE_KEY = "qt-sidebar-collapsed";
 
@@ -13,12 +13,16 @@ watch(collapsed, (value) => localStorage.setItem(STORAGE_KEY, value ? "1" : "0")
 
 const player = usePlayerStore();
 
-/** PL-01：空格键切换播放/暂停；焦点在输入类控件内时不拦截（否则打字打不了空格） */
+/** PL-01 / PL-08：空格切播放、左右方向键快退快进 5 秒、上下方向键调音量。
+    键位判定在 utils/shortcuts（沉浸页共用同一套，避免两处各写一份漂掉）。 */
+const shortcuts = {
+  toggle: () => player.toggle(),
+  seekBy: (seconds: number) => player.seekTo(player.progress + seconds),
+  adjustVolume: (delta: number) => player.setVolume(player.volume + delta),
+};
+
 function onKeydown(event: KeyboardEvent): void {
-  if (event.code !== "Space" || event.repeat) return;
-  if (isEditableTarget(event.target as unknown as EditableLike | null)) return;
-  event.preventDefault();
-  player.toggle();
+  if (handleShortcut(event, shortcuts)) event.preventDefault();
 }
 
 onMounted(() => {

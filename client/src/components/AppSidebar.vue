@@ -42,17 +42,22 @@ const navItems = computed<NavItem[]>(() => {
     <div class="sb-inner">
       <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听音乐</span></div>
 
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.name"
-        class="nav-item"
-        active-class="active"
-        :title="item.label"
-        :to="{ name: item.name }"
-      >
-        <component :is="item.icon" class="icon" />
-        <span class="lbl">{{ item.label }}</span>
-      </RouterLink>
+      <!-- 主导航：包一层 nav（顺便拿到 navigation 地标），并且**项与项之间留 4px** ——
+           不加间距时，悬浮/选中的圆角底色会上下贴成一块（需求方：“又挤在一起了”）。
+           4px 是 shadcn 的 sidebar 里 `SidebarMenu` 的 `gap-1`，页脚那两枚也用同一个值（v5.11）。 -->
+      <nav class="sb-nav">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.name"
+          class="nav-item"
+          active-class="active"
+          :title="item.label"
+          :to="{ name: item.name }"
+        >
+          <component :is="item.icon" class="icon" />
+          <span class="lbl">{{ item.label }}</span>
+        </RouterLink>
+      </nav>
 
       <!-- 歌单分区（PRD 3.6 / 原型 v2.6）：数据接入在 M2（PS-01） -->
       <div class="sb-sep" />
@@ -118,6 +123,16 @@ const navItems = computed<NavItem[]>(() => {
   letter-spacing: 1px;
   padding: 4px 12px 18px;
   white-space: nowrap;
+}
+
+/* 导航列表与页脚用同一个“项间距”（v5.11）：4px。
+   贴在一起时，悬浮/选中的圆角底色会上下连成一块；页脚原本是 2px、主体是 0，
+   两种节奏并存只会让人以为是 bug。 */
+.sb-nav,
+.sb-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sb-logo .note {
@@ -210,10 +225,8 @@ const navItems = computed<NavItem[]>(() => {
 }
 
 .sb-foot {
+  /* flex 列与 4px 间距见上面 .sb-nav/.sb-foot 的共用规则，这里只管“贴底” */
   margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .sb-foot .nav-item {

@@ -49,12 +49,21 @@ export interface Song {
   uploadedAt: string;
 }
 
-/** 歌单内的一条曲目引用（跨来源） */ export interface PlaylistItem {
+/** 歌单内的一条曲目引用（跨来源，PS-02） */
+export interface PlaylistItem {
   source: TrackSource;
-  /** source = server 时为 Song.id；online 为 "provider:id"；local 仅记文件名 */
+  /**
+   * 引用键（见铁律 4：在线曲目用 `provider:id`）：
+   *   server → `Song.id`
+   *   online → `provider:id`
+   *   local  → 稳定键 `歌手|曲名`（本地曲目的 id 每次重新导入都会变，不能当引用；
+   *            与歌词库 `lyricsLibrary` 同一口径）
+   * 可选是因为早期只记文件名的数据也能读回来。
+   */
   refId?: string;
   title: string;
   artist: string;
+  /** 冗余存一份展示信息：原曲目从曲库删掉后，歌单里仍能显示它曾经是什么 */
   cover?: string | null;
   duration?: number | null;
 }
@@ -65,6 +74,11 @@ export interface Playlist {
   items: PlaylistItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** GET /api/playlists 的返回（PS-01）：侧栏与详情页一次拿全，量很小 */
+export interface PlaylistListResult {
+  playlists: Playlist[];
 }
 
 /** GET /api/songs 的返回（LB-04）：列表一次拿全，过滤/排序在客户端做（LB-07） */
@@ -179,4 +193,55 @@ function splitOnLastDash(text: string): { title: string; artist: string } | null
 export function hasAccess(role: Role, required: AccessLevel): boolean {
   if (required === "admin") return role === "admin";
   return role === "visitor" || role === "admin";
+}
+
+/* ---------- 歌单（PS-01~04）：纯函数，前后端共用 ---------- */
+
+/** 歌单名长度上限 */
+export const PLAYLIST_NAME_MAX_LENGTH = 40;
+
+/** 歌单名校验：去首尾空白后不能为空、不能超长（无名或长到看不清的歌单在侧栏上没法认） */
+export function validatePlaylistName(
+  raw: unknown,
+): { ok: true; name: string } | { ok: false; message: string } {
+  if (typeof raw !== "string") return { ok: false, message: "歌单名不能为空" };
+  const name = raw.trim();
+  if (!name) return { ok: false, message: "歌单名不能为空" };
+  if (name.length > PLAYLIST_NAME_MAX_LENGTH) {
+    return { ok: false, message: `歌单名最多 ${PLAYLIST_NAME_MAX_LENGTH} 个字` };
+  }
+  return { ok: true, name };
+}
+
+/** 曲目引用的身份键：优先用 refId，没有就退到“来源 + 歌手|曲名”（本地曲目与旧数据走这条） */
+export function playlistItemKey(item: PlaylistItem): string {
+  return `${item.source}:${item.refId || `${item.artist}|${item.title}`}`;
+}
+
+/** 去重：同一首歌重复加进歌单只留一条（保留先加的那条，其余顺序不变） */
+export function dedupePlaylistItems(items: readonly PlaylistItem[]): PlaylistItem[] {
+  const seen = new Set<string>();
+  const result: PlaylistItem[] = [];
+  for (const item of items) {
+    const key = playlistItemKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}
+
+/** 把播放器曲目转成歌单引用（PS-02：本地 / 云端 / 在线三种来源都支持） */
+export function toPlaylistItem(track: Track): PlaylistItem {
+  const item: PlaylistItem = {
+    source: track.source,
+    title: track.title,
+    artist: track.artist,
+    cover: track.cover,
+    duration: track.duration,
+  };
+  // server → Song.id；online → `provider:id`（铁律 4 已经保证在线曲目的 id 就是这个形状）；
+  // local 的 id 每次重新导入都会变，改用“歌手|曲名”稳定键
+  item.refId = track.source === "local" ? `${track.artist}|${track.title}` : track.id;
+  return item;
 }

@@ -61,6 +61,15 @@ export function apiPost<T>(path: string, body?: unknown): Promise<T> {
   });
 }
 
+/** PUT JSON 请求，直接返回 data 部分（歌单改名与曲目整表替换用它） */
+export function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  return request<T>(path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
 /** DELETE 请求，直接返回 data 部分 */
 export function apiDelete<T>(path: string): Promise<T> {
   return request<T>(path, { method: "DELETE" });

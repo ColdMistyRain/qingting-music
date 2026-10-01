@@ -68,6 +68,32 @@ describe("队列操作（PL-06）", () => {
     expect(player.progress).toBe(0);
     expect(player.duration).toBe(0);
   });
+
+  it("setQueue 整单替换并从指定那首开始播（PS-03 播放歌单）", () => {
+    const player = usePlayerStore();
+    player.addTracks([track("old")]);
+
+    player.setQueue([track("a"), track("b"), track("c")], 1);
+
+    expect(player.queue.map((item) => item.id)).toEqual(["a", "b", "c"]);
+    expect(player.currentTrack?.id).toBe("b");
+    expect(player.progress).toBe(0);
+    // 单测环境不创建 <audio>，所以只断言“选中了哪一首”，不断言 playing
+  });
+
+  it("setQueue 起点越界时夹回合法范围；空数组等于只清空", () => {
+    const player = usePlayerStore();
+
+    player.setQueue([track("a"), track("b")], 99);
+    expect(player.currentTrack?.id).toBe("b");
+
+    player.setQueue([track("a"), track("b")], -3);
+    expect(player.currentTrack?.id).toBe("a");
+
+    player.setQueue([]);
+    expect(player.queue).toEqual([]);
+    expect(player.hasTrack).toBe(false);
+  });
 });
 
 describe("播放与切歌（PL-01/02/05）", () => {

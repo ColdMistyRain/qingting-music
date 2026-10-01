@@ -394,6 +394,20 @@ export const usePlayerStore = defineStore("player", () => {
     persist();
   }
 
+  /**
+   * 整单替换并开播（PS-03 播放歌单）：先清空（释放旧的 Blob URL / 登记），再放进新的一批。
+   * 从 `startIndex` 那一首开始播；越界时夹回合法范围。
+   */
+  function setQueue(tracks: readonly Track[], startIndex = 0): void {
+    clear();
+    if (tracks.length === 0) return;
+    queue.value = [...tracks];
+    const index = Math.min(Math.max(startIndex, 0), tracks.length - 1);
+    currentIndex.value = index;
+    persist();
+    playAt(index);
+  }
+
   /** 追加曲目；同 ID 视为重复，直接跳过并释放其 Blob URL，返回新增条数 */
   function addTracks(tracks: readonly Track[]): number {
     const existing = new Set(queue.value.map((track) => track.id));
@@ -571,6 +585,7 @@ export const usePlayerStore = defineStore("player", () => {
     toggle,
     notify,
     playAt,
+    setQueue,
     next,
     prev,
     seekTo,

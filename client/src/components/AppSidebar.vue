@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { RouterLink } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { RouterLink, useRouter } from "vue-router";
 import IconCaretDoubleLeft from "~icons/ph/caret-double-left";
 import IconGearSix from "~icons/ph/gear-six";
 import IconListPlus from "~icons/ph/list-plus";
+import IconPlaylist from "~icons/ph/playlist";
+import InlineNameInput from "@/components/InlineNameInput.vue";
 import { useNavItems } from "@/composables/useNavItems";
+import { playlistErrorMessage } from "@/api/playlists";
+import { useAuthStore } from "@/stores/auth";
+import { usePlaylistsStore } from "@/stores/playlists";
 
 const props = withDefaults(defineProps<{ collapsed: boolean; toggleLabel?: string }>(), {
   toggleLabel: "折叠侧边栏",
@@ -12,6 +18,33 @@ defineEmits<{ toggle: [] }>();
 
 /** 一级导航与手机底栏共用一份（RT-02）：按身份与音源配置裁剪的逻辑在 useNavItems 里 */
 const navItems = useNavItems();
+
+const auth = useAuthStore();
+const playlists = usePlaylistsStore();
+const router = useRouter();
+
+/** 歌单存在服务器端（PS-01），且是访客级（AC-03）—— 未登录时看不到也建不了（AC-01） */
+const canUsePlaylists = computed(() => auth.role !== "anonymous");
+const creating = ref(false);
+
+onMounted(() => {
+  if (canUsePlaylists.value) void playlists.load();
+});
+
+/** 新建：建完直接跳进新歌单，省得再去列表里找一遍 */
+async function submitCreate(name: string): Promise<void> {
+  creating.value = false;
+  try {
+    const created = await playlists.create(name);
+    await router.push({ name: "playlist", params: { id: created.id } });
+  } catch (error) {
+    playlists.error = playlistErrorMessage(error);
+  }
+}
+
+function dismissPlaylistError(): void {
+  playlists.clearError();
+}
 </script>
 
 <template>
@@ -43,16 +76,54 @@ const navItems = useNavItems();
           </RouterLink>
         </nav>
 
-        <!-- 歌单分区（PRD 3.6 / 原型 v2.6）：数据接入在 M2（PS-01） -->
+        <!-- 歌单分区（PRD 3.6 / PS-01）：侧栏只放「列表 + 新建」，详情在内容区 -->
         <div class="sb-sep" />
         <div class="sb-section">
           <div class="sb-section-head">
             <span class="lbl">歌 单</span>
-            <button class="sb-add" disabled title="新建歌单（开发中）">
+            <button
+              class="sb-add"
+              :disabled="!canUsePlaylists"
+              :title="canUsePlaylists ? '新建歌单' : '登录后可用'"
+              @click="creating = true"
+            >
               <IconListPlus class="icon" />
             </button>
           </div>
-          <p class="sb-hint lbl">暂无歌单</p>
+
+          <InlineNameInput
+            v-if="creating"
+            class="sb-new"
+            placeholder="歌单名"
+            @submit="submitCreate"
+            @cancel="creating = false"
+          />
+
+          <p v-if="!canUsePlaylists" class="sb-hint lbl">登录后可用</p>
+          <p
+            v-else-if="playlists.error"
+            class="sb-hint lbl"
+            role="alert"
+            @click="dismissPlaylistError"
+          >
+            {{ playlists.error }}
+          </p>
+          <p v-else-if="playlists.count === 0 && !creating" class="sb-hint lbl">暂无歌单</p>
+
+          <ul v-else-if="playlists.count > 0" class="sb-lists">
+            <li v-for="playlist in playlists.playlists" :key="playlist.id">
+              <RouterLink
+                class="nav-item"
+                exact-active-class="active"
+                :title="playlist.name"
+                :to="{ name: 'playlist', params: { id: playlist.id } }"
+              >
+                <IconPlaylist class="icon" />
+                <span class="lbl">{{ playlist.name }}</span>
+                <span class="sb-count lbl">{{ playlist.items.length }}</span>
+              </RouterLink>
+            </li>
+          </ul>
         </div>
       </div>
 
@@ -254,6 +325,26 @@ const navItems = useNavItems();
   font-size: 12px;
   color: var(--text-3);
   padding: 4px 0;
+}
+
+/* 歌单列表：节奏与 .sb-nav 一致（4px 间距），折叠态只留图标 */
+.sb-lists {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+}
+
+.sb-new {
+  margin: 2px 0 6px;
+}
+
+/* 曲目数徽标（原型 v2.6）：弱一档，不与歌单名抢注意力 */
+.sb-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .sb-foot {

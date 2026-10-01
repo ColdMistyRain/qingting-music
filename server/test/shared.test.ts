@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { fileExtension, hasAccess, isAudioFileName, parseTrackFileName } from "@qingting/shared";
+import {
+  PLAYLIST_NAME_MAX_LENGTH,
+  dedupePlaylistItems,
+  fileExtension,
+  hasAccess,
+  isAudioFileName,
+  parseTrackFileName,
+  playlistItemKey,
+  toPlaylistItem,
+  validatePlaylistName,
+  type PlaylistItem,
+  type Track,
+} from "@qingting/shared";
 
 describe("fileExtension", () => {
   it("取小写扩展名", () => {
@@ -97,5 +109,90 @@ describe("hasAccess", () => {
     expect(hasAccess("admin", "admin")).toBe(true);
     expect(hasAccess("visitor", "admin")).toBe(false);
     expect(hasAccess("anonymous", "admin")).toBe(false);
+  });
+});
+
+describe("validatePlaylistName（PS-01）", () => {
+  it("去首尾空白后返回合法名字", () => {
+    expect(validatePlaylistName("  夜行歌单  ")).toEqual({ ok: true, name: "夜行歌单" });
+  });
+
+  it("空名 / 全空白 / 非字符串都拒绝", () => {
+    expect(validatePlaylistName("")).toMatchObject({ ok: false });
+    expect(validatePlaylistName("   \n ")).toMatchObject({ ok: false });
+    expect(validatePlaylistName(undefined)).toMatchObject({ ok: false });
+    expect(validatePlaylistName(42)).toMatchObject({ ok: false });
+  });
+
+  it("超长名字拒绝（按去空白后的长度算，正好等于上限仍然通过）", () => {
+    expect(validatePlaylistName("a".repeat(PLAYLIST_NAME_MAX_LENGTH))).toMatchObject({ ok: true });
+    const tooLong = validatePlaylistName("a".repeat(PLAYLIST_NAME_MAX_LENGTH + 1));
+    expect(tooLong).toMatchObject({ ok: false });
+  });
+});
+
+describe("playlistItemKey / dedupePlaylistItems（PS-02）", () => {
+  const serverItem: PlaylistItem = {
+    source: "server",
+    refId: "song-1",
+    title: "海阔天空",
+    artist: "BEYOND",
+  };
+  const localItem: PlaylistItem = { source: "local", title: "夜行", artist: "林晚" };
+
+  it("有 refId 用 refId，没有就退到「来源 + 歌手|曲名」", () => {
+    expect(playlistItemKey(serverItem)).toBe("server:song-1");
+    expect(playlistItemKey(localItem)).toBe("local:林晚|夜行");
+  });
+
+  it("同一首歌重复加只留一条，保留先加的那条", () => {
+    const first = { ...serverItem, cover: "/covers/a.jpg" };
+    const again = { ...serverItem, cover: "其他" };
+    expect(dedupePlaylistItems([first, again])).toEqual([first]);
+  });
+
+  it("本地曲目靠“歌手|曲名”去重（id 每次导入都变）", () => {
+    expect(dedupePlaylistItems([localItem, { ...localItem, cover: "x" }])).toHaveLength(1);
+  });
+
+  it("不同来源/不同曲目不会被误合并，顺序保持", () => {
+    const mixed = [serverItem, localItem, { ...localItem, source: "online" as const }];
+    expect(dedupePlaylistItems(mixed)).toHaveLength(3);
+  });
+});
+
+describe("toPlaylistItem（PS-02：任意来源的曲目都能进歌单）", () => {
+  const base: Track = {
+    id: "song-1",
+    source: "server",
+    url: "/audio/a.mp3",
+    title: "海阔天空",
+    artist: "BEYOND",
+    album: "乐与怒",
+    cover: "/covers/a.jpg",
+    duration: 325,
+  };
+
+  it("云端曲目用 Song.id 作引用", () => {
+    expect(toPlaylistItem(base)).toEqual({
+      source: "server",
+      refId: "song-1",
+      title: "海阔天空",
+      artist: "BEYOND",
+      cover: "/covers/a.jpg",
+      duration: 325,
+    });
+  });
+
+  it("在线曲目用 provider:id 作引用（铁律 4）", () => {
+    expect(toPlaylistItem({ ...base, source: "online", id: "netease:123" }).refId).toBe(
+      "netease:123",
+    );
+  });
+
+  it("本地曲目改用“歌手|曲名”（本地 id 每次导入都会重新生成）", () => {
+    expect(toPlaylistItem({ ...base, source: "local", id: "blob-abc" }).refId).toBe(
+      "BEYOND|海阔天空",
+    );
   });
 });

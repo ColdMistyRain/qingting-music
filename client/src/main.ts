@@ -5,6 +5,8 @@ import { router } from "./router";
 import { useThemeStore } from "./stores/theme";
 import "./styles/tokens.css";
 import "./styles/global.css";
+// 材质双模式（v4.55）：必须排在 global.css 之后，靠 `[data-material]` 覆盖外壳底色
+import "./styles/material.css";
 
 const app = createApp(App);
 

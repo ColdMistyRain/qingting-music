@@ -1,0 +1,94 @@
+/* ============================================================
+   轻听音乐 · 材质双模式（v4.55，供需求方在同一页面上比对）
+   ------------------------------------------------------------
+   背景：需求方对着 Apple Music 网页版说"我们的玻璃拟态不太像"。逐项量过之后，
+   真因不是参数没调好，而是**玻璃用错了地方**：
+   1) 玻璃后面没有可模糊的高频细节（我们背后是平滑光晕，糊前糊后一样），
+      于是玻璃的"存在感"只剩描边 + 投影 → 读起来是半透明卡片，不是一层材质；
+   2) 1px 描边 + 大投影是"卡片/窗口"的语言，Apple 的玻璃两者都没有；
+   3) 深色下岛面填充只有 0.055，基本等于底色，层次全靠描边撑；
+   4) Apple 页面底色是不透明中性色（浅 #fff / 深 #1f1f1f），我们整页被封面光晕染紫。
+
+   本文件只做一件事：把"材质"抽成一个可切换的维度（<html data-material>），
+   两种模式共用同一套令牌**名字**，组件不判断模式、不写死颜色（遵守铁律 3 与 5.6.5）。
+   - islands（默认，现状）：半透明玻璃浮岛 + 封面光晕 + 描边 + 投影。
+   - flat（对比用）      ：中性底色 + 实心面板，分隔只靠留白与细线；
+     "玻璃"退回它真正成立的位置 —— 浮在内容之上的 chrome（播放条等）。
+   Apple Music Web 实测值（浅 / 深）：
+     底色 #ffffff / #1f1f1f；导航玻璃 saturate(2.2) blur(16px) + rgba(245,245,247,.55)
+     / rgba(38,38,40,.6)；悬浮件 blur(60px) saturate(2) + rgba(246,246,246,.48~.6)；
+     描边 0 / 投影 none / 卡片完全透明。
+   ============================================================ */
+
+:root {
+  /* 浮层材质：所有"盖在内容之上"的临时层共用（播放条、音量弹层、沉浸页浮件） */
+  --chrome-bg: rgba(245, 245, 247, 0.55);
+  --chrome-blur: blur(16px) saturate(2.2);
+  /* 实心面板色：flat 模式下岛/卡片用它 */
+  --plane: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  --chrome-bg: rgba(38, 38, 40, 0.6);
+  --plane: #232326;
+}
+
+/* ---------- flat：浅色 ---------- */
+:root[data-material="flat"][data-theme="light"] {
+  /* 中性底色：去掉封面光晕，颜色只留给封面与状态（需求方 v4.30 定调） */
+  --bg-base: #f0f0f2;
+  --plane: #ffffff;
+  --glow1: transparent;
+  --glow2: transparent;
+  /* 扁平模式不靠投影拉层次 */
+  --shadow: none;
+  --card-shadow: none;
+  --glass-border: rgba(0, 0, 0, 0.1);
+}
+
+/* ---------- flat：深色 ---------- */
+:root[data-material="flat"][data-theme="dark"] {
+  --bg-base: #191919;
+  --plane: #232326;
+  --glow1: transparent;
+  --glow2: transparent;
+  --shadow: none;
+  --card-shadow: none;
+  --glass-border: rgba(255, 255, 255, 0.11);
+}
+
+/* ---------- flat：组件层 ---------- */
+
+/* 岛＝实心面板。描边 + 投影一起撤掉：它们是"卡片模板"的语言，
+   而扁平模式下页面的结构由留白（岛间距）与内容自身的层级说清。 */
+:root[data-material="flat"] .glass {
+  background: var(--plane);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+}
+
+/* 岛内卡片：底色与岛面相同（同一材质，不再用玻璃叠玻璃），分组只留**一条细线**，
+   投影撤掉。曾经把描边也撤掉过——洞：岛面与卡片都是白的，卡片直接消失、
+   设置页只剩一串文字（自评时发现并改回）。 */
+:root[data-material="flat"] .card {
+  background: var(--plane);
+  border: 1px solid var(--glass-border);
+  box-shadow: none;
+}
+
+/* 播放条是唯一常驻"浮在内容之上"的层 → 换成真正的 chrome 玻璃（无边无影），
+   这也是玻璃唯一成立的位置：内容从它下面滚过时才有东西可模糊。 */
+:root[data-material="flat"] .playerbar {
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  border: none;
+  box-shadow: none;
+}
+
+/* 投放区是交互目标不是装饰：细描边留着，只去掉投影 */
+:root[data-material="flat"] .dropzone {
+  box-shadow: none;
+}

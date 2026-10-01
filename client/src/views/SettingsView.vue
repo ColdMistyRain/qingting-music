@@ -75,7 +75,22 @@ async function signOut(): Promise<void> {
             <button :class="{ active: theme.mode === 'light' }" @click="theme.setTheme('light')">浅色</button>
           </div>
         </div>
-        <div class="set-note">默认跟随系统，手动切换后记忆选择（VS-08）。全部颜色走 CSS 变量，切换即时生效。</div>
+        <div class="set-row">
+          <span>材质</span>
+          <div class="seg">
+            <button :class="{ active: theme.material === 'islands' }" @click="theme.setMaterial('islands')">
+              玻璃浮岛
+            </button>
+            <button :class="{ active: theme.material === 'flat' }" @click="theme.setMaterial('flat')">
+              实心面板
+            </button>
+          </div>
+        </div>
+        <div class="set-note">
+          默认跟随系统，手动切换后记忆选择（VS-08）。全部颜色走 CSS 变量，切换即时生效。<br />
+          <b>材质</b>可切换比对：玻璃浮岛＝半透明玻璃岛 + 封面光晕 + 描边投影；
+          实心面板＝中性底色 + 实心面板，玻璃只留给浮在内容之上的层（播放条等）。
+        </div>
       </div>
       <div class="set-card card">
         <b>歌词页布局</b>

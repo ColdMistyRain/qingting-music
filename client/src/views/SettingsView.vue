@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import IconSignOut from "~icons/ph/sign-out";
+import SegmentedControl from "@/components/SegmentedControl.vue";
+import { useActiveIndicator } from "@/composables/useActiveIndicator";
 import { useAuthStore } from "@/stores/auth";
 import { useConfigStore } from "@/stores/config";
-import { useThemeStore, type ImLayout } from "@/stores/theme";
+import { useThemeStore, type ImLayout, type MaterialMode, type ThemeMode } from "@/stores/theme";
 import { tabSlideDirection } from "@/utils/tabs";
 
 /** 设置页（PRD 3.8）：顶部 Tab 形态，管理 Tab 仅管理员可见 */
@@ -35,35 +37,19 @@ const tabs = computed<SettingsTab[]>(() => {
 const active = ref("appearance");
 
 /* 下划线指示条（v5.6）：“会滑过去”靠的是一条共享元素，所以得知道当前 Tab 在哪、多宽。
-   这里只量两个原始值（x / w）写成 CSS 变量，滑动与宽度变化全交给 CSS 过渡
-   （与取色管线同一条原则：JS 不写样式，只写原始值）。 */
-const tabsWrapRef = ref<HTMLElement | null>(null);
-const ink = ref({ x: 0, w: 0 });
-const inkReady = ref(false);
-let inkObserver: ResizeObserver | undefined;
+   量坐标这件事抽成了 `useActiveIndicator`（v5.9）—— 分段控件的选中底板干的是同一件事，
+   两处共用一份实现；这里只把量到的两个原始值写成 CSS 变量，怎么滑留在 CSS。 */
+const {
+  setRoot: setTabsWrap,
+  rect: inkRect,
+  ready: inkReady,
+  sync: syncInk,
+} = useActiveIndicator('[role="tab"][data-state="active"]');
 
-function syncInk(): void {
-  const activeEl = tabsWrapRef.value?.querySelector<HTMLElement>(
-    '[role="tab"][data-state="active"]',
-  );
-  if (!activeEl) return;
-  // offsetLeft/offsetWidth 是相对 offsetParent（就是 .tabs-wrap，它有 position: relative）
-  ink.value = { x: activeEl.offsetLeft, w: activeEl.offsetWidth };
-}
-
-onMounted(async () => {
-  await nextTick();
-  syncInk();
-  // 首帧量完再打开过渡，否则指示条会从 0 滑到第一格（开页时的假动画）
-  requestAnimationFrame(() => {
-    inkReady.value = true;
-  });
-  // 窗口缩放、侧栏折叠、字体替换都会改变标签宽度，跟着重量一次
-  inkObserver = new ResizeObserver(() => syncInk());
-  if (tabsWrapRef.value) inkObserver.observe(tabsWrapRef.value);
-});
-
-onBeforeUnmount(() => inkObserver?.disconnect());
+const inkStyle = computed(() => ({
+  "--ink-x": `${inkRect.value.x}px`,
+  "--ink-w": `${inkRect.value.w}px`,
+}));
 
 // 切换时内容往哪边滑（v5.7）：与下划线“往哪边滑”同一个方向——
 // 选中项在列表里向后移就是从右边进来，向前移就从左边进来。
@@ -80,6 +66,29 @@ watch(active, (to, from) => {
   void nextTick(syncInk);
 });
 watch(tabs, () => void nextTick(syncInk));
+
+/* 分段控件（v5.9）：选项与绑定
+   两个控件都走 `SegmentedControl`（Reka RadioGroup 行为 + 我们自绘的滑动底板）。 */
+const modeOptions = [
+  { value: "dark", label: "深色" },
+  { value: "light", label: "浅色" },
+] as const;
+
+const materialOptions = [
+  { value: "islands", label: "玻璃浮岛" },
+  { value: "flat", label: "实心面板" },
+] as const;
+
+// v-model 需要可写计算属性：store 的 setter 要的类型比组件传出来的 string 窄，这里收口一次
+const themeMode = computed({
+  get: () => theme.mode,
+  set: (value: string) => theme.setTheme(value as ThemeMode),
+});
+
+const themeMaterial = computed({
+  get: () => theme.material,
+  set: (value: string) => theme.setMaterial(value as MaterialMode),
+});
 
 /** VS-09：三种沉浸页布局，设置页用**缩略图卡片**让需求方先看到版式再选（不是只给个名字） */
 const layouts: { key: ImLayout; label: string }[] = [
@@ -114,18 +123,14 @@ async function signOut(): Promise<void> {
          aria-label 得自己给：Reka 会给 tablist 角色，但不会替你起名字（v5.4 实测补上）——
          没有名字时屏幕阅读器只会念“标签列表”，不知道这组标签是干什么的。 -->
     <TabsRoot v-model="active" :style="{ '--panel-dir': dir }">
-      <div ref="tabsWrapRef" class="tabs-wrap" :class="{ 'is-ready': inkReady }">
+      <div :ref="setTabsWrap" class="tabs-wrap" :class="{ 'is-ready': inkReady }">
         <TabsList class="tabs" aria-label="设置分组">
           <TabsTrigger v-for="tab in tabs" :key="tab.key" :value="tab.key" class="tab">
             {{ tab.label }}
           </TabsTrigger>
         </TabsList>
         <!-- 下划线指示条：位置/宽度由 JS 写原始值（v5.6），装饰物所以 aria-hidden -->
-        <span
-          class="tabs__ink"
-          aria-hidden="true"
-          :style="{ '--ink-x': `${ink.x}px`, '--ink-w': `${ink.w}px` }"
-        />
+        <span class="tabs__ink" aria-hidden="true" :style="inkStyle" />
       </div>
 
       <!-- 外观 -->
@@ -134,31 +139,11 @@ async function signOut(): Promise<void> {
           <b>主题</b>
           <div class="set-row">
             <span>模式</span>
-            <div class="seg">
-              <button :class="{ active: theme.mode === 'dark' }" @click="theme.setTheme('dark')">
-                深色
-              </button>
-              <button :class="{ active: theme.mode === 'light' }" @click="theme.setTheme('light')">
-                浅色
-              </button>
-            </div>
+            <SegmentedControl v-model="themeMode" :options="modeOptions" />
           </div>
           <div class="set-row">
             <span>材质</span>
-            <div class="seg">
-              <button
-                :class="{ active: theme.material === 'islands' }"
-                @click="theme.setMaterial('islands')"
-              >
-                玻璃浮岛
-              </button>
-              <button
-                :class="{ active: theme.material === 'flat' }"
-                @click="theme.setMaterial('flat')"
-              >
-                实心面板
-              </button>
-            </div>
+            <SegmentedControl v-model="themeMaterial" :options="materialOptions" />
           </div>
           <div class="set-note">
             模式默认跟随系统，手动切换后记住选择。<br />

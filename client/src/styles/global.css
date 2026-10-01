@@ -1070,26 +1070,9 @@ kbd {
   color: var(--text-1);
 }
 
-.seg {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: var(--radius-control);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-}
-
-.seg button {
-  padding: 6px 16px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  color: var(--text-2);
-  transition: background 0.15s;
-}
-
-.seg button.active {
-  background: var(--accent);
-  color: var(--on-accent);
-}
+/* 分段控件（.seg 系列）的皮肤已随组件一起搬到 components/SegmentedControl.vue（v5.9）：
+   它现在有行为（Reka RadioGroup）和状态（滑动底板），不再是“一条全局类”。
+   全站只有设置页的「模式 / 材质」在用，所以跟着组件走，不再留两份。 */
 
 /* ---------- 移动端底线（RT-08）：不白屏、布局不崩 ---------- */
 @media (max-width: 767px) {

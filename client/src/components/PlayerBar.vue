@@ -15,6 +15,7 @@ import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
 import { usePlayerStore } from "@/stores/player";
 import ScrollingText from "@/components/ScrollingText.vue";
+import QueuePopover from "@/components/QueuePopover.vue";
 import { formatTime } from "@/utils/format";
 import type { PlayMode } from "@/utils/player";
 
@@ -190,9 +191,14 @@ const marqueeActive = computed(() => player.playing || hovering.value);
     </div>
 
     <div class="pb-right">
-      <button class="ctl" disabled title="播放队列（开发中）">
-        <IconQueue class="icon" />
-      </button>
+      <!-- 队列弹层（PL-06）：触发按钮由这里传入，保持播放条那套控件样式 -->
+      <QueuePopover>
+        <template #trigger>
+          <button class="ctl" :title="`播放队列（${player.queue.length} 首）`">
+            <IconQueue class="icon" />
+          </button>
+        </template>
+      </QueuePopover>
     </div>
   </footer>
 </template>

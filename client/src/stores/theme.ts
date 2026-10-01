@@ -20,9 +20,12 @@ function resolveInitial(): ThemeMode {
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
-/** 材质默认保持现状（玻璃浮岛）：外观基线不替需求方换 */
+/**
+ * 材质默认值（v4.59 需求方定稿）：默认「实心面板」（更接近 Apple Music 的材质逻辑）；
+ * 「玻璃浮岛」仍保留，设置 › 外观 一键切回并记忆。
+ */
 function resolveInitialMaterial(): MaterialMode {
-  return localStorage.getItem(MATERIAL_KEY) === "flat" ? "flat" : "islands";
+  return localStorage.getItem(MATERIAL_KEY) === "islands" ? "islands" : "flat";
 }
 
 export const useThemeStore = defineStore("theme", () => {

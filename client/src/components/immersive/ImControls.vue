@@ -122,54 +122,14 @@ function onPointerUp(event: PointerEvent): void {
   display: flex;
   align-items: center;
   gap: 20px;
-  /* 沉浸页的控件图标略大（22px），共享的音量控件跟着这里走 */
+  /* 沉浸页的控件只是**尺寸**比播放条大一档；配方其余部分（图标/主按钮的软底、
+     主题色、极淡描边、光晕、悬停光、禁用态、过渡）全在 global.css 的 .ctl 系列里，
+     这里只写差异（v4.98 收口）。v4.95 的漂移就是因为两处各留一份实现：主按钮在这里
+     写 48px / 图标 30px / 还有自己的一份 hover，播放条那边一改就只改了一半。
+     --ctl-icon-size 同时管到共享的音量控件（它渲染在 .im-ctrls 里）。 */
   --ctl-icon-size: 22px;
-}
-
-.ctl {
-  color: var(--text-2);
-  display: grid;
-  place-items: center;
-  transition:
-    color 0.15s,
-    filter 0.15s;
-}
-
-.ctl:hover:not(:disabled) {
-  color: var(--text-1);
-  /* 与播放条一致：悬浮反馈用光，不用放大（v4.67） */
-  filter: drop-shadow(0 0 6px var(--glow-halo));
-}
-
-.ctl:disabled {
-  opacity: 0.45;
-}
-
-.ctl .icon {
-  width: 22px;
-  height: 22px;
-}
-
-/* 主按钮与播放条同一套语言（半透明主题色软底 + 主题色图标 + 极淡描边）：
-   两处长得一样，用户才不会以为是两个不同的播放器 */
-.ctl.play {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-  box-shadow:
-    0 0 0 1px var(--glow-ring),
-    0 3px 14px -7px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-
-.ctl.play:hover:not(:disabled) {
-  filter: brightness(1.12) drop-shadow(0 0 6px var(--glow-halo));
-}
-
-.ctl.play .icon {
-  width: 30px;
-  height: 30px;
+  --ctl-play-size: 48px;
+  --ctl-play-icon: 30px;
 }
 
 .im-progress {

@@ -633,7 +633,13 @@ select {
     /* 悬浮反馈从“放大”换成“光”（v4.67）：过渡的也换成 filter */ filter 0.15s;
 }
 
-.ctl:hover:not(:disabled) {
+/* 悬浮反馈**只给旁边那几枚图标按钮**：文字色由 --text-2 提到 --text-1。
+   主按钮必须排除（`:not(.play)`）——它自带 `class="ctl play"`，不排除的话这条 (0,3,0)
+   会盖掉 `.ctl.play` 的 (0,2,0) 主题色，鼠标一放上去图标就从主题色变成 --text-1
+   （浅色主题近黑、深色主题近白），也就是 v4.98 需求方说的
+   “中间图标的颜色不应该变成白色或者黑色”（实测悬停色 rgba(18,24,38,.94) / rgba(255,255,255,.94)）。
+   主按钮的悬浮反馈只有光，见下面 `.ctl.play:hover`。 */
+.ctl:hover:not(:disabled):not(.play) {
   color: var(--text-1);
   /* 悬浮反馈用**光**而不是放大（v4.67 需求方：“这些按钮都不要放大效果”）：
      drop-shadow 才能给 SVG 图标上光（text-shadow 对图标无效），
@@ -646,8 +652,11 @@ select {
 }
 
 .ctl .icon {
-  width: 21px;
-  height: 21px;
+  /* 尺寸随宿主：调用方用 --ctl-icon-size 覆盖（播放条 21px、沉浸页 22px），
+     与 VolumeControl 的图标读同一个令牌（v4.98 收口：这里原来是写死的 21px，
+     沉浸页只好再写一份 scoped 规则去压它）。 */
+  width: var(--ctl-icon-size, 21px);
+  height: var(--ctl-icon-size, 21px);
 }
 
 /* 播放主按钮：**不用实心主题色底**（用户：“这个实心按钮不好看吧” → “像这样半透明” →
@@ -655,8 +664,10 @@ select {
    半透明主题色软底 + 主题色图标 + 一圈极淡描边 + 一层主题色光晕
    （光晕按 42px 的尺寸缩小，不照搬圆徽的 62px 参数）。 */
 .ctl.play {
-  width: 42px;
-  height: 42px;
+  /* 尺寸同样随宿主（播放条 42px、沉浸页 48px）——**只有尺寸是差异**，
+     其余（软底 / 主题色图标 / 极淡描边 / 光晕 / 悬停光）是两处共用的配方。 */
+  width: var(--ctl-play-size, 42px);
+  height: var(--ctl-play-size, 42px);
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
@@ -668,14 +679,24 @@ select {
 }
 
 .ctl.play:hover:not(:disabled) {
-  /* 悬浮只提亮一丁点：软底本身就是主题色，再叠底色会发闷（与 .btn-primary 同一手法）；
-     光效与其他控件一致地叠在 filter 里（两条 filter 会互相覆盖，必须写在一起）。 */
-  filter: brightness(1.12) drop-shadow(0 0 6px var(--glow-halo));
+  /* 主按钮的悬浮反馈**只有光**（v4.98 需求方：“鼠标放在播放按钮上时中间图标的颜色
+     不应该变成白色或者黑色，应该加上光效”）：
+     ① 不换文字色——图标是主题色，换成 --text-1 就是近黑/近白，等于把“这个是主按钮”
+        这条信息换成了一次颜色抖动（原因见上面那条 :not(.play)）；
+     ② 也不再叠 brightness()——它是乘性的，会把主题色推离本来的调（深色主题的主题色亮，推向白；
+        浅色主题的主题色暗，被推亮），同样属于“颜色变了”；软底本身就是 14% 的主题色，不缺这点亮度。
+     比旁边那几枚强一档：它是一枚 42/48px 的圆盘，光要罩得住。
+     两层用**同一个令牌**：4px 那层贴着轮廓（边缘亮起来的实感）、14px 那层向外散开。
+     只写一层 10px 是不够的——圆盘只有 14% 不透明度，而 drop-shadow 的浓度跟着内容
+     alpha 走，散开就把浓度摊没了（实测浅色主题峰值差只剩 4/255 ≈ 看不见）；
+     收到 4px 才把浓度压在轮廓上（峰值差 60/255、5100+ 像素可见，深色 34/255）。
+     filter 会互相覆盖，所以光只写这一条（与 .ctl 的过渡共用 0.15s）。 */
+  filter: drop-shadow(0 0 4px var(--glow-halo)) drop-shadow(0 0 14px var(--glow-halo));
 }
 
 .ctl.play .icon {
-  width: 26px;
-  height: 26px;
+  width: var(--ctl-play-icon, 26px);
+  height: var(--ctl-play-icon, 26px);
 }
 
 /* 空闲态（还没选歌）：控制区退为"幽灵态"——

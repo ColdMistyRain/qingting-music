@@ -742,6 +742,21 @@ select {
   inset: 0 auto 0 0;
   border-radius: 4px;
   background: var(--accent);
+  /* “亮起来”要有个过渡，别“啪”地一下（v4.97）；亮的条件见下面 .progress.playing .fill */
+  transition: box-shadow 0.3s ease;
+}
+
+/* 播放中：走过的那一段也散一圈柔光（v4.97 需求方：“进度条是不是也可以加点光效？”）。
+   与手柄共用同一份柔光配方（8px / --accent-soft），所以“亮着的这一整段”看着是同一个光源：
+   手柄是灯芯、走过的部分是灯身；光色仍取自封面（VS-02），不新增颜色。
+   三条规矩：
+   ① 静止不亮——暂停就收拾干净（v4.30：颜色/动效只表达状态），这里只管“亮/不亮”的过渡；
+   ② 不跟着手柄一起呼吸——一幅画面里只让一个东西脉动，两个都呼吸会互相打架；
+      何况 box-shadow 不是合成层属性，逐帧动它就是每帧重绘（v4.94 记过这个坑）。
+      填充宽度本来就跟着 timeupdate（~4Hz）在变，这层 shadow 搭同一趟重绘，不额外加负担；
+   ③ 与手柄同在一条轨道上就别各写一个 blur 值——将来调亮度只改这两处（手柄 / 填充）。 */
+.progress.playing .fill {
+  box-shadow: 0 0 8px var(--accent-soft);
 }
 
 /* 滑杆手柄：进度条与音量条**共用这一份配方**（v4.95）。
@@ -756,6 +771,23 @@ select {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent-soft);
+  /* 平时不显示——“指针放到轨道上、键盘聚焦滑杆、或正在拖动”时才出现
+     （v4.96 需求方：“手柄只有鼠标放在轨道时才显示”）。
+     三个条件缺一不可：常驻圆点会把注意力从进度/音量本身拽到那个点上；
+     而拖动中**必须**保持可见，否则指针拖到轨道外时手柄会消失——
+     指针捕获并不保证 :hover 还在，所以拖动用状态类（seeking / dragging）兜底。 */
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* 出现条件（两个滑杆共用这一套，别在组件里再写一份） */
+.progress:hover .knob,
+.progress:focus-within .knob,
+.progress.seeking .knob,
+.vol-pop__track:hover .vol-pop__thumb,
+.vol-pop__track:focus-within .vol-pop__thumb,
+.vol-pop__track.dragging .vol-pop__thumb {
+  opacity: 1;
 }
 
 /* 进度手柄的定位（视觉在上面的共用配方里）：沿轨道按比例横向定位、垂直居中。
@@ -805,6 +837,12 @@ select {
 
 /* 减少动态效果：不呼吸，不过给一圈静态光晕——状态还看得出来（VS-07） */
 @media (prefers-reduced-motion: reduce) {
+  /* 手柄的淡入淡出、柔光的亮灭都不做过渡，直接切换 */
+  .progress .knob,
+  .vol-pop__thumb,
+  .progress .fill {
+    transition: none;
+  }
   .progress.playing .knob::after {
     animation: none;
     opacity: 0.35;

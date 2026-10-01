@@ -134,7 +134,11 @@ const marqueeActive = computed(() => player.playing || hovering.value);
         <div
           ref="barRef"
           class="progress"
-          :class="{ 'progress--disabled': !player.hasTrack, playing: player.playing }"
+          :class="{
+            'progress--disabled': !player.hasTrack,
+            playing: player.playing,
+            seeking: player.seeking,
+          }"
           @pointerdown="onPointerDown"
           @pointermove="onPointerMove"
           @pointerup="player.endSeek()"

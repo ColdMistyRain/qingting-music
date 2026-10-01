@@ -93,6 +93,7 @@ function onKeydown(event: KeyboardEvent): void {
         <div
           ref="trackRef"
           class="vol-pop__track"
+          :class="{ dragging }"
           role="slider"
           tabindex="0"
           aria-label="音量"

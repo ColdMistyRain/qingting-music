@@ -91,7 +91,11 @@ function onPointerUp(event: PointerEvent): void {
       <div
         ref="barRef"
         class="progress"
-        :class="{ 'progress--disabled': !player.hasTrack, playing: player.playing }"
+        :class="{
+          'progress--disabled': !player.hasTrack,
+          playing: player.playing,
+          seeking: player.seeking,
+        }"
         :style="{ '--p': `${player.displayRatio * 100}%` }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
@@ -182,34 +186,7 @@ function onPointerUp(event: PointerEvent): void {
   min-width: 34px;
 }
 
-.progress {
-  flex: 1;
-  height: 5px;
-  border-radius: 4px;
-  background: var(--fill-track);
-  position: relative;
-  cursor: pointer;
-}
-
-.progress--disabled {
-  cursor: default;
-}
-
-.progress .fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: 4px;
-  background: var(--accent);
-}
-
-/* 进度手柄的样式在 global.css 的 `.progress .knob`（两个播放条共用一份，v4.93 收口）；
-   这里只说沉浸页的差异：**只在悬停时出现**（沉浸页以歌词为主，常驻圆点太抢眼）。 */
-.progress .knob {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.progress:hover .knob {
-  opacity: 1;
-}
+/* 进度条本体（轨道 / 填充 / 手柄 / 播放时的柔光）与“手柄何时出现”全在 global.css 的共用规则里
+   （v4.95 手柄配方、v4.96 悬停才出现、v4.97 填充柔光）——
+   播放条与沉浸页是同一个控件，这里不再写第二份：v4.95 就是因为两边各留一份而漂过一次。 */
 </style>

@@ -2,7 +2,15 @@ import { createPinia, setActivePinia } from "pinia";
 import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Track } from "@qingting/shared";
+import { fetchLyrics } from "@/api/songs";
 import { NOTICE_TTL_MS, usePlayerStore } from "./player";
+
+// 云端歌词是开播时向 /api/songs/:id/lyrics 拉的（LR-02）：单测里只关心"拉没拉、什么时候拉"
+vi.mock("@/api/songs", () => ({
+  fetchLyrics: vi.fn(async (id: string) => ({
+    lyrics: id === "cloud" ? "[00:01.00]云端内嵌歌词" : null,
+  })),
+}));
 
 /** 队列里的曲目：用 https 地址，避免单测触碰 Blob URL 释放（那是浏览器行为） */
 function track(id: string, duration: number | null = null): Track {
@@ -536,5 +544,73 @@ describe("时长回填（LC-04 前置）", () => {
   it("未知 ID 不报错也不改动状态", () => {
     const player = usePlayerStore();
     expect(() => player.patchDuration("missing", 10)).not.toThrow();
+  });
+});
+
+describe("云端曲目的内嵌歌词（LR-02：开播时按需拉一次）", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(fetchLyrics).mockClear();
+  });
+
+  it("hasLyrics 为真：拉回来回填到曲目上，并落进「内嵌」优先级", async () => {
+    const player = usePlayerStore();
+    player.addTracks([{ ...track("cloud"), source: "server", hasLyrics: true }]);
+    player.playAt(0);
+
+    await vi.waitFor(() => expect(player.lyricsSource).toBe("[00:01.00]云端内嵌歌词"));
+    expect(player.currentTrack?.lyrics).toBe("[00:01.00]云端内嵌歌词");
+  });
+
+  it("没有内嵌歌词的云端曲目：一次也不去请求（hasLyrics 为假）", async () => {
+    const player = usePlayerStore();
+    player.addTracks([{ ...track("plain"), source: "server" }]);
+    player.playAt(0);
+    await Promise.resolve();
+
+    expect(fetchLyrics).not.toHaveBeenCalled();
+  });
+
+  it("本地曲目不去问服务端（歌词来自文件标签本身）", async () => {
+    const player = usePlayerStore();
+    player.addTracks([{ ...track("local"), source: "local", hasLyrics: true }]);
+    player.playAt(0);
+    await Promise.resolve();
+
+    expect(fetchLyrics).not.toHaveBeenCalled();
+  });
+
+  it("同一首来回切歌只拉一次（问过没有就是没有）", async () => {
+    const player = usePlayerStore();
+    player.addTracks([
+      { ...track("other"), source: "server" },
+      { ...track("cloud"), source: "server", hasLyrics: true },
+    ]);
+
+    player.playAt(1);
+    await vi.waitFor(() => expect(fetchLyrics).toHaveBeenCalledTimes(1));
+    player.playAt(0);
+    player.playAt(1);
+    await Promise.resolve();
+
+    expect(fetchLyrics).toHaveBeenCalledTimes(1);
+  });
+
+  it("手动导入的歌词仍然优先于云端内嵌歌词（LR-02 优先级不变）", async () => {
+    const memory = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => void memory.set(key, value),
+      removeItem: (key: string) => void memory.delete(key),
+    });
+    const player = usePlayerStore();
+    player.addTracks([{ ...track("cloud"), source: "server", hasLyrics: true }]);
+    player.playAt(0);
+    await vi.waitFor(() => expect(player.currentTrack?.lyrics).toBeTruthy());
+
+    player.importLyrics("[00:09.00]我自己找的");
+
+    expect(player.lyricsSource).toBe("[00:09.00]我自己找的");
+    vi.unstubAllGlobals();
   });
 });

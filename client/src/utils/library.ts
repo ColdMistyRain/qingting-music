@@ -44,5 +44,7 @@ export function songToTrack(song: Song): Track {
     album: song.album,
     cover: song.coverUrl,
     duration: song.duration,
+    // 有内嵌歌词时，播放器会在开播时去 /api/songs/:id/lyrics 拉一次（LR-02）
+    hasLyrics: song.hasLyrics === true,
   };
 }

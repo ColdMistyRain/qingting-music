@@ -11,6 +11,14 @@ export function deleteSong(id: string): Promise<{ id: string }> {
   return apiDelete<{ id: string }>(`/api/songs/${encodeURIComponent(id)}`);
 }
 
+/**
+ * 云端曲目的内嵌歌词（LR-02 第一优先级）。
+ * 正文不进列表响应（一首几 KB，列表不该拖着它走），开播时按需取；没有歌词时 lyrics 为 null。
+ */
+export function fetchLyrics(id: string): Promise<{ lyrics: string | null }> {
+  return apiGet<{ lyrics: string | null }>(`/api/songs/${encodeURIComponent(id)}/lyrics`);
+}
+
 /** 后端不可用/未接入时给页面一个可读的提示，而不是白屏 */
 export function libraryErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {

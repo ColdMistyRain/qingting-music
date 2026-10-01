@@ -3,6 +3,7 @@
  * 用 music-metadata 的浏览器入口（`parseBlob`）直接读 Blob，不经过服务器（LC-06）；
  * 解析失败不报错，交给调用方回退到文件名解析（LC-03）。
  */
+import { pickEmbeddedLyrics } from "@qingting/shared";
 
 export interface AudioTags {
   title: string | null;
@@ -35,8 +36,9 @@ function readText(value: string | undefined): string | null {
 export function pickTags(metadata: RawMetadataLike): AudioTags {
   const duration = metadata.format?.duration;
   const picture = metadata.common?.picture?.[0];
-  // 内嵌歌词：取第一段有正文的（同一声明里偶尔会有多段，空白的忽略）
-  const lyrics = metadata.common?.lyrics?.find((entry) => entry.text?.trim())?.text?.trim() ?? null;
+  // 内嵌歌词：拿第一段有正文的。挑取规则与服务端共用一份（`pickEmbeddedLyrics`），
+  // 免得两边对同一个文件挑出不同的那一段（MP3 与 FLAC 给出来的形状就不一样）
+  const lyrics = pickEmbeddedLyrics(metadata.common?.lyrics);
 
   return {
     title: readText(metadata.common?.title),

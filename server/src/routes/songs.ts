@@ -8,6 +8,7 @@ import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail, sendOk } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
 import { parseAudioFile, decodeUploadFileName } from "../services/metadata.js";
+import { pruneLyrics, readLyrics, removeLyrics, saveLyrics } from "../services/lyrics.js";
 import {
   createSongId,
   createStoredName,
@@ -19,11 +20,14 @@ import {
 /**
  * 云端曲库（PRD 3.4 / 3.12，接口见 5.6）。
  *   GET    /api/songs           列表（访客及以上，LB-04）
+ *   GET    /api/songs/:id/lyrics 内嵌歌词原文（访客及以上，LR-02）
  *   POST   /api/songs/upload    上传（管理员，LB-01/02/03）
  *   DELETE /api/songs/:id       删除曲目与文件（管理员，LB-05）
  *   POST   /api/songs/reindex   扫 uploads 重建索引（管理员，LB-11 / AD-05）
  *
  * 索引每次现读现写（文件很小），不上内存缓存：省掉一整套缓存失效的坑。
+ * 内嵌歌词不走索引：正文存 `data/lyrics/<id>.lrc`，索引里只留 `hasLyrics` 标记
+ * （列表接口每次都要整读索引，几 MB 的歌词文本不该拖着一起走）。
  */
 
 /** 扩展名不在白名单（LB-02）：交给下面的错误映射翻成 415 */
@@ -55,6 +59,21 @@ export function createSongsRouter(config: AppConfig): Router {
     requireAccess("visitor"),
     asyncHandler(async (_req, res) => {
       sendOk(res, toSongListResult(await loadSongs(config.dataDir)));
+    }),
+  );
+
+  // 内嵌歌词原文（LR-02）：正文按需取，不进列表响应。没有歌词时 lyrics 为 null（不是 404）
+  router.get(
+    "/:id/lyrics",
+    requireAccess("visitor"),
+    asyncHandler(async (req, res) => {
+      const id = String(req.params.id);
+      const songs = await loadSongs(config.dataDir);
+      if (!songs.some((song) => song.id === id)) {
+        sendFail(res, 404, "这首曲目不在曲库里");
+        return;
+      }
+      sendOk(res, { lyrics: await readLyrics(config.dataDir, id) });
     }),
   );
 
@@ -100,10 +119,18 @@ export function createSongsRouter(config: AppConfig): Router {
         storedName: path.basename(file.path),
         size: file.size,
         uploadedAt: new Date().toISOString(),
+        hasLyrics: parsed.lyrics !== null,
       };
 
-      // 覆盖：先把旧文件删掉再写索引（反过来的话，中途失败会留下指向已删文件的条目）
-      if (duplicate) await removeSongFiles(config, duplicate);
+      // 覆盖：先把旧文件与旧歌词删掉再写索引（反过来的话，中途失败会留下指向已删文件的条目）
+      if (duplicate) {
+        await removeSongFiles(config, duplicate);
+        await removeLyrics(config.dataDir, duplicate.id);
+      }
+      // 先清再写：新上传的这个文件完全可能没有歌词，留着旧的就是挂了一首别的内容的歌词
+      await removeLyrics(config.dataDir, id);
+      if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
+
       const kept = songs.filter((song) => song.id !== duplicate?.id);
       await saveSongs(config.dataDir, [...kept, song]);
 
@@ -130,6 +157,7 @@ export function createSongsRouter(config: AppConfig): Router {
         songs.filter((entry) => entry.id !== id),
       );
       await removeSongFiles(config, song);
+      await removeLyrics(config.dataDir, id);
 
       sendOk(res, { id });
     }),
@@ -158,6 +186,10 @@ export function createSongsRouter(config: AppConfig): Router {
         const id = previous?.id ?? createSongId();
         const coverName = await saveCover(config, id, parsed.cover);
 
+        // 歌词跟着重建一起重抽：以前上传的曲目就是这样补上歌词的
+        if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
+        else await removeLyrics(config.dataDir, id);
+
         songs.push({
           id,
           title: parsed.title,
@@ -169,11 +201,18 @@ export function createSongsRouter(config: AppConfig): Router {
           storedName: name,
           size: info.size,
           uploadedAt: previous?.uploadedAt ?? info.mtime.toISOString(),
+          hasLyrics: parsed.lyrics !== null,
         });
         if (!previous) added += 1;
       }
 
       await saveSongs(config.dataDir, songs);
+      // 收尾：索引里已经没有的歌词文件一并清掉（只能是从前删歌时留下的余），
+      // 不把数量报给前端：这是内部清理，用户不需要知道
+      await pruneLyrics(
+        config.dataDir,
+        songs.map((song) => song.id),
+      );
 
       sendOk(res, {
         scanned: audioNames.length,

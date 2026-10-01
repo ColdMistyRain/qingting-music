@@ -1,5 +1,10 @@
 import { parseFile } from "music-metadata";
-import { UNKNOWN_ALBUM, UNKNOWN_ARTIST, parseTrackFileName } from "@qingting/shared";
+import {
+  UNKNOWN_ALBUM,
+  UNKNOWN_ARTIST,
+  parseTrackFileName,
+  pickEmbeddedLyrics,
+} from "@qingting/shared";
 
 /** 内嵌封面：交给调用方落盘（uploads/ 里与音频同目录，PRD 12） */
 export interface ParsedCover {
@@ -15,6 +20,8 @@ export interface ParsedAudio {
   /** 秒；解析不出为 0（绝不返回 NaN/负值——前端直接显示它） */
   duration: number;
   cover: ParsedCover | null;
+  /** 内嵌歌词原文（LRC）；没有就是 null。解析在共享层的 `pickEmbeddedLyrics` */
+  lyrics: string | null;
 }
 
 /**
@@ -38,6 +45,7 @@ export async function parseAudioFile(filePath: string, originalName: string): Pr
       album: clean(album) || UNKNOWN_ALBUM,
       duration: Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : 0,
       cover: toCover(picture?.[0]),
+      lyrics: pickEmbeddedLyrics(meta.common.lyrics),
     };
   } catch {
     return {
@@ -46,6 +54,7 @@ export async function parseAudioFile(filePath: string, originalName: string): Pr
       album: UNKNOWN_ALBUM,
       duration: 0,
       cover: null,
+      lyrics: null,
     };
   }
 }

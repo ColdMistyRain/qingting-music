@@ -59,9 +59,9 @@ shared/src/index.ts       前后端共享类型与纯函数（Track/Song/Playlis
 server/src/config.ts      环境变量 → AppConfig（PRD 5.5 全量清单，含 parseSize/parseTtl）
 server/src/http.ts        统一响应 sendOk/sendFail + errorHandler
 server/src/services/auth.ts  签名 Cookie 签发/验签、密码比对、密钥持久化
-server/src/services/       storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退）、range（Range 解析）
+server/src/services/       storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退 + 内嵌歌词）、lyrics（data/lyrics/<id>.lrc 按需读写）、range（Range 解析）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
-server/src/routes/        auth、config、songs（列表/上传/删除/重建索引）、audio（/audio + /covers）、stats
+server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/内嵌歌词）、audio（/audio + /covers）、stats、playlists
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen
 client/src/assets/        logo-mark.png（品牌标记：透明底单色，供 `.brand-mark` 遮罩上色；水印已裁掉）
 client/src/styles/        tokens.css（令牌 + OKLCH 取色核心）、global.css（外壳与共用类）、

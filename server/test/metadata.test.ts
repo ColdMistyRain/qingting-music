@@ -65,6 +65,7 @@ describe("parseAudioFile", () => {
       album: UNKNOWN_ALBUM,
       duration: 0,
       cover: null,
+      lyrics: null,
     });
   });
 

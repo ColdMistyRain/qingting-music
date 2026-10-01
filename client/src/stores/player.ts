@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import type { Track } from "@qingting/shared";
+import { fetchLyrics } from "@/api/songs";
 import {
   nextMode as nextPlayMode,
   PLAY_MODE_LABELS,
@@ -187,6 +188,30 @@ export const usePlayerStore = defineStore("player", () => {
   watch(currentIndex, () => {
     lyricsText.value = "";
   });
+
+  /* ---------- 云端曲目的内嵌歌词（LR-02）：开播时按需拉一次 ---------- */
+  /** 已经去服务端问过的曲目：来回切歌不重复请求（问过没有就是没有） */
+  const askedCloudLyrics = new Set<string>();
+
+  /**
+   * 拉取并回填内嵌歌词。
+   * 回填到那条 Track 的 `lyrics` 上之后，它自然落进 `pickLyricsSource` 的「内嵌」档——
+   * 优先级判定与沉浸页一行都不用改（手动导入仍然优先于它）。
+   * 拿不到就安静地当这首歌没内嵌歌词：手动导入与在线两条路仍然可用。
+   */
+  async function loadCloudLyrics(track: Track | null): Promise<void> {
+    if (!track || track.source !== "server" || !track.hasLyrics) return;
+    if (track.lyrics != null || askedCloudLyrics.has(track.id)) return;
+    askedCloudLyrics.add(track.id);
+    try {
+      const { lyrics } = await fetchLyrics(track.id);
+      if (lyrics) patchTrack(track.id, { lyrics });
+    } catch {
+      // 服务端不可用/这首歌已被删：不影响播放，也不影响手动与在线来源
+    }
+  }
+
+  watch(currentTrack, (track) => void loadCloudLyrics(track), { immediate: true });
 
   /**
    * VS-02：切歌时把封面的两个**原始色源**写到 <html> 上——

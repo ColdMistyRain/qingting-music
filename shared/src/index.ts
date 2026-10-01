@@ -27,10 +27,13 @@ export interface Track {
   duration: number | null;
   /**
    * 歌词原文（LR-02 的第一优先级：音频内嵌）。
-   * 只由客户端在读取本地标签时写入，服务端不下发这个字段，所以是可选的；
-   * 在线音源与手动 .lrc 两条来源不经 Track（由 player store 的 lyricsText 承载）。
+   * 本地曲目由客户端读标签时写入；云端曲目由客户端在开播时按需向
+   * `GET /api/songs/:id/lyrics` 取回后回填（服务端只存一份原文，不做解析）。
+   * 在线源与手动 .lrc 两条来源不经 Track（由 player store 的 lyricsText 承载）。
    */
   lyrics?: string | null;
+  /** 服务端抽到内嵌歌词了吗（云端曲目才有；客户端据此决定要不要去拉） */
+  hasLyrics?: boolean;
 }
 
 /** 服务端曲目记录（data/songs.json 的一条） */
@@ -47,6 +50,8 @@ export interface Song {
   storedName: string;
   size: number;
   uploadedAt: string;
+  /** 服务端抽到内嵌歌词了吗（歌词正文在 `data/lyrics/<id>.lrc`，不进列表响应、按需取） */
+  hasLyrics?: boolean;
 }
 
 /** 歌单内的一条曲目引用（跨来源，PS-02） */
@@ -195,11 +200,39 @@ export function hasAccess(role: Role, required: AccessLevel): boolean {
   return role === "visitor" || role === "admin";
 }
 
+/* ---------- 内嵌歌词（LR-02）：前后端共用一份归一化 ---------- */
+
+/**
+ * 从 music-metadata 的 `common.lyrics` 里挑出**第一段非空**歌词。
+ *
+ * 各容器给出来的形状不一样（同一个库、不同格式）：
+ *   MP3/ID3  → `{ language, descriptor, text }`
+ *   FLAC/Vorbis → `{ contentType, timeStampFormat, text }`
+ *   偶尔也有旧版本直接给字符串数组
+ * 所以这里只认 `text` 字段（或字符串元素），别的都忽略。客户端读本地文件、
+ * 服务端读上传文件都用这一份，避免两边挑出不同的那一段。
+ */
+export function pickEmbeddedLyrics(lyrics: unknown): string | null {
+  if (!Array.isArray(lyrics)) return null;
+  for (const entry of lyrics) {
+    const text =
+      typeof entry === "string"
+        ? entry
+        : entry &&
+            typeof entry === "object" &&
+            typeof (entry as { text?: unknown }).text === "string"
+          ? (entry as { text: string }).text
+          : "";
+    const trimmed = text.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
 /* ---------- 歌单（PS-01~04）：纯函数，前后端共用 ---------- */
 
 /** 歌单名长度上限 */
 export const PLAYLIST_NAME_MAX_LENGTH = 40;
-
 /** 歌单名校验：去首尾空白后不能为空、不能超长（无名或长到看不清的歌单在侧栏上没法认） */
 export function validatePlaylistName(
   raw: unknown,

@@ -6,6 +6,7 @@ import {
   hasAccess,
   isAudioFileName,
   parseTrackFileName,
+  pickEmbeddedLyrics,
   playlistItemKey,
   toPlaylistItem,
   validatePlaylistName,
@@ -109,6 +110,37 @@ describe("hasAccess", () => {
     expect(hasAccess("admin", "admin")).toBe(true);
     expect(hasAccess("visitor", "admin")).toBe(false);
     expect(hasAccess("anonymous", "admin")).toBe(false);
+  });
+});
+
+describe("pickEmbeddedLyrics（LR-02：前后端共用一份抽取规则）", () => {
+  it("MP3/ID3 的形状：{ language, descriptor, text }", () => {
+    expect(pickEmbeddedLyrics([{ language: "XXX", descriptor: "", text: "[00:01.00]你好" }])).toBe(
+      "[00:01.00]你好",
+    );
+  });
+
+  it("FLAC/Vorbis 的形状：{ contentType, timeStampFormat, text }", () => {
+    expect(pickEmbeddedLyrics([{ contentType: 1, timeStampFormat: 2, text: "[00:02.00]Hi" }])).toBe(
+      "[00:02.00]Hi",
+    );
+  });
+
+  it("多段时取第一段有正文的（空白的跳过），并把首尾空白去掉", () => {
+    expect(pickEmbeddedLyrics([{ text: "   " }, { text: "  [00:01.00]第一句  " }])).toBe(
+      "[00:01.00]第一句",
+    );
+    expect(pickEmbeddedLyrics([{ text: "  " }, {}])).toBeNull();
+  });
+
+  it("空数组 / 非数组 / 全是空文本：都当没有歌词", () => {
+    expect(pickEmbeddedLyrics([])).toBeNull();
+    expect(pickEmbeddedLyrics(undefined)).toBeNull();
+    expect(pickEmbeddedLyrics("一段普通字符串")).toBeNull();
+  });
+
+  it("旧版本直接给字符串数组也认", () => {
+    expect(pickEmbeddedLyrics(["", "[00:03.00]老格式"])).toBe("[00:03.00]老格式");
   });
 });
 

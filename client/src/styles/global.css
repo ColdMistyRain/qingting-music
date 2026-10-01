@@ -895,6 +895,10 @@ select {
   .tabs ~ [role="tabpanel"] > * {
     animation: none;
   }
+  /* 下划线不滑，直接到位 */
+  .tabs-wrap.is-ready .tabs__ink {
+    transition: none;
+  }
 }
 
 .pb-right {
@@ -904,7 +908,17 @@ select {
   gap: 10px;
 }
 
-/* ---------- 设置页：顶部 Tab（PRD 3.8，活跃 Tab 主题色下划线） ---------- */
+/* ---------- 设置页：顶部 Tab（PRD 3.8，活跃 Tab 主题色下划线） ----------
+   下划线是一条**会滑过去**的指示条（v5.6 需求方：“是 tabs 下的横线没有滑动效果”）。
+   为什么不继续用每个 tab 自己的 border-bottom：边框不会从一格滑到另一格，
+   只能原地淡入淡出（切页时看着就是“灭了又亮”）。改成 .tabs__ink 一条共享元素：
+   位置与宽度由 JS 写两个原始值（--ink-x / --ink-w，与取色管线同一条原则：
+   JS 只写原始值，怎么用留在 CSS），滑动交给 transform、宽度变化交给 width 的过渡。
+   .tabs-wrap 必须 position: relative —— 它同时是 offsetParent，量出来的坐标才是相对它的。 */
+.tabs-wrap {
+  position: relative;
+}
+
 .tabs {
   display: flex;
   gap: 4px;
@@ -916,21 +930,41 @@ select {
   padding: 10px 16px;
   font-size: 13.5px;
   color: var(--text-2);
+  /* 保留 2px 透明边框：它是“格子高度”的一部分，去掉会让整条 Tab 矮 2px */
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
+  transition: color 0.15s;
 }
 
 .tab:hover {
   color: var(--text-1);
 }
 
-/* Tab 状态由 Reka 的 data-state 驱动（v4.60）：不再用 .active 类 */
+/* Tab 状态由 Reka 的 data-state 驱动（v4.60）：不再用 .active 类。
+   v5.6 起选中态只剩“文字变亮”——那根下划线已交给 .tabs__ink。 */
 .tab[data-state="active"] {
   color: var(--text-1);
-  border-bottom-color: var(--accent);
+}
+
+/* 指示条：宽度与位置都是 JS 写的原始值；未量到之前（is-ready 未加）不显示也不过渡，
+   否则页面刚打开时它会从 0 滑到第一格（一个假动画）。 */
+.tabs__ink {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  width: var(--ink-w, 0);
+  transform: translateX(var(--ink-x, 0));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tabs-wrap.is-ready .tabs__ink {
+  opacity: 1;
+  transition:
+    transform 0.25s var(--ease-ios),
+    width 0.25s var(--ease-ios);
 }
 
 /* 切 Tab 时面板内容淡入一点点（v5.5 需求方：“那为什么没有动画过渡”）。

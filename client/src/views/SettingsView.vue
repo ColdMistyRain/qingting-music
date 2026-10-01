@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import IconSignOut from "~icons/ph/sign-out";
@@ -32,6 +32,41 @@ const tabs = computed<SettingsTab[]>(() => {
 });
 
 const active = ref("appearance");
+
+/* 下划线指示条（v5.6）：“会滑过去”靠的是一条共享元素，所以得知道当前 Tab 在哪、多宽。
+   这里只量两个原始值（x / w）写成 CSS 变量，滑动与宽度变化全交给 CSS 过渡
+   （与取色管线同一条原则：JS 不写样式，只写原始值）。 */
+const tabsWrapRef = ref<HTMLElement | null>(null);
+const ink = ref({ x: 0, w: 0 });
+const inkReady = ref(false);
+let inkObserver: ResizeObserver | undefined;
+
+function syncInk(): void {
+  const activeEl = tabsWrapRef.value?.querySelector<HTMLElement>(
+    '[role="tab"][data-state="active"]',
+  );
+  if (!activeEl) return;
+  // offsetLeft/offsetWidth 是相对 offsetParent（就是 .tabs-wrap，它有 position: relative）
+  ink.value = { x: activeEl.offsetLeft, w: activeEl.offsetWidth };
+}
+
+onMounted(async () => {
+  await nextTick();
+  syncInk();
+  // 首帧量完再打开过渡，否则指示条会从 0 滑到第一格（开页时的假动画）
+  requestAnimationFrame(() => {
+    inkReady.value = true;
+  });
+  // 窗口缩放、侧栏折叠、字体替换都会改变标签宽度，跟着重量一次
+  inkObserver = new ResizeObserver(() => syncInk());
+  if (tabsWrapRef.value) inkObserver.observe(tabsWrapRef.value);
+});
+
+onBeforeUnmount(() => inkObserver?.disconnect());
+
+// 点／键盘切换、以及“管理”Tab 因身份变化而出现时，都要重量一次
+watch(active, () => void nextTick(syncInk));
+watch(tabs, () => void nextTick(syncInk));
 
 /** VS-09：三种沉浸页布局，设置页用**缩略图卡片**让需求方先看到版式再选（不是只给个名字） */
 const layouts: { key: ImLayout; label: string }[] = [
@@ -66,11 +101,19 @@ async function signOut(): Promise<void> {
          aria-label 得自己给：Reka 会给 tablist 角色，但不会替你起名字（v5.4 实测补上）——
          没有名字时屏幕阅读器只会念“标签列表”，不知道这组标签是干什么的。 -->
     <TabsRoot v-model="active">
-      <TabsList class="tabs" aria-label="设置分组">
-        <TabsTrigger v-for="tab in tabs" :key="tab.key" :value="tab.key" class="tab">
-          {{ tab.label }}
-        </TabsTrigger>
-      </TabsList>
+      <div ref="tabsWrapRef" class="tabs-wrap" :class="{ 'is-ready': inkReady }">
+        <TabsList class="tabs" aria-label="设置分组">
+          <TabsTrigger v-for="tab in tabs" :key="tab.key" :value="tab.key" class="tab">
+            {{ tab.label }}
+          </TabsTrigger>
+        </TabsList>
+        <!-- 下划线指示条：位置/宽度由 JS 写原始值（v5.6），装饰物所以 aria-hidden -->
+        <span
+          class="tabs__ink"
+          aria-hidden="true"
+          :style="{ '--ink-x': `${ink.x}px`, '--ink-w': `${ink.w}px` }"
+        />
+      </div>
 
       <!-- 外观 -->
       <TabsContent value="appearance">

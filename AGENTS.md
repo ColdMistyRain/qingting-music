@@ -127,6 +127,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 15. **无头浏览器里 `backdrop-filter` 不参与合成（v5.40）**：抽屉用玻璃（`--panel-bg` + `blur(64px)`，总遮盖度算下来 0.94）时，背后那排走带键在截图里**能认出形状** —— 因为模糊压根没生效（`getComputedStyle` 里照样声明着 `blur(64px)`，**声明了不等于渲染了**）。两条结论：① 验证“玻璃够不够挡”别只看截图，也别只信 computed 值；② **不要拿模糊当“藏信息”的手段** —— 真的不能露（背景里是同屏的第二套控件）就该让它是不透明面。
 
+16. **验证浏览器时别只收 `error`，`warning` 也要看（v5.42 实测）**：前几版的无头脚本只写 `if (m.type() === "error")`，于是一条 Reka 的无障碍告警（`Missing Description or aria-describedby … for DialogContent`）从 v5.40 起一直没被发现 —— 换到 VS Code 自带浏览器（`browser_console_messages` 会把 warning 单列出来）才看到。两条：① 弹层的 a11y 属性要配全（Reka 的 `Dialog` 对 `DialogTitle` **和** `DialogDescription` 都有要求，`Popover` 没有）；② 验证脚本把 warning 一并报出来。
+
 ## 文档索引
 
 | 文档                                                         | 内容                                                                          |

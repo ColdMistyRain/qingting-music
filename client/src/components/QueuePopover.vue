@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import {
   DialogContent,
+  DialogDescription,
   DialogOverlay,
   DialogPortal,
   DialogRoot,
@@ -93,8 +94,13 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
     <DialogPortal>
       <DialogOverlay class="q-scrim" />
       <DialogContent class="q-sheet">
-        <!-- 无障碍名字：视觉上由面板里的“当前播放”承担（Reka 缺 DialogTitle 会告警） -->
+        <!-- 无障碍名字与描述：视觉上由面板里的“当前播放”承担。
+             ⚠️ 两个都要给：Reka 的 DialogContent 缺 DialogTitle **或** DialogDescription
+             都会在控制台告警（Popover 没有这条要求）—— 只在浏览器里看 error 会漏掉它。 -->
         <DialogTitle class="sr-only">播放队列</DialogTitle>
+        <DialogDescription class="sr-only">
+          查看当前播放队列，可切换曲目，或把某一首移出队列。
+        </DialogDescription>
 
         <!-- 把手：既是“从底部上来的”的信号，也是下滑收起的抓手。
              手势只挂在把手上（不挂整块面板）：列表要能正常滚动，两者不能抢。 -->

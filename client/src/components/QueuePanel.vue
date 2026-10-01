@@ -23,8 +23,13 @@ const player = usePlayerStore();
 const emit = defineEmits<{ close: [] }>();
 
 /** 清空是破坏性操作（队列没了要一首首重新加）→ 走统一确认入口（开发约定） */
-function askClear(): void {
-  if (!confirmAction("清空播放队列？")) return;
+async function askClear(): Promise<void> {
+  const count = player.queue.length;
+  const ok = await confirmAction({
+    title: "清空播放队列？",
+    description: `队列里的 ${count} 首会全部移除，播放同时停止；不会删除任何歌曲文件。`,
+  });
+  if (!ok) return;
   player.clear();
   emit("close");
 }

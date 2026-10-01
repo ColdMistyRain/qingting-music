@@ -61,7 +61,11 @@ function toggleDirection(): void {
 
 /** 单曲删除：先问一句（带歌名，别让用户猜删的是哪首） */
 async function askRemoveOne(id: string, title: string): Promise<void> {
-  if (!(await confirmAction(`确定删除《${title}》？`))) return;
+  const ok = await confirmAction({
+    title: `删除《${title}》？`,
+    description: "会和服务器上的文件一起删掉，且无法撤销。",
+  });
+  if (!ok) return;
   await removeOne(id);
 }
 
@@ -89,7 +93,12 @@ function toggleSelectIfSelected(id: string): void {
 async function askRemoveSelected(): Promise<void> {
   const count = selectedCount.value;
   if (count === 0) return;
-  if (!(await confirmAction(`确定删除选中的 ${count} 首？`))) return;
+  const ok = await confirmAction({
+    title: `删除选中的 ${count} 首？`,
+    description: "会和服务器上的文件一起删掉，且无法撤销。",
+    confirmText: `删除 ${count} 首`,
+  });
+  if (!ok) return;
   await removeSelected();
 }
 

@@ -14,6 +14,7 @@ import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
 import { isTouchTap } from "@/utils/pointer";
 import { handleShortcut } from "@/utils/shortcuts";
+import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
 
 /**
  * 沉浸式播放页（VS-03 + 3.7 歌词）。
@@ -26,6 +27,9 @@ import { handleShortcut } from "@/utils/shortcuts";
  */
 const player = usePlayerStore();
 const theme = useThemeStore();
+
+/** 本页在“层”里的身份（utils/topLayer）：Esc 只关最上面那层，有抽屉/对话框时本页让位 */
+let layerId: number | null = null;
 
 /**
  * VS-09：布局是**组件切换**，不是同一套 DOM 换类名（原型那套类切换已证明会产生层叠逃逸）。
@@ -169,6 +173,8 @@ function onGestureEnd(event: PointerEvent): void {
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
+    // 上面还有层（队列抽屉 / 确认对话框）时放行：Esc 只关最上面那层（utils/topLayer）
+    if (layerId !== null && !isTopLayer(layerId)) return;
     close();
     return;
   }
@@ -179,9 +185,15 @@ function onKeydown(event: KeyboardEvent): void {
   if (handleShortcut(event, shortcuts)) event.preventDefault();
 }
 
-onMounted(() => window.addEventListener("keydown", onKeydown));
+onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
+  // 沉浸页是“最下面那层”：整页开着时它算最上面，抽屉 / 对话框一开就让位（Esc 只关最上面那层）
+  layerId = pushTopLayer();
+});
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
+  if (layerId !== null) popTopLayer(layerId);
+  layerId = null;
   if (frame) cancelAnimationFrame(frame);
   frame = 0;
 });

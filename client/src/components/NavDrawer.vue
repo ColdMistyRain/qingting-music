@@ -136,7 +136,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   position: fixed;
   inset: 0;
   z-index: 85;
-  background: rgba(12, 16, 28, 0.34);
+  /* 全站只有一种“后面还有东西”的压暗（--scrim，三处遮罩共用） */
+  background: var(--scrim);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.24s ease;

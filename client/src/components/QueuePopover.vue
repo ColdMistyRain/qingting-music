@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   DialogContent,
   DialogDescription,
@@ -16,6 +16,7 @@ import {
 import QueuePanel from "@/components/QueuePanel.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { isTouchTap } from "@/utils/pointer";
+import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
 
 /**
  * 播放队列的**壳层**（PL-06）：同一个触发按钮，两种壳层。
@@ -55,19 +56,32 @@ function onGripUp(event: PointerEvent): void {
 /**
  * Esc：抽屉只关自己这一层。
  *
- * 沉浸页在 `window` 上听 Esc（收起整页），Reka 也在 `window` 上听（关抽屉）。
- * 两个都在同一层时“谁先注册谁先跑”，靠 `@escape-key-down` 里 stopPropagation 拦不住
- * （实测：按一下抽屉与整页一起关）。所以这里挂**捕获阶段**的 window 监听 ——
- * 它一定先于任何冒泡监听执行，拦住并自己关抽屉，保证“Esc 只关最上面那层”。
+ * 沉浸页在 `window` 上听 Esc（收起整页）、确认对话框也在 `window` 上听（关对话框）——
+ * 三个监听同在 `window`，按注册顺序跑不可控。所以这里：开抽屉时在 `utils/topLayer` 登记，
+ * 处理按键前先问“我是不是最上面那层”—— 不是就放行（让上面的对话框去关）。
+ * 是最上面那层时挂**捕获阶段**监听并 `stopPropagation()`，下面的沉浸页就收不到（v5.40）。
  */
+const layerId = ref<number | null>(null);
+watch(open, (isOpen) => {
+  if (isOpen && layerId.value === null) layerId.value = pushTopLayer();
+  else if (!isOpen && layerId.value !== null) {
+    popTopLayer(layerId.value);
+    layerId.value = null;
+  }
+});
+
 function onKeydown(event: KeyboardEvent): void {
   if (!isMobile.value || !open.value || event.key !== "Escape") return;
+  if (layerId.value === null || !isTopLayer(layerId.value)) return;
   event.stopPropagation();
   open.value = false;
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown, true));
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown, true);
+  if (layerId.value !== null) popTopLayer(layerId.value);
+});
 </script>
 
 <template>
@@ -165,8 +179,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   position: fixed;
   inset: 0;
   z-index: 95;
-  /* 与左抽屉（NavDrawer）同一档遮罩：全站只有一种“后面还有东西”的压暗 */
-  background: rgba(12, 16, 28, 0.34);
+  /* 与左抽屉、确认对话框同一档遮罩：全站只有一种“后面还有东西”的压暗（--scrim） */
+  background: var(--scrim);
   /* 与抽屉同时长（下面 .q-sheet 的 0.34s），一升一降看着是一层。
      ⚠️ `visibility: hidden` 不能省：遮罩现在 force-mount 常驻 DOM（为了收起动画），
         而 `opacity: 0` **不等于不可点** —— 少了这一句，关闭态的透明遮罩会拦住整页的点击
@@ -176,13 +190,16 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   pointer-events: none;
   transition:
     opacity 0.34s var(--ease-ios),
-    visibility 0.34s;
+    visibility 0s 0.34s;
 }
 
 .q-scrim[data-state="open"] {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  transition:
+    opacity 0.34s var(--ease-ios),
+    visibility 0s;
 }
 
 .q-sheet {
@@ -225,18 +242,23 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   /* 圆角里的内容是列表，裁一下，免得行色/滚动条从圆角处漏出去 */
   overflow: hidden;
   /* 开合都走过渡（v5.50）：base 态是“收在屏幕外”，[data-state="open"] 才是升起后的位置。
-     visibility 一起过渡 —— 它是离散属性，浏览器会在过渡**结束时**才真的隐藏（反向在开头就可见），
-     所以收起动画能完整放完，而不是“一帧就没了”。 */
+     visibility 按“隐藏等淡出播完（延迟 = 时长）、显示立即生效”分开写（v5.53 修正）：
+     它是离散属性，现代引擎按“过渡过半才翻转”处理 —— 两个方向用同一个时长的话，
+     打开后的前半个过渡期里元素仍是 hidden（不参与合成的截图里就是“半天升不上来”，
+     而且 `focus()` 会静默失败）。 */
   transform: translateY(100%);
   visibility: hidden;
   transition:
     transform 0.34s var(--ease-ios),
-    visibility 0.34s;
+    visibility 0s 0.34s;
 }
 
 .q-sheet[data-state="open"] {
   transform: translateY(0);
   visibility: visible;
+  transition:
+    transform 0.34s var(--ease-ios),
+    visibility 0s;
 }
 
 :root[data-theme="dark"] .q-sheet {

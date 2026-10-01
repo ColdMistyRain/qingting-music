@@ -68,7 +68,13 @@ async function transferToLibrary(): Promise<void> {
     .map((track) => localSourceFor(track.id))
     .filter((file): file is File => file !== undefined);
   if (files.length === 0) return;
-  if (!(await confirmAction(`把本地列表里的 ${files.length} 首上传到音乐库？`))) return;
+  const ok = await confirmAction({
+    title: `上传 ${files.length} 首到音乐库？`,
+    description: "文件会逐个传到服务器；曲库里已有同一首歌时会让你选跳过还是覆盖。",
+    confirmText: "上传",
+    tone: "primary",
+  });
+  if (!ok) return;
   transfer.queue(files);
   await router.push({ name: "console-upload" });
 }
@@ -179,9 +185,14 @@ function onRowPlay(index: number): void {
 }
 
 /** 清空是不可逆的批量动作：先问一句，确认后才真清（LC-06）。
-    确认统一走 confirmAction（当前是原生对话框占位，将来换成应用内弹窗只改那一处）。 */
+    确认统一走 confirmAction（应用内对话框，界面在 components/ConfirmDialog.vue）。 */
 async function clearAll(): Promise<void> {
-  if (!(await confirmAction(`确定清空这 ${player.queue.length} 首？`))) return;
+  const count = player.queue.length;
+  const ok = await confirmAction({
+    title: "清空列表？",
+    description: `列表里的 ${count} 首会全部移除，播放同时停止；不会删除任何歌曲文件。`,
+  });
+  if (!ok) return;
   player.clear();
 }
 </script>

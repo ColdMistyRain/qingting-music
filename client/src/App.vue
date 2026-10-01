@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useMediaSession } from "@/composables/useMediaSession";
 
 // 应用根：只承载路由出口（登录页与播放器/控制台外壳由路由决定）
@@ -73,4 +74,7 @@ router.afterEach(() => {
       <component :is="Component" :key="layer" />
     </Transition>
   </RouterView>
+
+  <!-- 破坏性 / 批量动作的二次确认（v5.53）：全站唯一一份，只改 utils/confirm.ts 那一个入口 -->
+  <ConfirmDialog />
 </template>

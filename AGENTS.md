@@ -77,6 +77,7 @@ client/src/utils/         player（模式状态机与选曲，纯函数）、loc
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
                           spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）、
                           mediaSession（锁屏/通知栏元数据与进度：纯函数 + 浏览器薄封装 - RT-04）、
+                          confirm（二次确认的唯一入口：队列 + 发答案 - v5.53）、topLayer（“Esc 只关最上面那层”登记处 - v5.53）、
                           pointer（触摸点击判定：手机上“点一下就是播这首” - v5.32）、
 client/src/views/         login/local/library/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
 client/src/composables/   useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
@@ -88,6 +89,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           NavDrawer（手机左侧导航抽屉的面板 - RT-02）、
                           QueuePopover（PL-06，两套壳层：桌面 Reka Popover 浮层 / 手机 Reka Dialog 半屏底部抽屉 - v5.40）、
                           QueuePanel（队列内容：标题行 + 清空 + 列表，两壳共用一份 - v5.40）、
+                          ConfirmDialog（应用内二次确认：Reka Dialog + 自绘玻璃，挂 App.vue 全站一份 - v5.53）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
                           TrackRow（通用曲目行）、EmptyState、
                           immersive/{LyricsView,ImTitle,ImControls,LyricsSourceMenu}（沉浸页三布局共享件：歌词壳层（自研）/ 标题 / 控制栏 / 歌词来源菜单）
@@ -133,6 +135,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
     **同族第二例（v5.44）**：`AppSidebar` 里四条 `.app.collapsed …`（改内容层宽度、藏标签、藏折叠箭头、藏新建按钮）同样会跨进抽屉 —— 外壳一旦处于折叠态，抽屉里的标签/新建按钮就被藏、内容层宽度只剩 68px；已全部收窄为 `.app.collapsed > .sidebar …`。另：内容层的**宽度**也不能写死（那里写的是桌面列宽 224，抽屉只有 208，溢出的部分被 `overflow: hidden` 裁掉，表现是“选中项背景右侧被切平”——行的右圆角与 12px 内缩全没了）。判据：**凡是以“外壳/宿主状态”为前提的规则，选择器就从外壳那一层写起；宿主差异（宽度、断点、折叠态）一律由宿主那层给。**
 
 18. **`force-mount` 常驻 DOM 的两个连带后果（v5.50 实测）**：给 Reka 的弹层做**收起动画**时，标准做法是 `force-mount`（它默认一关就卸载，压根没有能播离场动画的元素）+ 用 `data-state` 驱动 CSS 过渡，base 态写成“收在屏幕外”。但这样元素**一直在 DOM 里**，于是：① **`opacity: 0` 不等于不可点** —— 关闭态的遮罩会拦住全页点击（实测：列表里的行都点不动了），必须补 `visibility: hidden`（离散属性，过渡结束时才隐藏，所以离场动画仍然放得完）；② 任何靠 `body:has(...)` / 状态类做联动的规则，**选择器都要带上 `[data-state]`**（否则“打开时把背后的控件淡出”会变成永久淡出）。
+
+19. **`transition: visibility <时长>` 会让弹层“打开后前半个时长仍然是 hidden”（v5.53 实测）**：Reka 弹层用 `force-mount` + `visibility: hidden` 表达关闭态（为什么不能用 `opacity: 0` 见第 18 条）。但 `visibility` 是**离散属性**，现代引擎按“过渡过半才翻转”处理 —— 写 `transition: opacity .2s, visibility .2s` 时，打开后的前 100ms 元素仍然 hidden：渐变看着正常（`opacity` 在动），但**对 hidden 元素调 `focus()` 会静默失败**。症状是“焦点还留在背后的触发按钮上”（后果：回车把弹层又调一遍），时间线上 0ms / 16ms 两次聚焦都没产生 focusin，100ms 后手动聚焦才成功。写法：关闭态 `visibility 0s <时长>`（先播完淡出再隐藏）、打开态 `visibility 0s`（立即可见）；`opacity` / `transform` 照旧。
 
 ## 文档索引
 

@@ -747,13 +747,60 @@ select {
 .progress .knob {
   position: absolute;
   top: 50%;
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--accent);
-  border: 2px solid var(--bg-base);
   transform: translate(-50%, -50%);
+  /* 就一个干净的主题色圆点 + 一圈柔光，**不描边**（v4.93）。
+     原写法是 `border: 2px solid var(--bg-base)`——用“表面色”描一圈做出“从轨道里挖出来”的效果，
+     浅色下 --bg-base ≈ #f0f0f2 恰好与条子同色所以看着没问题，深色下它接近纯黑，
+     套在玻璃条上就是一圈黑圈（需求方：“深色模式下进度条手柄处有圈黑色”）。
+     这类做法只在**表面色可预测**时成立；播放条的底是玻璃与封面渐变，预测不了。 */
   box-shadow: 0 0 8px var(--accent-soft);
+}
+
+/* 播放中：手柄四周散一圈主题色光晕（v4.94 需求方：“播放时它的四周散发主题颜色光效”）。
+   两个规矩：① 光晕只用 **transform / opacity**（合成层，不逐帧重算布局与重绘）——
+   动 box-shadow 会每帧重绘，是这类“呼吸”最常见的性能坑；
+   ② 亮的是**状态**：只有播放中才呼吸，暂停就干干净净（v4.30：颜色/动效只表达状态）。
+   颜色取 `--accent-soft`，所以它跟着封面取色走（VS-02）。 */
+.progress .knob::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-soft), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.progress.playing .knob::after {
+  animation: knob-glow 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes knob-glow {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+/* 减少动态效果：不呼吸，不过给一圈静态光晕——状态还看得出来（VS-07） */
+@media (prefers-reduced-motion: reduce) {
+  .progress.playing .knob::after {
+    animation: none;
+    opacity: 0.35;
+    transform: scale(1);
+    will-change: auto;
+  }
 }
 
 .pb-right {

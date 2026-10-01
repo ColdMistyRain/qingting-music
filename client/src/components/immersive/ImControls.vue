@@ -91,7 +91,7 @@ function onPointerUp(event: PointerEvent): void {
       <div
         ref="barRef"
         class="progress"
-        :class="{ 'progress--disabled': !player.hasTrack }"
+        :class="{ 'progress--disabled': !player.hasTrack, playing: player.playing }"
         :style="{ '--p': `${player.displayRatio * 100}%` }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
@@ -202,15 +202,9 @@ function onPointerUp(event: PointerEvent): void {
   background: var(--accent);
 }
 
+/* 进度手柄的样式在 global.css 的 `.progress .knob`（两个播放条共用一份，v4.93 收口）；
+   这里只说沉浸页的差异：**只在悬停时出现**（沉浸页以歌词为主，常驻圆点太抢眼）。 */
 .progress .knob {
-  position: absolute;
-  top: 50%;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--bg-base);
-  transform: translate(-50%, -50%);
   opacity: 0;
   transition: opacity 0.15s;
 }

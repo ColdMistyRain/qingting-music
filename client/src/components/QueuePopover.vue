@@ -160,10 +160,16 @@ function askClear(): void {
    与列表页 .page-frame__scroll 同一套做法。
    不这么做时滚动条会“悬”在右留白中间，看起来行宽与面板内宽不一致
    （需求方实拍：“有点抽象，两个宽度最好一致”）。 */
+/* 行节奏：与主列表同一套（`.row-list` 的 6px）——
+   没有间距时，悬浮态与“播放中”的底色会直接贴在一起（需求方：“这个挨的有点紧了”）。
+   用 flex 列 + gap（**不要**给行加 margin：那样首尾会多出半格，滚动时也不好算）。 */
 .q-list {
   list-style: none;
   overflow-y: auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-right: calc(var(--q-pad) * -1);
   padding-right: var(--q-pad);
 }
@@ -172,6 +178,8 @@ function askClear(): void {
   display: flex;
   align-items: center;
   border-radius: var(--radius-row);
+  /* 列方向 flex 里要显式禁止收缩，否则行会被压矮 */
+  flex: none;
 }
 
 .q-item:hover {

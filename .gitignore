@@ -27,3 +27,6 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Playwright MCP 的截图/快照产物（本机调试用）
+.playwright-mcp/

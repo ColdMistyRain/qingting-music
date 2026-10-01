@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import AppSidebar from "@/components/AppSidebar.vue";
+import MobileTabBar from "@/components/MobileTabBar.vue";
 import PlayerBar from "@/components/PlayerBar.vue";
 import { useConfigStore } from "@/stores/config";
 import { usePlayerStore } from "@/stores/player";
@@ -45,5 +46,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
       </RouterView>
     </main>
     <PlayerBar />
+    <!-- 手机导航（RT-02）：≥768px 自身 display:none，桌面不受影响 -->
+    <MobileTabBar />
   </div>
 </template>

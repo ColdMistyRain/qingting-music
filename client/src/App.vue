@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useMediaSession } from "@/composables/useMediaSession";
 
 // 应用根：只承载路由出口（登录页与播放器/控制台外壳由路由决定）
 const route = useRoute();
+
+/** RT-04：锁屏 / 通知栏 / 耳机按键。挂在根组件而不是 PlayerLayout ——
+ *  播放器是单例，控制台页面里音乐也在播，挂在布局里会一进控制台就解绑。 */
+useMediaSession();
 
 /** 顶层「层」标识：取首个匹配记录的 path。
  *  主壳内部换页（库 ⇄ 设置 …）在同一层内，`:key` 不变 —— 侧栏与播放条不会被重挂。 */

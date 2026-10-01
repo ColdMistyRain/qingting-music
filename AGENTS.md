@@ -40,7 +40,7 @@
 | ------------------------------------- | ---------------------------------------------------- |
 | `npm.cmd install`                     | 装齐三个包（workspace）                              |
 | `npm.cmd run dev`                     | 前端 5173 + 后端 3000 同时启动                       |
-| `npm.cmd run test`                    | 全量单测（server 103 例 + client 189 例）            |
+| `npm.cmd run test`                    | 全量单测（server 103 例 + client 275 例）            |
 | `npm.cmd run typecheck`               | `tsc --noEmit` + `vue-tsc --noEmit`                  |
 | `npm.cmd run build`                   | 后端 tsup → `server/dist`，前端 vite → `client/dist` |
 | `npm.cmd run format`                  | Prettier 全量格式化                                  |
@@ -76,9 +76,14 @@ client/src/utils/         player（模式状态机与选曲，纯函数）、loc
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
                           spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）、
+                          mediaSession（锁屏/通知栏元数据与进度：纯函数 + 浏览器薄封装 - RT-04）、
+                          pointer（触摸点击判定：手机上“点一下就是播这首” - v5.32）、
 client/src/views/         login/local/library/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
-client/src/composables/   useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）
-client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、QueuePopover（PL-06，Reka Popover）、
+client/src/composables/   useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
+                          useNavItems（一级导航项：侧栏与手机底栏共用一份 - RT-02）、
+                          useMediaSession（把播放器状态接到锁屏/通知栏，挂 App.vue - RT-04）
+client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、MobileTabBar（手机底部标签栏 - RT-02）、
+                          QueuePopover（PL-06，Reka Popover）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
                           TrackRow（通用曲目行）、EmptyState、
                           immersive/{LyricsView,ImTitle,ImControls,LyricsSourceMenu}（沉浸页三布局共享件：歌词壳层（自研）/ 标题 / 控制栏 / 歌词来源菜单）
@@ -88,9 +93,11 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 ## 当前进度
 
-**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.86：按公式自行实现 `utils/spring.ts`，只参考思路不搬代码）** + **歌词来源打开与滚动键盘化（v4.87：支持增强型 LRC、可手动导入 `.lrc`/`.yrc`（按曲目记忆、GBK 回退）、歌词区键盘滚动；顺带修好开发环境封面一直没加载出来的代理缺陷）**；前后端类型检查、生产构建、**341 个单测**（server 103 + client 238）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
+**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.86：按公式自行实现 `utils/spring.ts`，只参考思路不搬代码）** + **歌词来源打开与滚动键盘化（v4.87：支持增强型 LRC、可手动导入 `.lrc`/`.yrc`（按曲目记忆、GBK 回退）、歌词区键盘滚动；顺带修好开发环境封面一直没加载出来的代理缺陷）**；前后端类型检查、生产构建、**378 个单测**（server 103 + client 275）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
 
-**下一步**（建议顺序）：歌单（3.6，需服务端）→ 在线音源（3.5，需服务端）→ 移动端专属适配（RT-08）→ 生产静态托管（服务端）。
+**手机端（v5.32，RT-01/02/03）**：`<768px` 侧栏隐藏 + 底部标签栏（`MobileTabBar`：本地播放 / 音乐库 / 设置，选中态只改主题色与字重）；播放条变迷你条（封面+信息+三枚走带键+顶沿 3px 进度线）；列表收起「专辑/来源」两列、删除键隐藏；管理台只给「请使用电脑访问」提示；行的触摸单击即播放（`utils/pointer.ts`）。**移动端参考对象＝Salt Player（椒盐音乐）**：无推荐流的简易首页、迷你条可显歌词、长按播放键进沉浸、封面/壁纸取色、横竖屏与平板、通知栏/系统媒体控制 —— 与原型同为参考而非教条。**锁屏/通知栏（RT-04）**：锁屏显示封面+歌名+歌手+专辑，播放/暂停/上一个/下一个/快退快进六个动作全接上（`utils/mediaSession.ts` + `useMediaSession`，挂在 `App.vue`）。
+
+**下一步**（建议顺序）：歌单（3.6，需服务端）→ 在线音源（3.5，需服务端）→ 移动端手势与横竖屏（RT-05/06，按 Salt Player 的交互语言）→ 生产静态托管（服务端）。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 
@@ -107,6 +114,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 9. **许可（v4.86）**：本项目自身未指定开源许可，且**不含 AGPL / GPL 代码**（v4.84 曾接入 AMLL 的 npm 包 → v4.85 改为移植其代码 → v4.86 连移植也换成**按公式/按效果自行实现**）。装新依赖前先 `npm view <pkg> license`，**不要再引入强拷贝依赖**；想拄某个实现必须先看许可（AGPL 不能拄，只能参考思路）。
 10. **逐帧推进的动画在页面不可见时会停住（rAF 不触发）**（v4.85）：歌词列表位移改成弹簧逐帧推之后，后台标签页里弹簧不推进、位置会停在旧值。所以 `driveTo()` 在 `document.visibilityState !== "visible"` 时直接落位（不做动画）；其它新加的逐帧动画也要给这条退路。
 11. **后端挂在根路径下的媒体路由，开发代理要同步补一条（v4.87）**：`client/vite.config.ts` 只代理了 `/api` 与 `/audio`，**漏了 `/covers`**——漏了不会报错，而是被 Vite 的 SPA 兜底成 `index.html`（200 `text/html`），表现是“封面静默加载不出来”＋取色退回默认色（实测 `<img>.naturalWidth` 一直是 0）。**以后后端每加一个根路径路由（如 `/lyrics`），代理里同时加一条**；判断这类问题看响应类型（`text/html` 就是被兜底了），不要只看状态码。
+
+12. **`npx.ps1` 同样被拦截（v5.32）**：与第 1 条同源—— `npx -y <pkg>` 在 PowerShell 下会报“未对文件 npx.ps1 进行数字签名”，**一律用 `npx.cmd`**。
 
 ## 文档索引
 

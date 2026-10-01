@@ -1152,14 +1152,31 @@ kbd {
    它现在有行为（Reka RadioGroup）和状态（滑动底板），不再是“一条全局类”。
    全站只有设置页的「模式 / 材质」在用，所以跟着组件走，不再留两份。 */
 
-/* ---------- 移动端底线（RT-08）：不白屏、布局不崩 ---------- */
+/* ---------- 手机布局（RT-01/02/03，<768px） ---------- */
 @media (max-width: 767px) {
-  .app,
-  .app.collapsed {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 72px;
+  :root {
+    /* 手机列栅格：在 ≤1024px（已收「专辑」）基础上再收「来源」 ——
+       手机上只剩 封面 | 歌名·歌手 | 时长 | 操作 四列，列距从 20px 收到 12px
+       （390px 宽下光是列距空隙就吃掉 60px，歌名会被挤没）。
+       表头（TrackListHead）与行（TrackRow）同一个断点各自隐藏对应单元格，
+       两边列宽才不会错位（v4.38 的约定）。 */
+    --row-grid: 44px minmax(0, 1fr) 48px 40px;
+    --row-gap: 12px;
+    --row-pad-x: 10px;
   }
 
+  .app,
+  .app.collapsed {
+    /* 三行：内容 / 迷你播放条 / 底部标签栏（PC 端是 224px 侧栏 + 1fr 内容 + 84px 播放条）。
+       两行都用 auto 而不是固定高度：标签栏要留刘海屏安全区（env(safe-area-inset-bottom)），
+       写死 56px 会把最后一行字压到系统手势条底下。 */
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto auto;
+  }
+
+  /* 侧栏收起，导航交给底部标签栏（RT-02）。
+     ⚠️ 别在 AppSidebar.vue 的 scoped 样式里写 display —— 那边选择器带 [data-v-x]，
+     特异性更高，会把这行压掉（AppSidebar 里已记了这条）。 */
   .sidebar {
     display: none;
   }
@@ -1169,9 +1186,63 @@ kbd {
     padding: 16px;
   }
 
+  /* 播放条 → 迷你条（RT-02：“播放条简化为迷你条，点击展开沉浸式播放页”）。
+     保留：封面 + 曲目信息（点它进沉浸页，与桌面同一处热区）、上一首/播放/下一首、进度细线、异常提示。
+     收起：模式（进沉浸页切）、音量（手机上用系统音量键）、队列、时间数字。
+     进度**不能整条删** —— 那是“播到哪了”的唯一线索；它搬到条子顶沿做 3px 细线，不占高度。
+     也**不可交互**：3px 高的热区点不准，拖动会误触（RT-05 手势另做），快进统一进沉浸页。 */
   .playerbar {
     grid-column: 1;
-    /* 窄屏缩小左侧固定宽度，给中间控制键留位置 */
-    --pb-left-width: 168px;
+    grid-row: 2;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 0 12px;
+    min-height: 56px;
+    position: relative;
+  }
+
+  /* 桌面的 --pb-left-width 固定列宽是“长文本要不要滚动可预期”的约定，迷你条不需要 */
+  .pb-left {
+    --pb-left-width: auto;
+    min-width: 0;
+  }
+
+  .pb-left .cover {
+    width: 40px;
+    height: 40px;
+  }
+
+  .pb-ctrls {
+    gap: 2px;
+  }
+
+  /* 迷你条只留三枚走带键（RT-02：迷你条 + 点开沉浸页看全部控件）。
+     音量点开的是 HoverCard（悬浮卡片），手机上既没有悬浮、也有系统音量键 —— 一并收起，
+     沉浸页里那枚保留（那里才是完整控制区）。
+     ⚠️ 音量键的 display 写在 VolumeControl.vue 的 scoped 样式里（`.vctl[data-v-x]`），
+     特异性同为 (0,2,0) 而组件样式在运行时注入 → 源码顺序上它更靠后。
+     所以这里必须写到 (0,3,0)：用 .playerbar 前缀，别省。 */
+  .playerbar .pb-ctrls .ctl.mode,
+  .playerbar .pb-ctrls .vctl,
+  .pb-right {
+    display: none;
+  }
+
+  .progress-row {
+    position: absolute;
+    inset: 0 0 auto 0;
+    max-width: none;
+    gap: 0;
+    pointer-events: none;
+  }
+
+  .progress-row .time,
+  .progress .knob {
+    display: none;
+  }
+
+  .progress {
+    height: 3px;
+    border-radius: 0;
   }
 }

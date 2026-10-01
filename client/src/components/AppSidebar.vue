@@ -1,37 +1,15 @@
 <script setup lang="ts">
-import type { Component } from "vue";
-import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import IconCaretDoubleLeft from "~icons/ph/caret-double-left";
 import IconGearSix from "~icons/ph/gear-six";
-import IconGlobe from "~icons/ph/globe";
-import IconHouse from "~icons/ph/house";
 import IconListPlus from "~icons/ph/list-plus";
-import IconMusicNotes from "~icons/ph/music-notes";
-import { useAuthStore } from "@/stores/auth";
-import { useConfigStore } from "@/stores/config";
+import { useNavItems } from "@/composables/useNavItems";
 
 defineProps<{ collapsed: boolean }>();
 defineEmits<{ toggle: [] }>();
 
-const auth = useAuthStore();
-const config = useConfigStore();
-
-interface NavItem {
-  name: string;
-  label: string;
-  icon: Component;
-}
-
-/** 导航项按身份与音源配置裁剪（AC-01：未登录只留本地播放；ON-04：音源未配置隐藏在线搜索） */
-const navItems = computed<NavItem[]>(() => {
-  const items: NavItem[] = [{ name: "local", label: "本地播放", icon: IconHouse }];
-  if (auth.canUseServer) {
-    items.push({ name: "library", label: "音乐库", icon: IconMusicNotes });
-    if (config.onlineEnabled) items.push({ name: "online", label: "在线搜索", icon: IconGlobe });
-  }
-  return items;
-});
+/** 一级导航与手机底栏共用一份（RT-02）：按身份与音源配置裁剪的逻辑在 useNavItems 里 */
+const navItems = useNavItems();
 </script>
 
 <template>

@@ -14,7 +14,7 @@
   <div class="list-head">
     <span class="list-head__title">曲目</span>
     <span class="list-head__album">专辑</span>
-    <span>来源</span>
+    <span class="list-head__source">来源</span>
     <span>时长</span>
   </div>
 </template>
@@ -28,6 +28,15 @@
 /* 窄屏专辑列让位：与 TrackRow 同一断点（栅格由全局 --row-grid 同步收窄） */
 @media (max-width: 1024px) {
   .list-head__album {
+    display: none;
+  }
+}
+
+/* 手机：来源列也让位（栅格见 global.css 的 <768px 段）。
+   这里只能靠**隐藏单元格**让后面的列自动前移 —— 列宽本身在 --row-grid 里，
+   表头与行读同一份，所以两边一起隐藏才不会错位。 */
+@media (max-width: 767px) {
+  .list-head__source {
     display: none;
   }
 }

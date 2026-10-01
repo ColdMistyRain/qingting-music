@@ -6,6 +6,7 @@ import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
 import IconX from "~icons/ph/x";
 import { formatTime } from "@/utils/format";
+import { isTouchTap } from "@/utils/pointer";
 
 /**
  * 通用曲目行（PRD 3.8 歌曲行结构）。
@@ -36,10 +37,22 @@ const SOURCE_LABELS: Record<Track["source"], string> = {
 
 const sourceLabel = computed(() => SOURCE_LABELS[props.track.source]);
 const isPlaying = computed(() => props.active && props.playing);
+
+/** 触摸设备的“点一下”就是播这首（RT-03：手机端要能播放/切歌）。
+    桌面不变：单击无响应、双击播放 —— 所以只认 pointerType 为 touch 的点击。
+    行内的按钮全部 @click.stop，不会连带触发这里。 */
+function onRowClick(event: MouseEvent): void {
+  if (isTouchTap((event as PointerEvent).pointerType)) emit("play", props.index);
+}
 </script>
 
 <template>
-  <div class="row" :class="{ 'row--active': active }" @dblclick="emit('play', index)">
+  <div
+    class="row"
+    :class="{ 'row--active': active }"
+    @click="onRowClick"
+    @dblclick="emit('play', index)"
+  >
     <div class="row__cover">
       <img v-if="track.cover" :src="track.cover" alt="" />
       <IconMusicNotes v-else class="icon" />
@@ -60,7 +73,12 @@ const isPlaying = computed(() => props.active && props.playing);
         <IconPause v-if="isPlaying" class="icon" />
         <IconPlay v-else class="icon" />
       </button>
-      <button v-if="removable" class="ctl" title="从列表移除" @click.stop="emit('remove', index)">
+      <button
+        v-if="removable"
+        class="ctl row__remove"
+        title="从列表移除"
+        @click.stop="emit('remove', index)"
+      >
         <IconX class="icon" />
       </button>
     </div>
@@ -163,6 +181,29 @@ const isPlaying = computed(() => props.active && props.playing);
 @media (max-width: 1024px) {
   .row__album {
     display: none;
+  }
+}
+
+/* 手机：来源列也让位（栅格见 global.css 的 <768px 段，与表头同断点） */
+@media (max-width: 767px) {
+  .row__source {
+    display: none;
+  }
+
+  /* RT-03：删除属管理操作，手机端不给入口（入口在控制台，桌面为主） */
+  .row__remove {
+    display: none;
+  }
+}
+
+/* 无悬浮能力的设备（触摸屏）：操作键**常显**。
+   手机上主要的播放入口是“点整行”（见 onRowClick），这枚键是**兜底与显式入口**：
+   ① 万一某个引擎的 click 不带 pointerType（老引擎），还能靠它点；② 正在播的那行它变“暂停”，
+   需要一直看得见（那条规则还在上面：.row--active .ctl）。
+   用能力查询（hover）而不是宽度：桌面窗口调窄仍能悬浮，没必要常显。 */
+@media (hover: none) {
+  .row__actions .ctl {
+    opacity: 1;
   }
 }
 

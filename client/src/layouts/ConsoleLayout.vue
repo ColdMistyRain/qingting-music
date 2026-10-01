@@ -4,7 +4,9 @@ import { RouterLink } from "vue-router";
 import IconArrowLeft from "~icons/ph/arrow-left";
 import IconChartPieSlice from "~icons/ph/chart-pie-slice";
 import IconListDashes from "~icons/ph/list-dashes";
+import IconMonitor from "~icons/ph/monitor";
 import IconUploadSimple from "~icons/ph/upload-simple";
+import EmptyState from "@/components/EmptyState.vue";
 
 interface ConsoleNavItem {
   name: string;
@@ -46,11 +48,28 @@ const navItems: ConsoleNavItem[] = [
       </div>
     </aside>
     <main class="cs-main glass">
-      <RouterView v-slot="{ Component }">
-        <Transition name="page">
-          <component :is="Component" />
-        </Transition>
-      </RouterView>
+      <!-- 手机端（RT-03）：上传/删除/曲库管理以桌面为主，与其把三栏管理界面硬挤成单列，
+           不如直接说清楚。必须自带一条“回播放器”的路 —— 控制台侧栅栏在手机上已隐藏，
+           而播放器的底部标签栏在**本布局里不存在**（它挂在 PlayerLayout 下），
+           不给出口就是死路。 -->
+      <div class="cs-hint">
+        <EmptyState
+          :icon="IconMonitor"
+          fill
+          title="请使用电脑访问"
+          desc="上传、删除与曲库管理以桌面为主；手机上先听歌就好。"
+        >
+          <RouterLink class="btn" :to="{ name: 'library' }">回到音乐库</RouterLink>
+        </EmptyState>
+      </div>
+
+      <div class="cs-body">
+        <RouterView v-slot="{ Component }">
+          <Transition name="page">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
+      </div>
     </main>
   </div>
 </template>
@@ -173,12 +192,27 @@ const navItems: ConsoleNavItem[] = [
   color: var(--text-3);
 }
 
+/* 手机端提示：桌面不出现。用 display 而不是 v-if 切换，是因为断点判定交给 CSS
+   （与全局响应式同一套机制）；代价是窄屏还会挂载一次页面，多一次接口请求 —— 可接受。 */
+.cs-hint {
+  display: none;
+}
+
 @media (max-width: 767px) {
   .console {
     grid-template-columns: 1fr;
   }
 
   .cs-side {
+    display: none;
+  }
+
+  .cs-hint {
+    display: flex;
+    min-height: 100%;
+  }
+
+  .cs-body {
     display: none;
   }
 }

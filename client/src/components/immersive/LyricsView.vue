@@ -22,7 +22,9 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 const activeIndex = computed(() => currentLineIndex(props.lines, props.time));
 const activeLine = computed(() => props.lines[activeIndex.value] ?? null);
 /** 逐字填充进度（每个字 0~1） */
-const activeWords = computed(() => (activeLine.value ? wordFillProgress(activeLine.value, props.time) : []));
+const activeWords = computed(() =>
+  activeLine.value ? wordFillProgress(activeLine.value, props.time) : [],
+);
 /** 行级进度（0~1）：仅行级数据时的整句渐亮 */
 const activeRatio = computed(() => lineProgress(props.lines, activeIndex.value, props.time));
 
@@ -46,8 +48,15 @@ function measure(): void {
     shift.value = 0;
     return;
   }
-  // 行的 offsetTop 是相对内层列表的：位移 = 行中线 - 窗口中线
-  shift.value = line.offsetTop + line.offsetHeight / 2 - viewport.clientHeight / 2;
+  // 行的 offsetTop 是相对外层窗口的（.ly 是最近的定位祖先）：位移 = 行中线 - 窗口中线
+  const desired = line.offsetTop + line.offsetHeight / 2 - viewport.clientHeight / 2;
+  // **必须夹住**：整首歌刚开头时把第一行推到中线，上面会空出一大片（需求方实拍指出
+  // “隔太远”）；末尾同理会把列表推过头、下面留白。
+  // 所以前几句从顶部开始排，当前句越过中线之后才真正开始居中——Apple / Spotify 同款行为。
+  const last = lineEls.get(props.lines.length - 1);
+  const listHeight = last ? last.offsetTop + last.offsetHeight : 0;
+  const max = Math.max(0, listHeight - viewport.clientHeight);
+  shift.value = Math.min(Math.max(desired, 0), max);
 }
 
 /* 合并多次请求，但**不用 rAF**：rAF 在页面不可见（后台标签页、未聚焦窗口）时完全不触发，

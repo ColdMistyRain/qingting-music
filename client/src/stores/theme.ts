@@ -10,8 +10,16 @@ export type ThemeMode = "dark" | "light";
  */
 export type MaterialMode = "islands" | "flat";
 
+/**
+ * 沉浸页布局（VS-09）：经典双栏 / 沉浸歌词。
+ * 海报背景（彩胶）待实现后再加入这个联合类型——**不先写上**，
+ * 否则切到它会渲染出空白（类型允许、组件不存在）。
+ */
+export type ImLayout = "duo" | "center";
+
 const STORAGE_KEY = "qt-theme";
 const MATERIAL_KEY = "qt-material";
+const LAYOUT_KEY = "qt-im-layout";
 
 /** 默认跟随系统，手动切换后记忆选择（VS-08） */
 function resolveInitial(): ThemeMode {
@@ -28,9 +36,15 @@ function resolveInitialMaterial(): MaterialMode {
   return localStorage.getItem(MATERIAL_KEY) === "islands" ? "islands" : "flat";
 }
 
+/** 歌词页布局默认经典双栏（VS-09 的原型默认） */
+function resolveInitialLayout(): ImLayout {
+  return localStorage.getItem(LAYOUT_KEY) === "center" ? "center" : "duo";
+}
+
 export const useThemeStore = defineStore("theme", () => {
   const mode = ref<ThemeMode>("dark");
   const material = ref<MaterialMode>("islands");
+  const layout = ref<ImLayout>("duo");
 
   function apply(next: ThemeMode, persist: boolean): void {
     mode.value = next;
@@ -44,10 +58,17 @@ export const useThemeStore = defineStore("theme", () => {
     if (persist) localStorage.setItem(MATERIAL_KEY, next);
   }
 
+  /** 布局不挂到 <html> 上：它是沉浸页内部的组件切换（VS-09 的组件化要求），不靠 CSS 类 */
+  function applyLayout(next: ImLayout, persist: boolean): void {
+    layout.value = next;
+    if (persist) localStorage.setItem(LAYOUT_KEY, next);
+  }
+
   /** 挂载前调用：把已记忆/系统偏好的主题与材质落到 <html data-*> */
   function init(): void {
     apply(resolveInitial(), false);
     applyMaterial(resolveInitialMaterial(), false);
+    applyLayout(resolveInitialLayout(), false);
   }
 
   function setTheme(next: ThemeMode): void {
@@ -58,5 +79,9 @@ export const useThemeStore = defineStore("theme", () => {
     applyMaterial(next, true);
   }
 
-  return { mode, material, init, setTheme, setMaterial };
+  function setLayout(next: ImLayout): void {
+    applyLayout(next, true);
+  }
+
+  return { mode, material, layout, init, setTheme, setMaterial, setLayout };
 });

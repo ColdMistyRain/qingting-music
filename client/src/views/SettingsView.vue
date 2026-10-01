@@ -102,8 +102,24 @@ async function signOut(): Promise<void> {
         </div>
         <div class="set-card card">
           <b>歌词页布局</b>
+          <div class="set-row">
+            <span>沉浸式播放页</span>
+            <div class="seg">
+              <button :class="{ active: theme.layout === 'duo' }" @click="theme.setLayout('duo')">
+                经典双栏
+              </button>
+              <button
+                :class="{ active: theme.layout === 'center' }"
+                @click="theme.setLayout('center')"
+              >
+                沉浸歌词
+              </button>
+            </div>
+          </div>
           <div class="set-note">
-            经典双栏 / 沉浸歌词 / 海报背景（彩胶）三种布局，随播放页一起上线（VS-09）。
+            在播放条点左侧展开沉浸页即可看到，选择按设备记忆。 经典双栏＝封面左 ·
+            歌词右；沉浸歌词＝纯歌词居中。<br />
+            海报背景（彩胶）随后续版本加入（VS-09）。
           </div>
         </div>
       </TabsContent>

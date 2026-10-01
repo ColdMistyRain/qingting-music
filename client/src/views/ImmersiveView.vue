@@ -4,8 +4,10 @@ import { useRouter } from "vue-router";
 import IconCaretDown from "~icons/ph/caret-down";
 import IconMusicNotes from "~icons/ph/music-notes";
 import ImControls from "@/components/immersive/ImControls.vue";
+import ImLayoutCenter from "@/components/immersive/ImLayoutCenter.vue";
 import ImLayoutDuo from "@/components/immersive/ImLayoutDuo.vue";
 import { usePlayerStore } from "@/stores/player";
+import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
 
 /**
@@ -18,6 +20,10 @@ import { parseLyrics } from "@/utils/lyrics";
  * 加了只会得到"描边 + 投影"的假玻璃（v4.55 实测结论）。文字的可读性靠一层跟随主题的薄雾。
  */
 const player = usePlayerStore();
+const theme = useThemeStore();
+
+/** VS-09：布局是**组件切换**，不是同一套 DOM 换类名（原型那套类切换已证明会产生层叠逃逸） */
+const layoutComponent = computed(() => (theme.layout === "center" ? ImLayoutCenter : ImLayoutDuo));
 const router = useRouter();
 
 const track = computed(() => player.currentTrack);
@@ -112,7 +118,8 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <div class="im-body">
-        <ImLayoutDuo
+        <component
+          :is="layoutComponent"
           :title="titleText"
           :subtitle="subtitleText"
           :cover-url="coverUrl"

@@ -173,9 +173,30 @@ const marqueeActive = computed(() => player.playing || hovering.value);
       @mouseenter="hovering = true"
       @mouseleave="hovering = false"
     >
-      <div class="cover">
-        <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
-        <IconMusicNotes v-else class="icon" />
+      <div class="cover-wrap">
+        <div class="cover">
+          <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
+          <IconMusicNotes v-else class="icon" />
+        </div>
+        <!-- 手机：进度绕着封面走（QQ 音乐那个样式）。形状必须**跟着封面的轮廓**：
+             封面是 40×40 的**圆角矩形**，所以用 <rect> 而不是 <circle> ——
+             圆环会切在封面的四个角上（角上离中心最远），看着像套错了。
+             环画在封面外扩 3px 的圆角矩形上，圆角半径也跟着 +3px，四边与四角间距才均匀。
+             pathLength="100" 把路径长度归一化：进度只跟比例有关，与周长、圆角半径都无关
+             （否则圆角一改周长就得重算，而 π 在 CSS 里算不了）。
+             JS 只写原始比例（--p），怎么用留在 CSS。 -->
+        <svg v-if="isMobile" class="cover-ring" viewBox="0 0 46 46" aria-hidden="true">
+          <rect class="cover-ring__track" x="1" y="1" width="44" height="44" pathLength="100" />
+          <rect
+            class="cover-ring__fill"
+            x="1"
+            y="1"
+            width="44"
+            height="44"
+            pathLength="100"
+            :style="{ '--p': player.displayRatio }"
+          />
+        </svg>
       </div>
       <div class="pb-info">
         <ScrollingText class="pb-title" :text="titleText" :active="marqueeActive" />

@@ -704,6 +704,57 @@ select {
   color: rgba(255, 255, 255, 0.75);
 }
 
+/* 封面外框：托住封面本身与它外面那圈进度（手机）。
+   **不改变封面的 40×40** —— 进度圈靠绝对定位悬在外面：
+   封面自己有 `overflow: hidden`，画在里面会被裁掉；放在外面还得让位给环宽，
+   那样封面就会缩水（手机迷你条里每一像素都算）。 */
+.pb-left .cover-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.pb-left .cover-ring {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  pointer-events: none;
+}
+
+/* 环的形状跟着封面：圆角矩形的轮廓外扩 3px —— 圆角半径同步 +3px，
+   这样四条边与四个角的间距都是均匀的（用圆环会切在封面的四个角上）。
+   rx 用 CSS 属性写（SVG 2 的写法，Chromium / Firefox 都认），
+   于是改了 --radius-cover 环会自己跟上，不用改两处。 */
+.pb-left .cover-ring rect {
+  fill: none;
+  stroke-width: 2;
+  rx: calc(var(--radius-cover) + 3px);
+}
+
+.pb-left .cover-ring__track {
+  stroke: var(--fill-track);
+}
+
+/* 走过的弧：路径长度已被 pathLength="100" 归一化，所以这里只跟比例有关。
+   `--p` 是原始比例（只由 JS 写），怎么用留在 CSS。
+   ⚠️ 写成 100px：`calc()` 算出来的是**无单位数**，而 stroke-dashoffset 要长度 →
+   不带单位时整条声明会被丢弃（实测偏移恒为 0，环永远不动）。 */
+.pb-left .cover-ring__fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 100px;
+  stroke-dashoffset: calc(100px * (1 - var(--p, 0)));
+  /* 进度跟着 timeupdate（~4Hz）走，插值一下才平顺（不是在“做动效”，是在补采样间隙） */
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-left .cover-ring__fill {
+    transition: none;
+  }
+}
+
 .pb-left .cover img {
   width: 100%;
   height: 100%;
@@ -1309,21 +1360,9 @@ kbd {
     display: none;
   }
 
-  .progress-row {
-    position: absolute;
-    inset: 0 0 auto 0;
-    max-width: none;
-    gap: 0;
-    pointer-events: none;
-  }
-
-  .progress-row .time,
-  .progress .knob {
+  /* 进度改到封面外圈（QQ 音乐那种），顶沿那条 3px 细线撤掉 ——
+     同一个信息不再两个入口（简约优先），而且它本来就不能点（3px 热区点不准）。 */
+  .playerbar .progress-row {
     display: none;
-  }
-
-  .progress {
-    height: 3px;
-    border-radius: 0;
   }
 }

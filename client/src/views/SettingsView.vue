@@ -233,12 +233,14 @@ async function signOut(): Promise<void> {
       <TabsContent value="keys">
         <div class="set-card card">
           <b>播放快捷键</b>
-          <div class="set-row"><span>播放 / 暂停</span><kbd>空格</kbd></div>
           <div class="set-row">
-            <span>快退 / 快进 5 秒</span><span><kbd>←</kbd><kbd>→</kbd></span>
+            <span>播放 / 暂停</span><span class="keys"><kbd>空格</kbd></span>
           </div>
           <div class="set-row">
-            <span>音量 ±5%</span><span><kbd>↑</kbd><kbd>↓</kbd></span>
+            <span>快退 / 快进 5 秒</span><span class="keys"><kbd>←</kbd><kbd>→</kbd></span>
+          </div>
+          <div class="set-row">
+            <span>音量 ±5%</span><span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span>
           </div>
           <div class="set-note">
             随时随地可用（沉浸页也一样）。焦点在输入框里时不生效——那些键要留给输入框。
@@ -283,16 +285,11 @@ async function signOut(): Promise<void> {
 </template>
 
 <style scoped>
-kbd {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-bg-strong);
-  font-family: inherit;
-  font-size: 11.5px;
-  color: var(--text-2);
+/* 键帽本体的配方在 global.css（v5.8：全站共用一份，别在这里再抄一次）；
+   这里只管一组键之间的间距。 */
+.keys {
+  display: inline-flex;
+  gap: 6px;
 }
 
 /* ---------- 歌词页布局：缩略图卡片（VS-09） ----------

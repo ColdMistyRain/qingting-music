@@ -995,6 +995,35 @@ select {
    而各页高度差很多——要么高度“啪啪”跳，要么容器永远跟最高那页一样高（下面留一大块空）。
    用方向一致的滑入，能让人看出“换了、从哪边换的”，代价却只有一行关键帧。 */
 
+/* ---------- 键帽（快捷键展示，v5.8） ----------
+   需求方：参考 Reka 文档里那排键帽（Stepper 页的 Accessibility / Keyboard Interactions）。
+   三个细节决定它像“一个键”、而不是一枚灰底标签：
+   ① **等宽 + 居中**：← → ↑ ↓ 与「空格」长短不同，但脊线要对齐（min-width + inline-flex）；
+   ② **底部那道“边”**：厚度感全在 inset 的 1px 上（键的前脸），不是靠把描边加粗；
+   ③ **文字用 --text-1**：键是画面里的“实体”，不该跟正文注释一样灰。
+   深浅主题都靠令牌派生（--glass-bg-strong / --glass-border），不写死底色。
+   配方放全局：以后沉浸页提示、弹层里要用键帽，直接写 <kbd>，不用再抄一份。 */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  /* 内侧那层是“键的前脸”，外侧那层是“键坐在桌面上”（深色主题里只有内层看得见） */
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.12);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+}
+
 /* ---------- 设置卡片 ---------- */
 .set-card {
   padding: 18px 20px;

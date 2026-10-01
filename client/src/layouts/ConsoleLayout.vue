@@ -24,16 +24,20 @@ const navItems: ConsoleNavItem[] = [
   <div class="console">
     <aside class="cs-side glass">
       <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听 · 控制台</span></div>
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.name"
-        class="nav-item"
-        active-class="active"
-        :to="{ name: item.name }"
-      >
-        <component :is="item.icon" class="icon" />
-        <span class="lbl">{{ item.label }}</span>
-      </RouterLink>
+      <!-- 与播放器侧栏同一套配方（v5.15）：品牌与页脚固定、中段（导航）是唯一滚动区，
+           否则窗口一矮就把「返回播放器」推出去滚不见了。 -->
+      <nav class="cs-nav">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.name"
+          class="nav-item"
+          active-class="active"
+          :to="{ name: item.name }"
+        >
+          <component :is="item.icon" class="icon" />
+          <span class="lbl">{{ item.label }}</span>
+        </RouterLink>
+      </nav>
       <div class="sb-foot">
         <RouterLink class="nav-item" :to="{ name: 'library' }">
           <IconArrowLeft class="icon" />
@@ -62,7 +66,30 @@ const navItems: ConsoleNavItem[] = [
   display: flex;
   flex-direction: column;
   padding: 18px 12px 12px;
+  /* 与播放器侧栏 `.sidebar`/`.sb-inner` 同一套分工：
+     这一层只管裁切与内边距，滚动的只有中段的 .cs-nav，品牌与页脚固定。 */
+  overflow: hidden;
+}
+
+/* 导航与页脚共用同一个“项间距”（4px，v5.11 定稿的规则；控制台原来是 0 / 2px 两种节奏） */
+.cs-nav,
+.sb-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 中段滚动区：**滚动条槽常留**（`scrollbar-gutter: stable`）+ 负的右外边距把槽挪进内边距里，
+   于是“要不要滚动”永远不改变项的宽度（展开时 200），滚动条也不会压住项与高亮。
+   配方与 .sb-scroll 完全一致（v5.15，改动同步两处）。 */
+.cs-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-right: calc(var(--scrollbar-size) * -1);
+  padding-bottom: 6px;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .cs-main {
@@ -72,6 +99,7 @@ const navItems: ConsoleNavItem[] = [
 }
 
 .sb-logo {
+  flex: none;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 1px;
@@ -128,10 +156,9 @@ const navItems: ConsoleNavItem[] = [
 }
 
 .sb-foot {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  /* 贴底由上面会伸缩的 .cs-nav 完成（flex 列与 4px 间距见共用规则），
+     不再需要 `margin-top: auto`（两个机制并存只会互相打架）。 */
+  flex: none;
 }
 
 .sb-foot .nav-item {

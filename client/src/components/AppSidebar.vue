@@ -42,33 +42,38 @@ const navItems = computed<NavItem[]>(() => {
     <div class="sb-inner">
       <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听音乐</span></div>
 
-      <!-- 主导航：包一层 nav（顺便拿到 navigation 地标），并且**项与项之间留 4px** ——
-           不加间距时，悬浮/选中的圆角底色会上下贴成一块（需求方：“又挤在一起了”）。
-           4px 是 shadcn 的 sidebar 里 `SidebarMenu` 的 `gap-1`，页脚那两枚也用同一个值（v5.11）。 -->
-      <nav class="sb-nav">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.name"
-          class="nav-item"
-          active-class="active"
-          :title="item.label"
-          :to="{ name: item.name }"
-        >
-          <component :is="item.icon" class="icon" />
-          <span class="lbl">{{ item.label }}</span>
-        </RouterLink>
-      </nav>
+      <!-- 中段（导航 + 歌单）是**唯一**的滚动区，品牌与页脚固定（v5.15）：
+           原来整个 .sb-inner 都在滚，窗口一矮就把「设置 / 折叠侧边栏」推出去滚不见了；
+           两者是外壳控件，任何内容都不该把它们挤走（shadcn 的 SidebarHeader/Content/Footer 同样分工）。 -->
+      <div class="sb-scroll">
+        <!-- 主导航：包一层 nav（顺便拿到 navigation 地标），并且**项与项之间留 4px** ——
+             不加间距时，悬浮/选中的圆角底色会上下贴成一块（需求方：“又挤在一起了”）。
+             4px 是 shadcn 的 sidebar 里 `SidebarMenu` 的 `gap-1`，页脚那两枚也用同一个值（v5.11）。 -->
+        <nav class="sb-nav">
+          <RouterLink
+            v-for="item in navItems"
+            :key="item.name"
+            class="nav-item"
+            active-class="active"
+            :title="item.label"
+            :to="{ name: item.name }"
+          >
+            <component :is="item.icon" class="icon" />
+            <span class="lbl">{{ item.label }}</span>
+          </RouterLink>
+        </nav>
 
-      <!-- 歌单分区（PRD 3.6 / 原型 v2.6）：数据接入在 M2（PS-01） -->
-      <div class="sb-sep" />
-      <div class="sb-section">
-        <div class="sb-section-head">
-          <span class="lbl">歌 单</span>
-          <button class="sb-add" disabled title="新建歌单（开发中）">
-            <IconListPlus class="icon" />
-          </button>
+        <!-- 歌单分区（PRD 3.6 / 原型 v2.6）：数据接入在 M2（PS-01） -->
+        <div class="sb-sep" />
+        <div class="sb-section">
+          <div class="sb-section-head">
+            <span class="lbl">歌 单</span>
+            <button class="sb-add" disabled title="新建歌单（开发中）">
+              <IconListPlus class="icon" />
+            </button>
+          </div>
+          <p class="sb-hint lbl">暂无歌单</p>
         </div>
-        <p class="sb-hint lbl">暂无歌单</p>
       </div>
 
       <div class="sb-foot">
@@ -109,15 +114,30 @@ const navItems = computed<NavItem[]>(() => {
   width: 224px;
   height: 100%;
   padding: 18px 12px 12px;
-  /* ⚠️ 横向必须显式 `hidden`（v5.14）：只写 `overflow-y: auto` 时，按规范 `overflow-x`
-     会被算成 `auto` —— 展开动画里有那么两三帧，内层还只有 81px 宽，而标签/品牌文字已经
-     瞬时显形（nowrap，宽 117px），于是**底部冒出一条横向滚动条**（实测 10px 高，两帧后消失）。
-     需求方看到的就是“侧边栏底部在收起/展开时跳一下”。这里要的是裁切而不是滚动。 */
-  overflow-x: hidden;
-  overflow-y: auto;
+  /* 滚动全部交给中间的 .sb-scroll（品牌与页脚固定），这一层只做**裁切**：
+     ① 折叠动画里多出来的文字被裁掉，而不是撑出横向滚动条（v5.14）；
+     ② 两个轴都不能是 auto，否则这里会再冒一条滚动条、把页脚又推走。 */
+  overflow: hidden;
   transition:
     width 0.25s ease,
     padding 0.25s ease;
+}
+
+/* 中段滚动区（导航 + 歌单）。两个要点：
+   ① **滚动条槽常留**（`scrollbar-gutter: stable`）：列表长到需要滚动、或窗口变矮时，
+      滚动条的出现/消失不再把项与高亮挤窄 10px（这正是需求方说的“侧栏的滚动条问题”）。
+   ② 负的右外边距把这条槽**挪进 .sb-inner 的内边距里**：滚动区的内容盒宽度因此
+      与不滚动时**完全一致**（展开 200 / 折叠 44），滚动条落在面板边缘 2px 处、
+      永远不压住项，也不改变 12px 的左右对称（与 .page-frame 的“负边距铺到岛边”同源）。
+   没有这条负边距，稳定槽会把内容永久缩窄 10px，右边距变成 22px、左 12px，一眼就歪。 */
+.sb-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-right: calc(var(--scrollbar-size) * -1);
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* 折叠态：**只改宽度**（+ 藏标签、折叠箭头转 180°）。
@@ -135,6 +155,7 @@ const navItems = computed<NavItem[]>(() => {
 }
 
 .sb-logo {
+  flex: none;
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 1px;
@@ -247,8 +268,10 @@ const navItems = computed<NavItem[]>(() => {
 }
 
 .sb-foot {
-  /* flex 列与 4px 间距见上面 .sb-nav/.sb-foot 的共用规则，这里只管“贴底” */
-  margin-top: auto;
+  /* flex 列与 4px 间距见上面 .sb-nav/.sb-foot 的共用规则；
+     这里只用 `flex: none` 把它钉在底部 —— 贴底由上面那个会伸缩的 .sb-scroll 完成，
+     不再需要 `margin-top: auto`（两个机制并存只会互相打架）。 */
+  flex: none;
 }
 
 .sb-foot .nav-item {

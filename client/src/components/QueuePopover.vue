@@ -183,6 +183,16 @@ onBeforeUnmount(() => {
     visibility 0s;
 }
 
+/* ⚠️ 上面那套 `visibility: hidden` 只能关掉**面板自己**的命中测试，
+   Reka 的浮层外面还有一层它自己的包装元素（`[data-reka-popper-content-wrapper]`）：
+   它是 auto 命中、且盒子大小就是面板大小（`visibility: hidden` 的子树照样占位），
+   于是收起状态下仍然有一块 390×116 的隐形矩形**吞掉右下角的点击** ——
+   表现是“列表最后几行点不动，还看不出原因”（v5.59 实测：正是播放条右下角那一片）。
+   包装层没有我们的类名，只能从里面用 :has 反着把它一起关掉命中。 */
+[data-reka-popper-content-wrapper]:has(> .q-pop[data-state="closed"]) {
+  pointer-events: none;
+}
+
 /* ---------- 手机：半屏底部抽屉 ----------
    需求方：“点击列表按钮后让它从底部弹出来占满下半屏幕”。
    高度用 50vh 而不是 50dvh：外壳自己就是 100vh（global.css 的 .app），

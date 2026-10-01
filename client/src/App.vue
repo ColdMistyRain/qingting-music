@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useMediaSession } from "@/composables/useMediaSession";
 
 // 应用根：只承载路由出口（登录页与播放器/控制台外壳由路由决定）
 const route = useRoute();
+const router = useRouter();
 
 /** RT-04：锁屏 / 通知栏 / 耳机按键。挂在根组件而不是 PlayerLayout ——
  *  播放器是单例，控制台页面里音乐也在播，挂在布局里会一进控制台就解绑。 */
@@ -31,11 +32,44 @@ const transitionName = computed(() => (sheetPair.value ? "im-sheet" : ""));
 function clearPair(): void {
   sheetPair.value = false;
 }
+
+/** 刷新 / 直达 URL 时**不播入场动画**（v5.51）。需求方：“在歌词界面如果这时刷新页面就会播放
+ *  歌词界面从下往上的动画，这好像有点不合理。”
+ *
+ *  真因：`<Transition>` 本来不管首屏（默认没有 `appear`），但**路由组件是懒加载的** —— 首屏先渲染成
+ *  空、拿到 chunk 之后再挂上，于是这一次“从无到有”被当成一次普通的 enter，连那段“从底部升起”也一并播了。
+ *  而那段动画的语义是“从列表页进入沉浸页”，刷新时压根没有“上一页”。
+ *
+ *  做法：首个路由组件挂载之前不允许 CSS 过渡（`:css="false"` 让 Vue 跳过过渡类与等待，元素一帧到位），
+ *  那一次 enter 走完之后再放开。
+ *  ⚠️ 不能在 App 的 `onMounted` 里放开：路由组件是懒加载的，App 挂载时 RouterView 里还是空的，
+ *     那一刻放开就盖不住首屏那一次 enter（v5.51 实测：照样从屏幕外升上来）。
+ *  ⚠️ 也不能放在 `router.isReady()` 里：它与首屏渲染谁先谁后取决于微任务顺序，不可靠。
+ *  于是用“首个 enter 的 after 钩子”作为释放点，另加一条导航次数兜底 —— 万一首个 enter 没触发，
+ *  下一次导航后也放开，免得动画永久失效。 */
+const allowTransition = ref(false);
+
+/** 首个 enter 结束（`:css=false` 时它会立即回调）：清掉配对标记，并放开过渡 */
+function onAfterEnter(): void {
+  clearPair();
+  allowTransition.value = true;
+}
+
+let navCount = 0;
+router.afterEach(() => {
+  navCount += 1;
+  if (navCount > 1) allowTransition.value = true;
+});
 </script>
 
 <template>
   <RouterView v-slot="{ Component }">
-    <Transition :name="transitionName" @after-enter="clearPair" @after-leave="clearPair">
+    <Transition
+      :name="transitionName"
+      :css="allowTransition"
+      @after-enter="onAfterEnter"
+      @after-leave="clearPair"
+    >
       <component :is="Component" :key="layer" />
     </Transition>
   </RouterView>

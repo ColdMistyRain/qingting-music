@@ -75,7 +75,9 @@ client/src/utils/         player（模式状态机与选曲，纯函数）、loc
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
-                          spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）
+                          spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）、
+                          viewTransition（View Transition：封面从播放条飞入/飞出沉浸页 + 看门狗 - VS-03）、
+                          viewTransition（View Transition：封面从播放条飞入/飞出沉浸页 + 看门狗 - VS-03）
 client/src/views/         login/local/library/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
 client/src/composables/   useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）
 client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、QueuePopover（PL-06，Reka Popover）、

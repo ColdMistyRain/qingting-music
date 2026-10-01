@@ -13,6 +13,7 @@ import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
 import { handleShortcut } from "@/utils/shortcuts";
+import { withViewTransition } from "@/utils/viewTransition";
 
 /**
  * 沉浸式播放页（VS-03 + 3.7 歌词）。
@@ -106,10 +107,22 @@ watch(
   { immediate: true },
 );
 
-/** 关掉沉浸页：有来路就回退（保留用户的浏览位置），直接进本页时回首页 */
+/** 关掉沉浸页：有来路就回到来路（保留用户的浏览位置），直接进本页时回首页。
+ *  同样用 View Transition 包：封面飞回播放条（与展开是同一对 `.vt-cover`）。
+ *
+ *  ⚠️ 这里用 `router.replace(来路)` 而不是 `router.back()`（v5.18 实测）：
+ *  **后退（history traversal）会把手动起的 View Transition 掐掉** —— 同一次点击，
+ *  `back()` 时过渡在 ready 后 11ms 就被跳过（伪元素动画从 6 个变 0 个，`finished` 只花 11ms），
+ *  而 `replace()` 时 6 个动画正常跑满 435ms。原因在浏览器：遍历导航提交时，
+ *  本次手动过渡会被当作“让位给导航自己的过渡”而 skip 掉。
+ *  `replace` 的副作用正好是我们想要的：`/now` 这条历史被来路替换（而不是再压一条），
+ *  关掉之后按浏览器后退键回到的是**来沉浸页之前**那一页，不会又跳回沉浸页。 */
 function close(): void {
-  if (window.history.state?.back) router.back();
-  else router.push({ name: "home" });
+  void withViewTransition(() => {
+    const back = window.history.state?.back as string | undefined;
+    if (back) router.replace(back);
+    else router.push({ name: "home" });
+  });
 }
 
 function onKeydown(event: KeyboardEvent): void {

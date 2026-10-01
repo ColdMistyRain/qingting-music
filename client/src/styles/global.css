@@ -434,6 +434,44 @@ select {
   mask: url("../assets/logo-mark.png") center / contain no-repeat;
 }
 
+/* ---------- 封面共享元素过渡（View Transition API，VS-03） ----------
+   播放条的小封面 ⇆ 沉浸页的大封面：两端各自给**装封面图的那个元素**挂 `.vt-cover`，
+   同名（`qt-cover`）的旧/新状态就会被浏览器配成同一元素，自己做位移与尺寸形变。
+   两个页面不会同时存在（/now 是顶层路由、不套主布局），所以不会撞“同名元素只能有一个”。
+   三条细节：
+   ① 封面这一对**关掉交叉淡化**（`animation: none`）—— 否则大小两图在飞行中叠影，
+      看起来是双影而不是同一张图在飞；
+   ② root 仍走淡入淡出，时长比封面短一档（页面 280ms / 封面 420ms，PRD v3.2）；
+   ③ 曲线写**字面量**而不是 `var(--ease-ios)`：伪元素从根元素继承变量这件事不可靠，
+      写死了就不会因为变量没传到而退化。 */
+.vt-cover {
+  view-transition-name: qt-cover;
+}
+
+::view-transition-group(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-group(qt-cover) {
+  animation-duration: 0.42s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-old(qt-cover),
+::view-transition-new(qt-cover) {
+  animation: none;
+  mix-blend-mode: normal;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 过渡期间，新页面自己的入场动画要让位（快照是在动画第一帧拍的，会拍到一张空页）。
+   `data-vt` 由 utils/viewTransition.ts 在过渡期间挂在 <html> 上。 */
+html[data-vt="on"] .im {
+  animation: none;
+}
+
 /* ---------- 应用外壳 ---------- */
 .app {
   position: relative;

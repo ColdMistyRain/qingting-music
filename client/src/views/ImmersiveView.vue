@@ -196,6 +196,10 @@ onBeforeUnmount(() => {
     @pointerup="onGestureEnd"
     @pointercancel="onGestureEnd"
   >
+    <!-- 背景光晕图层（z-index: -1：在 .im 的底色之上、内容与薄雾之下）
+         两层渐变各自缓慢漂移，不再是一块静态渐变 -->
+    <div class="im-glow" aria-hidden="true" />
+
     <header class="im-top">
       <button class="ctl" title="收起（Esc）" @click="close">
         <IconCaretDown class="icon" />
@@ -253,9 +257,7 @@ onBeforeUnmount(() => {
      --im-glow-2 会被海报布局置为 transparent（理由见 LAYOUTS）。 */
   --im-glow-1: var(--cv1);
   --im-glow-2: var(--cv2);
-  background:
-    radial-gradient(120% 90% at 16% 0%, var(--im-glow-1), transparent 62%),
-    radial-gradient(110% 80% at 88% 100%, var(--im-glow-2), transparent 58%), var(--bg-base);
+  background: var(--bg-base);
   /* 海报布局的大彩胶要从右上角**伸出屏幕**：本页是固定的全屏页，
      裁在视口上就好，不能让它变成页面滚动区域 */
   overflow: hidden;
@@ -311,6 +313,80 @@ onBeforeUnmount(() => {
   box-shadow: 0 -20px 46px -16px rgba(0, 0, 0, 0.6);
 }
 
+/* 背景光晕（VS-02 取色）：两层各自缓慢漂移。
+   原来这两个 radial-gradient 直接写在 .im 的 background 上 —— 那是**静态**的，
+   需求方：“背景的光晕能动起来吗，现在背景的光晕很死板”（v5.52）。
+   为什么拆成独立图层：动画只走 transform / opacity（合成层，不用逐帧重绘整屏的渐变），
+   两条周期取 34s / 46s 且**不成倍数**，所以看不出循环。
+   ⚠️ 两个坑（v5.52 都踩过）：
+   ① 图层要**比视口大一圈**（`inset: -12%`，四周各放大 12%）。图层和视口一样大时，
+      位移会在边缘露出一条“没染上色”的硬边（靠近左上时那里颜色很浓，能看出来）。
+      代价：图层内的百分比按 1.24 倍视口折算，所以下面写的是 96.8% / 22.6% 这类数 ——
+      都是“视口比例 ÷ 1.24（再叠 12% 偏移）”算出来的，想让光晕回到原样改这几个数就行。
+   ② 它必须是绝对定位，而下面那条 `.im > :not(.im-glow)`（给每个子元素建绘制层）与它
+      特异性相同、又写在后面 —— 原本写成 `.im > *` 时会把它压成 `relative`，
+      空 div 于是高度塔成 0、什么都不画（表面症状就是“光晕没了”）。
+      **通配子选择器要给装饰层留例外。** */
+.im-glow {
+  position: absolute;
+  /* 四周各放大 12%：位移 + 缩放 + 倾斜任何组合下，边缘都不会露出底色 */
+  inset: -12%;
+  /* 负数层级：在 .im 底色之上、::before 的薄雾与内容之下 */
+  z-index: -1;
+  pointer-events: none;
+}
+
+.im-glow::before,
+.im-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* 换封面时颜色要跟着过渡（与原来挂在 .im background 上的那条同义） */
+  transition: background 0.8s ease;
+}
+
+.im-glow::before {
+  /* 折算自视口上的 `radial-gradient(120% 90% at 16% 0%)` */
+  background: radial-gradient(96.8% 72.6% at 22.6% 9.7%, var(--im-glow-1), transparent 62%);
+  animation: glow-drift-a 16s ease-in-out infinite alternate;
+}
+
+.im-glow::after {
+  /* 折算自视口上的 `radial-gradient(110% 80% at 88% 100%)` */
+  background: radial-gradient(88.7% 64.5% at 80.6% 90.3%, var(--im-glow-2), transparent 58%);
+  animation: glow-drift-b 26s ease-in-out infinite alternate;
+}
+
+/* 漂移幅度按**图层自身**算（图层比视口大 12%，所以 ±7% ≈ 视口的 ±8.7%：手机 844 高的屏上约 73px）
+   —— 十几秒走一个单向行程。四个属性各管一件事，合起来像呼吸：
+   位移（位置滑动）+ 缩放（面积胀缩，最容易被看出来）+ 明暗（浓淡）+ 轻微倾斜（渐变是椭圆，转一下形状就变）。
+   幅度全是实测定下来的，别凭感觉调小（v5.52 调了三轮）：
+   ±2.5% / scale 1.08 端点像素差只有 3.4/255，把两张端点图摆一起都看不出区别（看着就是没动）；
+   现在是 ±7% / scale 1→1.3 / opacity .65↔1 / 16s，才真的“看得出在动”。 */
+@keyframes glow-drift-a {
+  from {
+    transform: translate3d(-7%, -5%, 0) scale(1) rotate(-3deg);
+    opacity: 0.65;
+  }
+
+  to {
+    transform: translate3d(7%, 5%, 0) scale(1.3) rotate(3deg);
+    opacity: 1;
+  }
+}
+
+@keyframes glow-drift-b {
+  from {
+    transform: translate3d(5%, 7%, 0) scale(1.3) rotate(3deg);
+    opacity: 1;
+  }
+
+  to {
+    transform: translate3d(-5%, -7%, 0) scale(1) rotate(-3deg);
+    opacity: 0.65;
+  }
+}
+
 /* 薄雾：封面颜色不可控，文字必须始终可读。用主题底色而不是写死黑/白，
    这样深色主题下是"压暗"、浅色主题下是"提亮"，符合 VS-08 的双主题要求。 */
 .im::before {
@@ -321,7 +397,11 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.im > * {
+/* 每个子元素自成一个绘制层（薄雾在它们**下面**，所以内容必须在同层或更上）。
+   ⚠️ 要排除背景光晕图层 `.im-glow`：它是绝对定位的底图，而这条与 `.im-glow` 的规则
+   特异性相同、又写在后面 —— 实测它会把 `position: absolute` 盖成 `relative`，
+   于是那个空 div 高度塔成 0，光晕什么都不画（v5.52 踩到）。 */
+.im > :not(.im-glow) {
   position: relative;
 }
 
@@ -400,6 +480,11 @@ onBeforeUnmount(() => {
   .im-sheet-leave-active {
     animation: none;
     transition: none;
+  }
+
+  .im-glow::before,
+  .im-glow::after {
+    animation: none;
   }
 }
 </style>

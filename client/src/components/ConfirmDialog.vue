@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import {
   DialogContent,
   DialogDescription,
@@ -8,6 +8,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui";
+import type { ConfirmRequest } from "@/utils/confirm";
 import { answerConfirm, currentConfirm } from "@/utils/confirm";
 import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
 
@@ -29,7 +30,25 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  * 破坏性动作里“回车 = 确定”太容易误删，安全默认是“回车 = 取消”（macOS 同款）。
  */
 const open = computed(() => currentConfirm.value !== null);
-const request = computed(() => currentConfirm.value);
+
+/**
+ * 正在展示的那一份请求。
+ *
+ * ⚠️ 它**不能**直接绑 `currentConfirm`（v5.55 需求方实拍：“我能看到是弹出的窗口会收缩高度最后消失”）：
+ * 用户一作答，队列里那条就出队了，标题/说明当场变空 —— 而卡片是 `force-mount` 常驻的，
+ * 离场动画还在放，于是看到的是**高度先从 169 塌到 79（只剩按钮行）、然后才淡出**
+ * （实测：关闭后的第一帧 height 就是 79，`opacity` 才开始从 1.00 降）。
+ * 所以留一份副本，等下一段请求来了再整块替换。关闭后它只是 `visibility: hidden`，也不在无障碍树里。
+ */
+const request = shallowRef<ConfirmRequest | null>(null);
+
+watch(
+  currentConfirm,
+  (next) => {
+    if (next) request.value = next;
+  },
+  { immediate: true },
+);
 
 /** 上面那层是谁由 topLayer 登记处说了算：它决定 Esc 该不该由我们吃掉 */
 let layerId: number | null = null;
@@ -41,7 +60,7 @@ let focusFrame = 0;
  * 把焦点放到“取消”上（打开时 + 每换一条请求）。
  *
  * ⚠️ 实测踩坑（v5.53）：最初只写了一次 `cancelRef.focus()`，结果焦点**仍在背后的触发按钮上**
- * （实测 activeElement 是页面上那颗“清空列表”）。真因不在这里，而在样式：关闲态的
+ * （实测 activeElement 是页面上那颗“清空列表”）。真因不在这里，而在样式：关闭态的
  * `.cf-card` 是 `visibility: hidden`，而 `transition: visibility .2s` 这种“离散属性按时长过渡”
  * 的写法会让**打开后的前 100ms 它仍是 hidden**，而对 hidden 元素调 `focus()` 会**静默失败**。
  * 修法见样式里的 `visibility 0s 0.2s`（显示立即、隐藏延迟）；这里再留一次下一帧复核兜底。
@@ -55,17 +74,23 @@ function focusCancel(): void {
   });
 }
 
+// 层登记看“开没开”（不看 request：它在关闭后还留着，否则内容会塌下去）
+watch(open, (isOpen) => {
+  if (isOpen) {
+    if (layerId === null) layerId = pushTopLayer();
+    return;
+  }
+  if (layerId !== null) {
+    popTopLayer(layerId);
+    layerId = null;
+  }
+});
+
+// 每换一条请求就重新把焦点放回“取消”（上一条可能是用鼠标点的“确定”）
 watch(
   () => request.value?.id,
   async (id) => {
-    if (id === undefined) {
-      if (layerId !== null) {
-        popTopLayer(layerId);
-        layerId = null;
-      }
-      return;
-    }
-    if (layerId === null) layerId = pushTopLayer();
+    if (id === undefined) return;
     await nextTick();
     focusCancel();
   },

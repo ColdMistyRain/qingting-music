@@ -13,6 +13,13 @@ import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
+import {
+  HoverCardArrow,
+  HoverCardContent,
+  HoverCardPortal,
+  HoverCardRoot,
+  HoverCardTrigger,
+} from "reka-ui";
 import { usePlayerStore } from "@/stores/player";
 import ScrollingText from "@/components/ScrollingText.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
@@ -121,7 +128,11 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
     <div class="pb-center">
       <div class="pb-ctrls">
-        <button class="ctl mode" :title="`播放模式：${player.modeLabel}`" @click="player.cycleMode()">
+        <button
+          class="ctl mode"
+          :title="`播放模式：${player.modeLabel}`"
+          @click="player.cycleMode()"
+        >
           <component :is="modeIcon" class="icon" />
         </button>
         <button class="ctl" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
@@ -139,33 +150,46 @@ const marqueeActive = computed(() => player.playing || hovering.value);
           <IconSkipForward class="icon" />
         </button>
 
-        <!-- 音量：点击静音，悬浮/聚焦展开竖向音量条（PL-04） -->
-        <div class="vol-wrap">
-          <button
-            class="ctl"
-            :title="silent ? '取消静音' : '静音'"
-            :aria-label="silent ? '取消静音' : '静音'"
-            @click="player.toggleMute()"
-          >
-            <component :is="volumeIcon" class="icon" />
-          </button>
-          <div class="vol-pop" role="group" aria-label="音量调节">
-            <div class="vol-pop__track">
-              <input
-                class="vol-pop__range"
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                :value="sliderValue"
-                :style="{ '--p': levelPercent }"
-                aria-label="音量"
-                @input="onVolumeInput"
-              />
-            </div>
-            <span class="vol-pop__value">{{ levelPercent }}</span>
-          </div>
-        </div>
+        <!-- 音量：点击静音，悬浮/聚焦展开竖向音量条（PL-04）
+             悬浮层交给 Reka 的 HoverCard：开合延迟与"悬浮到面板上算不算还在里面"
+             由它判定，所以那个 ::after 透明桥接补丁（以及 ::before 手写小三角）退役。 -->
+        <HoverCardRoot :open-delay="120" :close-delay="140">
+          <HoverCardTrigger as-child>
+            <button
+              class="ctl"
+              :title="silent ? '取消静音' : '静音'"
+              :aria-label="silent ? '取消静音' : '静音'"
+              @click="player.toggleMute()"
+            >
+              <component :is="volumeIcon" class="icon" />
+            </button>
+          </HoverCardTrigger>
+          <HoverCardPortal>
+            <HoverCardContent
+              class="vol-pop"
+              side="top"
+              :side-offset="10"
+              role="group"
+              aria-label="音量调节"
+            >
+              <div class="vol-pop__track">
+                <input
+                  class="vol-pop__range"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  :value="sliderValue"
+                  :style="{ '--p': levelPercent }"
+                  aria-label="音量"
+                  @input="onVolumeInput"
+                />
+              </div>
+              <span class="vol-pop__value">{{ levelPercent }}</span>
+              <HoverCardArrow class="vol-pop__arrow" :width="10" :height="5" />
+            </HoverCardContent>
+          </HoverCardPortal>
+        </HoverCardRoot>
       </div>
 
       <div class="progress-row">
@@ -204,78 +228,50 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 </template>
 
 <style scoped>
-/* ---------- 音量：悬浮/聚焦展开的竖向音量条（PL-04） ----------
-   玻璃令牌 + 主题色填充，与全站一套视觉语言；纯 CSS 控制显隐（含键盘 focus-within），
-   无需 JS 状态，触摸设备上仍可直接点按钮静音。 */
-.vol-wrap {
-  position: relative;
-  display: grid;
-  place-items: center;
-}
+/* 音量悬浮面板（PL-04）的样式在文件末尾的**非 scoped** 块里：
+   Reka 把面板 Teleport 到 body，scoped 属性会丢（见那里的说明）。 */
 
+@media (prefers-reduced-motion: reduce) {
+  .vol-pop {
+    animation: none;
+  }
+}
+</style>
+
+<style>
+/* ---------- 音量悬浮面板（PL-04） ----------
+   开合、延迟、"鼠标从按钮移到面板上"的判定全部交给 Reka HoverCard（v4.60）：
+   原来的 ::after 透明桥接与 ::before 手写小三角已退役，箭头改用 HoverCardArrow。
+   材质用**实底**而不是 chrome 玻璃：它浮在播放条上，背后是平坦底色，没有内容可模糊，
+   玻璃在这只会变成"看不见的一圈描边"（实拍发现的回归）；
+   队列弹层因为背后有滚动列表，仍然用 chrome 玻璃。
+   ⚠️ 必须是非 scoped 块：面板被 Reka Teleport 到 body，Vue 的 scoped 属性不会跟过去，
+   带 [data-v-x] 的规则永远匹配不上（v4.60 实测：class 在、样式不生效）。
+   隔离靠 .vol-pop* 前缀，不进全局命名空间。 */
 .vol-pop {
-  position: absolute;
-  bottom: calc(100% + 16px);
-  left: 50%;
-  z-index: 5;
+  z-index: 70;
   display: grid;
   justify-items: center;
   gap: 6px;
   padding: 14px 10px 10px;
-  /* 固定最小宽度：“100% → 44%”读数变化不能让面板宽度抽动；
-     同时要能容下“已静音”三个字不换行 */
   min-width: 60px;
   border-radius: var(--radius-control);
-  /* 悬浮层要压在页面内容之上：用接近实底的令牌色，保证两种主题下都读得清 */
-  background: color-mix(in srgb, var(--bg-base) 86%, transparent);
-  backdrop-filter: blur(28px) saturate(1.5);
-  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  background: var(--plane-2);
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateX(-50%) translateY(6px) scale(0.96);
   transform-origin: bottom center;
-  transition:
-    opacity 0.18s cubic-bezier(0.32, 0.72, 0, 1),
-    transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
-    visibility 0.22s;
+  animation: vol-in 0.18s var(--ease-ios);
 }
 
-.vol-wrap:hover .vol-pop,
-.vol-wrap:focus-within .vol-pop {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateX(-50%) translateY(0) scale(1);
+@keyframes vol-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
 }
 
-/* ① 小三角指向音量按钮（旋转 45° 的方块，只留朝外的两条边，颜色继承浮层） */
-.vol-pop::before {
-  content: "";
-  position: absolute;
-  bottom: -5.5px;
-  left: 50%;
-  width: 10px;
-  height: 10px;
-  transform: translateX(-50%) rotate(45deg);
-  background: inherit;
-  border-right: 1px solid var(--glass-border);
-  border-bottom: 1px solid var(--glass-border);
-  border-bottom-right-radius: 2px;
-}
-
-/* ② 透明"桥"填满按钮与浮层之间的空隙：
-   否则鼠标从按钮移向滑杆的途中会离开悬浮区，浮层还没碰到就被收起（用户报的 bug）。
-   它在浮层内部，所以鼠标停在这段空白上也算悬浮在浮层上。 */
-.vol-pop::after {
-  content: "";
-  position: absolute;
-  bottom: -16px;
-  left: 0;
-  width: 100%;
-  height: 16px;
+.vol-pop__arrow {
+  fill: var(--plane-2);
 }
 
 .vol-pop__track {
@@ -301,7 +297,12 @@ const marqueeActive = computed(() => player.playing || hovering.value);
   font-size: 11px;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
-  /* 读数永远单行：“100% → 44%”变化时不能让面板宽度抽动 */
   white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vol-pop {
+    animation: none;
+  }
 }
 </style>

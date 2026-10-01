@@ -747,7 +747,8 @@ select {
   color: var(--text-1);
 }
 
-.tab.active {
+/* Tab 状态由 Reka 的 data-state 驱动（v4.60）：不再用 .active 类 */
+.tab[data-state="active"] {
   color: var(--text-1);
   border-bottom-color: var(--accent);
 }

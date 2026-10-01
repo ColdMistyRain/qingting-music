@@ -58,11 +58,7 @@ function askClear(): void {
             class="q-item"
             :class="{ current: index === player.currentIndex }"
           >
-            <button
-              class="q-main"
-              :title="`播放 ${track.title}`"
-              @click="player.playAt(index)"
-            >
+            <button class="q-main" :title="`播放 ${track.title}`" @click="player.playAt(index)">
               <!-- 正在播放标识（PL-06）：当前曲目显示播放/暂停图标，其余显示序号 -->
               <span class="q-mark">
                 <template v-if="index === player.currentIndex">
@@ -90,9 +86,10 @@ function askClear(): void {
   </PopoverRoot>
 </template>
 
-<style scoped>
-/* 浮层材质用 chrome 配方（--chrome-bg / --chrome-blur，Apple Music 实测值）：
-   这是"内容会从它下面经过"的层，玻璃在这里才真的成立（v4.55 结论）。 */
+<style>
+/* ⚠️ 这里**不能**用 scoped：Reka 把弹层 Teleport 到 body，而 Vue 的 scoped 属性
+   不会跟过去，带 [data-v-x] 的规则永远匹配不上（v4.60 实测：class 在、样式不生效）。
+   隔离靠类名前缀：本组件所有类都用 q- 开头，不污染全局。 */
 .q-pop {
   z-index: 70;
   display: flex;

@@ -200,9 +200,10 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
         不能把“看不清”赌在模糊上；
      ③ 半屏的实时 64px 模糊在手机上是一笔真开销，而它换来的信息本来就不该看见。
      “透”交给遮罩（.q-scrim）：抽屉外的页面仍然透出来并被压暗一层。
-     底色用 --tray-bg（比页面底亮一档）：沉浸页自己的底就是 --bg-base（+ 封面环境光），
-     抽屉再拿同一个值垫底的话，深色下会变成一块比页面更黑的斑（v5.45 与左侧抽屉同一条）。 */
-  background: var(--tray-bg);
+     ⚠️ 与手机左侧抽屉（NavDrawer）故意不同：那边用 `--tray-bg` 跟着材质模式走
+     （浮岛 = 玻璃），这里**始终不透明**（`--plane`）—— 因为背后是同屏的第二套控件
+     （走带键），而模糊在某些环境里不参与合成（AGENTS #15），透出来就是两层控件叠着。 */
+  background: var(--plane);
   box-shadow:
     var(--panel-sheen),
     0 -18px 44px -16px rgba(20, 28, 60, 0.34);

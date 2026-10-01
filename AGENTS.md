@@ -36,15 +36,15 @@
 
 > Windows PowerShell 下 `npm.ps1` 会被执行策略拦截 → **一律用 `npm.cmd`**；链接命令用 `;`，不要用 `&&`。
 
-| 命令 | 说明 |
-| --- | --- |
-| `npm.cmd install` | 装齐三个包（workspace） |
-| `npm.cmd run dev` | 前端 5173 + 后端 3000 同时启动 |
-| `npm.cmd run test` | 全量单测（server 103 例 + client 189 例） |
-| `npm.cmd run typecheck` | `tsc --noEmit` + `vue-tsc --noEmit` |
-| `npm.cmd run build` | 后端 tsup → `server/dist`，前端 vite → `client/dist` |
-| `npm.cmd run format` | Prettier 全量格式化 |
-| `npm.cmd run dev -w @qingting/server` | 只起后端 |
+| 命令                                  | 说明                                                 |
+| ------------------------------------- | ---------------------------------------------------- |
+| `npm.cmd install`                     | 装齐三个包（workspace）                              |
+| `npm.cmd run dev`                     | 前端 5173 + 后端 3000 同时启动                       |
+| `npm.cmd run test`                    | 全量单测（server 103 例 + client 189 例）            |
+| `npm.cmd run typecheck`               | `tsc --noEmit` + `vue-tsc --noEmit`                  |
+| `npm.cmd run build`                   | 后端 tsup → `server/dist`，前端 vite → `client/dist` |
+| `npm.cmd run format`                  | Prettier 全量格式化                                  |
+| `npm.cmd run dev -w @qingting/server` | 只起后端                                             |
 
 启用门禁（三档权限）本地调试：
 
@@ -99,12 +99,13 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 5. **`<template>` 里别挂"测量用隐藏元素"**：为一个 `.vue` 模板多加一个 `visibility:hidden` 的探针 span，`vue-tsc` 会生成错误的虚拟代码——实测表现为模板里明明在用 `IconSkipBack`/`playIcon` 等，却报 4 个 `TS6133 声明未读取`，且改样式/重跑都不消失（删掉那个 span 立刻恢复正常）。需要量尺寸就用离屏探针（`utils/marquee.ts` 的 `measureTextWidth`，注入宿主便于单测），模板保持干净。判断技巧：`vue-tsc` 只报“模板专用符号未使用”，而模板里的类型错误照常报出，就是踩了这个坑。
 6. **Teleport 出去的内容没有 scoped 属性**：用 Reka 等库做弹层时，内容会被 Teleport 到 `body`，而 Vue 的 `<style scoped>` 生成的是 `.cls[data-v-x]`——**元素上没有 `data-v-x`，规则直接不匹配**，表现是“弹层弹得出来但完全没样式”（不是被覆盖，是从没生效）。弹层样式一律写在**非 scoped** 的 `<style>` 里，隔离靠类名前缀。v4.60 实测：两个弹层同时中招。
 7. **原生 `input[type=range]` 旋转后拖不动**：加 `transform: rotate(-90deg)` 做竖向滑杆时，**点击映射是对的、拖动不跟手**（浏览器用未旋转的几何算位移；实测从底拖到顶只动 1%）。竖向滑杆一律自绘（pointer 事件 + 自己算比例），键盘与 `role="slider"` 一并自己补。v4.64 实测。
+8. **页面不可见（`visibility: hidden` / 后台标签）时 CSS `transition` 不推进**：`getComputedStyle(el).transform` 读到的是**动画开始前的旧值**（与已知的「不可见时 rAF 不触发」同源）。v4.82 实测——我因此一度误判歌词列表“位移慢一拍”，其实内联 `style` 一直是对的。判断这类问题**看 `el.getAttribute("style")`（绑定值），不要看 computed（动画中间值）**。
 
 ## 文档索引
 
-| 文档 | 内容 |
-| --- | --- |
+| 文档                                                         | 内容                                                                          |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
 | [`docs/dev/架构与代码地图.md`](./docs/dev/架构与代码地图.md) | 目录结构、请求链路、鉴权设计、数据模型、样式体系、扩展指引（怎么加接口/页面） |
-| [`docs/dev/开发约定.md`](./docs/dev/开发约定.md) | 命名、TS、测试、CSS/组件、Git 等落地细则与待补项 |
-| [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md) | 里程碑状态、已交付清单、验证记录、留白清单、下一步开工要点 |
-| [`音乐软件需求文档.md`](./音乐软件需求文档.md) | 需求唯一权威来源（含全部需求编号与决策记录） |
+| [`docs/dev/开发约定.md`](./docs/dev/开发约定.md)             | 命名、TS、测试、CSS/组件、Git 等落地细则与待补项                              |
+| [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)         | 里程碑状态、已交付清单、验证记录、留白清单、下一步开工要点                    |
+| [`音乐软件需求文档.md`](./音乐软件需求文档.md)               | 需求唯一权威来源（含全部需求编号与决策记录）                                  |

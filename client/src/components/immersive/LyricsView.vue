@@ -33,6 +33,13 @@ const activeLine = computed(() => props.lines[activeIndex.value] ?? null);
 const activeWords = computed(() =>
   activeLine.value ? wordFillProgress(activeLine.value, props.time) : [],
 );
+/**
+ * 与当前句的距离（行）：LR-04 的模糊强度按它递增（AMLL 的真实机制）。
+ * 模板里写成 `--depth`，CSS 负责换算成 px——JS 只给“原始距离”，与取色管线同一原则。
+ */
+function depthOf(index: number): number {
+  return Math.abs(index - activeIndex.value);
+}
 /** 行级进度（0~1）：仅行级数据时的整句渐亮 */
 const activeRatio = computed(() => lineProgress(props.lines, activeIndex.value, props.time));
 
@@ -41,6 +48,7 @@ const activeRatio = computed(() => lineProgress(props.lines, activeIndex.value, 
    并观察**外层窗口**而不是被位移的内层列表——观察自己会被自己的 transform 触发
    （ScrollingText 踩过 ResizeObserver 死循环）。 */
 const viewportRef = ref<HTMLElement | null>(null);
+const listRef = ref<HTMLElement | null>(null);
 const shift = ref(0);
 const lineEls = new Map<number, HTMLElement>();
 
@@ -51,19 +59,34 @@ function setLineRef(el: Element | null, index: number): void {
 
 function measure(): void {
   const viewport = viewportRef.value;
+  const list = listRef.value;
   const line = lineEls.get(activeIndex.value);
   if (!viewport || !line) {
     shift.value = 0;
     return;
   }
+  const viewH = viewport.clientHeight;
+  /* 首/末句不能落在渐隐带里：视窗上下各有 `--ly-fade` 宽的遮罩渐隐区，正在唱的那句
+     如果（因为“不许推出两端”的夹取）正好压在这条带上，会被遮罩压到半透明——
+     “最该看清的一句最看不清”。所以列表两端各留出同宽的空白：首句停在不透明区
+     上沿，末句停在下面沿。留白 = 渐隐带高度（不是半个视窗），不会重新带来“隔太远”。
+     宽度**从 CSS 变量读**（不在 JS 里另写一份，避免和遮罩跑偏）。 */
+  const fadeRaw = getComputedStyle(viewport).getPropertyValue("--ly-fade").trim();
+  const fadePct = fadeRaw.endsWith("%") ? Number.parseFloat(fadeRaw) / 100 : Number.NaN;
+  // 变量必须是百分比（写 px 就让遮罩几何变成本地值，JS 猜不出来 → 回落到默认 14%）
+  const pad = Math.round(viewH * (fadePct > 0 && fadePct < 0.5 ? fadePct : 0.14));
+  if (list) {
+    list.style.paddingTop = `${pad}px`;
+    list.style.paddingBottom = `${pad}px`;
+  }
   // 行的 offsetTop 是相对外层窗口的（.ly 是最近的定位祖先）：位移 = 行中线 - 窗口中线
-  const desired = line.offsetTop + line.offsetHeight / 2 - viewport.clientHeight / 2;
+  const desired = line.offsetTop + line.offsetHeight / 2 - viewH / 2;
   // **必须夹住**：整首歌刚开头时把第一行推到中线，上面会空出一大片（需求方实拍指出
   // “隔太远”）；末尾同理会把列表推过头、下面留白。夹取规则在纯函数里（有单测）。
   const last = lineEls.get(props.lines.length - 1);
-  const listHeight = last ? last.offsetTop + last.offsetHeight : 0;
-  maxShift.value = Math.max(0, listHeight - viewport.clientHeight);
-  shift.value = centerShift(desired, listHeight, viewport.clientHeight);
+  const listHeight = last ? last.offsetTop + last.offsetHeight + pad : 0;
+  maxShift.value = Math.max(0, listHeight - viewH);
+  shift.value = centerShift(desired, listHeight, viewH);
   // 手动浏览中如果窗口尺寸变了，把手动位移也夹进新范围
   manualShift.value = clampManualShift(manualShift.value, maxShift.value);
 }
@@ -222,6 +245,7 @@ onBeforeUnmount(() => {
 
       <div
         v-else
+        ref="listRef"
         class="ly-list"
         :class="{ 'is-manual': manual, 'is-dragging': dragging }"
         :style="{ transform: `translateY(${-displayShift}px)` }"
@@ -237,6 +261,7 @@ onBeforeUnmount(() => {
           type="button"
           class="lyline"
           :class="{ current: i === activeIndex, past: i < activeIndex }"
+          :style="{ '--depth': depthOf(i) }"
           :title="`跳转到 ${line.text}`"
           @click="onLineClick(line)"
         >
@@ -291,9 +316,24 @@ onBeforeUnmount(() => {
   position: relative;
   height: 100%;
   overflow: hidden;
-  /* LR-04：上下边缘渐隐，让歌词"从雾里进出"而不是被硬切 */
-  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  /* 上下渐隐带的高度（LR-04：让歌词"从雾里进出"而不是被硬切）。
+     measure() 会读这个值，把同宽的空白垫在列表两端，保证首/末句落在不透明区
+     ——改这里就等于同时改了留白，不要在 JS 里另写一份。 */
+  --ly-fade: 14%;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--ly-fade),
+    #000 calc(100% - var(--ly-fade)),
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--ly-fade),
+    #000 calc(100% - var(--ly-fade)),
+    transparent
+  );
 }
 
 .ly-list {
@@ -371,8 +411,11 @@ onBeforeUnmount(() => {
   font-weight: 600;
   line-height: 1.35;
   color: var(--text-3);
-  /* LR-04 景深：非当前句模糊 + 缩小 + 降不透明度，三层叠加才有"离焦"感 */
-  filter: blur(1.7px);
+  /* LR-04 景深：模糊**按离当前句的距离递增**（不是所有非当前句一个固定值）——
+     这是 AMLL 的真实机制（`resolveBlurLevel` = 1 + 距离，上限 5px，窄视口 ×0.8），
+     远景才真的有纵深。距离由模板写成 `--depth`，夹到 3 档免得远处糊成一团。
+     另外两层景深跟着走：缩小（0.965，AMLL 的 SCALE_ASPECT=97）与降不透明度。 */
+  filter: blur(calc(min(var(--depth, 1), 3) * 1.1px));
   opacity: 0.5;
   transform: scale(0.965);
   transform-origin: left center;
@@ -384,12 +427,14 @@ onBeforeUnmount(() => {
 }
 
 .lyline.past {
-  filter: blur(1px);
   opacity: 0.58;
 }
 
+/* 悬浮的句取消模糊：LR-06 是点击跳转，先看得清才点得下去（AMLL 同做法：
+   `:hover .lyricLine { filter: unset !important }`） */
 .lyline:hover {
   opacity: 0.75;
+  filter: none;
 }
 
 .lyline.current {
@@ -418,7 +463,15 @@ onBeforeUnmount(() => {
    未唱部分用 --text-2 而不是 --text-3：当前句必须比相邻句更亮（LR-04），
    用 text-3 会出现"当前句反而最暗"（自评时发现）。 */
 .lyline .txt.fill {
-  background: linear-gradient(to right, var(--accent) calc(var(--p, 1) * 100%), var(--text-2) 0);
+  /* 填充边缘**柔化**：AMLL 有 `wordFadeWidth`（默认 0.5em，即整段渐变带宽 = 半个全角字）
+     ——渐变断点周围必须留过渡，否则填充前沿是一道硬边，扫过去像“被刀切开”。
+     这里取单边 0.25em（带宽合计 0.5em），与 AMLL 默认值一致。 */
+  background: linear-gradient(
+    to right,
+    var(--accent) calc(var(--p, 1) * 100% - 0.25em),
+    var(--accent) calc(var(--p, 1) * 100%),
+    var(--text-2) calc(var(--p, 1) * 100% + 0.25em)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

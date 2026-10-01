@@ -1,5 +1,5 @@
-import type { Song, SongListResult } from "@qingting/shared";
-import { ApiError, apiDelete, apiGet } from "./http";
+import type { Song, SongListResult, SongMetaPatch } from "@qingting/shared";
+import { ApiError, apiDelete, apiGet, apiPut } from "./http";
 
 /** 云端曲库接口（PRD 3.4 / LB-04）。列表一次拿全，过滤与排序在客户端做（LB-07） */
 export function fetchSongs(): Promise<SongListResult> {
@@ -9,6 +9,15 @@ export function fetchSongs(): Promise<SongListResult> {
 /** 删除一首云端曲目（LB-05）：服务端会一并删掉音频与封面文件 */
 export function deleteSong(id: string): Promise<{ id: string }> {
   return apiDelete<{ id: string }>(`/api/songs/${encodeURIComponent(id)}`);
+}
+
+/**
+ * 修改曲目的显示信息（AD-02，管理级）：只传改过的字段。
+ * 服务端改的是曲库索引（不动音频容器里的标签），并把改过的字段记进 `editedFields`，
+ * 重建索引时会保住它们。
+ */
+export function updateSong(id: string, patch: SongMetaPatch): Promise<Song> {
+  return apiPut<Song>(`/api/songs/${encodeURIComponent(id)}`, patch);
 }
 
 /**

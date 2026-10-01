@@ -52,6 +52,12 @@ export interface Song {
   uploadedAt: string;
   /** 服务端抽到内嵌歌词了吗（歌词正文在 `data/lyrics/<id>.lrc`，不进列表响应、按需取） */
   hasLyrics?: boolean;
+  /**
+   * 被**手动改过**的字段（AD-02）。上传的音频可能压根没带标签（或带错了），
+   * 于是允许在曲库管理 / 上传完成后改标题/歌手/专辑 —— 改过的字段记在这里，
+   * **重建索引时必须保住它们**，否则一次 reindex 就把人填的信息冲掉了。
+   */
+  editedFields?: SongEditableField[];
 }
 
 /** 歌单内的一条曲目引用（跨来源，PS-02） */
@@ -200,8 +206,60 @@ export function hasAccess(role: Role, required: AccessLevel): boolean {
   return role === "visitor" || role === "admin";
 }
 
-/* ---------- 内嵌歌词（LR-02）：前后端共用一份归一化 ---------- */
+/* ---------- 手动编辑元信息（AD-02）：前后端共用校验 ---------- */
 
+/** 可手动编辑的字段 */
+export const SONG_EDITABLE_FIELDS = ["title", "artist", "album"] as const;
+export type SongEditableField = (typeof SONG_EDITABLE_FIELDS)[number];
+
+/** 单个字段的长度上限（歌名/歌手/专辑都不该长到离谱） */
+export const SONG_FIELD_MAX_LENGTH = 120;
+
+/** 编辑请求体：只带要改的字段 */
+export interface SongMetaPatch {
+  title?: string;
+  artist?: string;
+  album?: string;
+}
+
+const FIELD_LABELS: Record<SongEditableField, string> = {
+  title: "歌名",
+  artist: "歌手",
+  album: "专辑",
+};
+
+/**
+ * 校验编辑请求：至少要带一个字段，值必须是文本、不超长；**歌名不能为空**。
+ * 歌手/专辑允许清空（服务端会退到“未知歌手/未知专辑”，界面不会留空白）。
+ */
+export function validateSongMeta(
+  input: unknown,
+): { ok: true; value: SongMetaPatch } | { ok: false; message: string } {
+  if (!input || typeof input !== "object") return { ok: false, message: "没有要改的字段" };
+  const raw = input as Record<string, unknown>;
+  const value: SongMetaPatch = {};
+  let touched = 0;
+
+  for (const field of SONG_EDITABLE_FIELDS) {
+    const given = raw[field];
+    if (given === undefined) continue;
+    if (typeof given !== "string") {
+      return { ok: false, message: `${FIELD_LABELS[field]}必须是文本` };
+    }
+    const text = given.trim();
+    if (text.length > SONG_FIELD_MAX_LENGTH) {
+      return { ok: false, message: `${FIELD_LABELS[field]}最多 ${SONG_FIELD_MAX_LENGTH} 个字` };
+    }
+    if (field === "title" && !text) return { ok: false, message: "歌名不能为空" };
+    value[field] = text;
+    touched += 1;
+  }
+
+  if (touched === 0) return { ok: false, message: "没有要改的字段" };
+  return { ok: true, value };
+}
+
+/* ---------- 内嵌歌词（LR-02）：前后端共用一份归一化 ---------- */
 /**
  * 从 music-metadata 的 `common.lyrics` 里挑出**第一段非空**歌词。
  *

@@ -3,12 +3,20 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
 import IconCheckCircle from "~icons/ph/check-circle";
 import IconFolderOpen from "~icons/ph/folder-open";
+import IconPencilSimple from "~icons/ph/pencil-simple";
 import IconUploadSimple from "~icons/ph/upload-simple";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import IconX from "~icons/ph/x";
-import { SONG_DUPLICATE_CODE, isAudioFileName } from "@qingting/shared";
+import {
+  SONG_DUPLICATE_CODE,
+  UNKNOWN_ALBUM,
+  UNKNOWN_ARTIST,
+  isAudioFileName,
+  type Song,
+} from "@qingting/shared";
 import { ApiError } from "@/api/http";
 import { isRetryableUploadError, uploadSong } from "@/api/upload";
+import SongMetaDialog from "@/components/SongMetaDialog.vue";
 import { useConfigStore } from "@/stores/config";
 import { useLibraryStore } from "@/stores/library";
 import { useTransferStore } from "@/stores/transfer";
@@ -33,6 +41,8 @@ interface UploadItem {
   /** 值不值得重试（不可重试的错误不给重试按钮，避免误导） */
   retryable: boolean;
   overwrite: boolean;
+  /** 上传成功后拿到的曲目：用它开编辑弹窗，改完还能就地刷新这一行 */
+  song?: Song;
 }
 
 const STATUS_LABELS: Record<ItemStatus, string> = {
@@ -52,6 +62,29 @@ const items = ref<UploadItem[]>([]);
 const dragging = ref(false);
 const skippedFiles = ref(0);
 const fileInput = ref<HTMLInputElement | null>(null);
+
+/** 正在编辑的那一条（AD-02，与曲库管理共用同一个弹窗） */
+const editing = ref<Song | null>(null);
+const metaOpen = ref(false);
+
+/** 音频里没带标签（歌手/专辑退到了未知占位）：这一行值得提示“可以补一下” */
+function needsMeta(song: Song | undefined): boolean {
+  if (!song) return false;
+  return song.artist === UNKNOWN_ARTIST || song.album === UNKNOWN_ALBUM;
+}
+
+function editItemMeta(item: UploadItem): void {
+  if (!item.song) return;
+  editing.value = item.song;
+  metaOpen.value = true;
+}
+
+function onMetaSaved(song: Song): void {
+  library.applyUpdated(song);
+  // 这一行的结果文字里有歌名，改了要跟着变，不然看起来像“没保存”
+  const item = items.value.find((entry) => entry.song?.id === song.id);
+  if (item) item.message = `${formatSize(song.size)} · ${song.title}`;
+}
 
 let keySeed = 0;
 let running = false;
@@ -199,6 +232,7 @@ async function runOne(item: UploadItem): Promise<void> {
     });
     item.status = "done";
     item.progress = 1;
+    item.song = song;
     item.message = `${formatSize(song.size)} · ${song.title}`;
     library.applyUploaded(song);
   } catch (error) {
@@ -341,6 +375,16 @@ function clearFinished(): void {
             </div>
 
             <div class="up__actions">
+              <!-- 标签缺失/写错的歌不用重传：上传完就地改（AD-02），与曲库管理共用同一个弹窗 -->
+              <button
+                v-if="item.status === 'done'"
+                class="btn btn-quiet"
+                :class="{ up__fill: needsMeta(item.song) }"
+                @click="editItemMeta(item)"
+              >
+                <IconPencilSimple class="icon" />
+                编辑信息
+              </button>
               <template v-if="item.status === 'duplicate'">
                 <button class="btn btn-quiet" @click="overwrite(item)">覆盖</button>
                 <button class="btn btn-quiet" @click="skip(item)">跳过</button>
@@ -374,6 +418,8 @@ function clearFinished(): void {
         </p>
       </div>
     </div>
+
+    <SongMetaDialog v-model:open="metaOpen" :song="editing" @saved="onMetaSaved" />
   </section>
 </template>
 
@@ -569,5 +615,10 @@ function clearFinished(): void {
   align-items: center;
   gap: 6px;
   justify-content: flex-end;
+}
+
+/* 标签缺失时把「编辑信息」点一下：颜色只用来表达状态（简约优先），这里是“这条需要你补” */
+.up__fill {
+  color: var(--accent);
 }
 </style>

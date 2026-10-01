@@ -59,7 +59,7 @@ shared/src/index.ts       前后端共享类型与纯函数（Track/Song/Playlis
 server/src/config.ts      环境变量 → AppConfig（PRD 5.5 全量清单，含 parseSize/parseTtl）
 server/src/http.ts        统一响应 sendOk/sendFail + errorHandler
 server/src/services/auth.ts  签名 Cookie 签发/验签、密码比对、密钥持久化
-server/src/services/       storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退 + 内嵌歌词）、lyrics（data/lyrics/<id>.lrc 按需读写）、range（Range 解析）
+server/src/services/storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退 + 内嵌歌词）、lyrics（data/lyrics/<id>.lrc 按需读写）、range（Range 解析）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
 server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/内嵌歌词）、audio（/audio + /covers）、stats、playlists
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen
@@ -90,6 +90,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           QueuePopover（PL-06，两套壳层：桌面 Reka Popover 浮层 / 手机 Reka Dialog 半屏底部抽屉 - v5.40）、
                           QueuePanel（队列内容：标题行 + 清空 + 列表，两壳共用一份 - v5.40）、
                           ConfirmDialog（应用内二次确认：Reka Dialog + 自绘玻璃，挂 App.vue 全站一份 - v5.53）、
+                          SongMetaDialog（元信息编辑弹窗：上传页与曲库管理共用一份 - AD-02 / v5.61）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
                           TrackRow（通用曲目行）、EmptyState、
                           immersive/{LyricsView,ImTitle,ImControls,LyricsSourceMenu}（沉浸页三布局共享件：歌词壳层（自研）/ 标题 / 控制栏 / 歌词来源菜单）
@@ -102,6 +103,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 **已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.86：按公式自行实现 `utils/spring.ts`，只参考思路不搬代码）** + **歌词来源打开与滚动键盘化（v4.87：支持增强型 LRC、可手动导入 `.lrc`/`.yrc`（按曲目记忆、GBK 回退）、歌词区键盘滚动；顺带修好开发环境封面一直没加载出来的代理缺陷）**；前后端类型检查、生产构建、**378 个单测**（server 103 + client 275）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
 
 **手机端（v5.32/5.33/5.34/5.35，RT-01/02/03/05/06）**：`<768px` 导航收进**左侧抽屉**（`NavDrawer` 面板 + 页头里的 `NavToggle` 按钮：与标题同一行、可从屏幕左缘右滑拉出，遮罩/左滑/选完自动收起）—— 桌面侧栏不变（收起 = 68px 图标条）；播放条变迷你条（**只剩 播放/暂停 + 下一首**，进度是**封面外圈的圆角矩形环** —— QQ 音乐那种，第二行显示**当前歌词**）；列表收起「专辑/来源」两列、删除键隐藏；管理台只给「请使用电脑访问」提示。手势：行单击即播（`utils/pointer.ts`）、迷你条与沉浸页左右滑切歌、沉浸页下滑收起 / 上滑歌词铺满、**长按播放键进沉浸**；均只认真实触摸。**队列（v5.40/5.41）**：手机上是**从底部升起的抽屉**（点沉浸页底部的列表键弹出，把手下滑 ≥40px 或点遮罩/Esc 收起；**最多半屏**：行多时正好盖住走带键那片——背后的东西不能透出来看，行少时贴着底部收短；点某首换曲后不自动收起）。**移动端参考对象＝Salt Player（椒盐音乐）**：无推荐流的简易首页、左侧抽屉、迷你条歌词、长按进沉浸、封面取色、横竖屏与平板、通知栏控制。**锁屏/通知栏（RT-04）**：锁屏显示封面+歌名+歌手+专辑，六个动作全接上（`utils/mediaSession.ts` + `useMediaSession`，挂在 `App.vue`）。
+
+**曲目元信息可编辑（v5.61，AD-02）**：上传的音频可能压根没有标签（或写错了），所以“曲库索引里的显示信息”要能手动改 —— 改的是**索引**、不重写音频容器里的标签；改过的字段记在 `Song.editedFields` 里，**重建索引时保住它们**（没改过的照旧按标签重抽），客户端只提交**真正改过的字段**（`utils/songMeta.ts`，否则歌手/专辑会永久脱离标签）。一个弹窗（`SongMetaDialog.vue`）两处入口：上传队列「已完成」那一行给「编辑信息」（标签缺失时这枚键着色提示）、曲库管理每行给「编辑曲目信息」；保存后列表当场变名、队列里正在播的那一份也跟着变，歌单展示改用实时元信息。
 
 **歌单（v5.58，PS-01~04）**：歌单存在服务器端（`data/playlists.json`，与曲库索引同一套原子写法）；接口 `GET / POST / PUT / DELETE /api/playlists` + `PUT /api/playlists/:id/items`（**整表替换**，添加/移除/排序都是一件事），权限按 AC-03 归**访客级**。前端：侧栏「歌 单」分区接上真数据（＋行内输入新建、曲目数徽标）+ 歌单详情页（头部/播放全部/重命名/删除/添加曲目选择器/移除单曲）；“这条能不能播”收在 `utils/playlistEntries` 一处（云端被删 / 本地缺失 / 在线未接入三种情况各自有话说）。**未做**：曲目拖拽排序、收藏/最近播放、导出（都是 P2）。
 
@@ -141,6 +144,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 19. **`transition: visibility <时长>` 会让弹层“打开后前半个时长仍然是 hidden”（v5.53 实测）**：Reka 弹层用 `force-mount` + `visibility: hidden` 表达关闭态（为什么不能用 `opacity: 0` 见第 18 条）。但 `visibility` 是**离散属性**，现代引擎按“过渡过半才翻转”处理 —— 写 `transition: opacity .2s, visibility .2s` 时，打开后的前 100ms 元素仍然 hidden：渐变看着正常（`opacity` 在动），但**对 hidden 元素调 `focus()` 会静默失败**。症状是“焦点还留在背后的触发按钮上”（后果：回车把弹层又调一遍），时间线上 0ms / 16ms 两次聚焦都没产生 focusin，100ms 后手动聚焦才成功。写法：关闭态 `visibility 0s <时长>`（先播完淡出再隐藏）、打开态 `visibility 0s`（立即可见）；`opacity` / `transform` 照旧。
 
 20. **删文件类命令先 dry-run，别把 `storedName` 当曲目 id（v5.60 血的教训）**：曲库索引里 `id` 与 `storedName` 是**各自独立生成的 nanoid**（`services/storage.ts` 里写明了“id 给前端引用、落盘名另外生成”），两者长度与字符集一样，肉眼分不出。我曾用“文件名 basename 不在 id 列表里”当孤儿判定去清 `uploads/`，结果把 **14 个音频全删了**（索引还在、文件没了，界面上就是一排点不动的鬼影）。两条：① 任何批量删除先只**打印**要删的清单，确认无误再执行；② “这个文件属于哪条曲目”必须用 `storedName` 字段对齐，不要拿 `id` 或 basename 猜。恢复办法（本项目特有）：索引里记着 `originalName` + `size`，可以从原始曲库目录按“名字 + 体积”精确拷回 `uploads/<storedName>`（实测 14/14 恢复，206 流式播放与封面全部正常）。
+
+21. **给 Reka 浮层做 `force-mount` 时，要连它的包装层一起关掉命中区（v5.62 实测）**：我们只给自己的面板写了 `visibility: hidden` + `pointer-events: none`，但带定位的浮层（Popover / Tooltip）外面还有 Reka 自己的一层包装元素（`[data-reka-popper-content-wrapper]`）—— 它 `pointer-events: auto`、盒子就是面板大小（**`visibility: hidden` 的子树照样占位**），于是收起状态下仍有一块隐形矩形**吞掉那块区域的点击**（实测：音乐库列表下部的「播放」按钮点不动，Playwright 直接报该元素 `intercepts pointer events`；量出来是一块 390×116 的隐形区盖在播放条右下）。包装层没有我们的类名，只能从里面反着关：`[data-reka-popper-content-wrapper]:has(> .q-pop[data-state="closed"]) { pointer-events: none }`。判据：**“浮层收起了”不能只看 transform / opacity / visibility，要拿 `document.elementFromPoint()` 量那块地方到底能点到谁**。（Dialog 类浮层不在带定位的包装层里 —— 内容自己 `visibility: hidden` 即不可点，故确认框/元信息弹窗无此问题。）
 
 ## 文档索引
 

@@ -3,7 +3,13 @@ import { readdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
-import { SONG_DUPLICATE_CODE, fileExtension, isAudioFileName, type Song } from "@qingting/shared";
+import {
+  SONG_DUPLICATE_CODE,
+  fileExtension,
+  isAudioFileName,
+  validateSongMeta,
+  type Song,
+} from "@qingting/shared";
 import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail, sendOk } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
@@ -14,7 +20,9 @@ import {
   createStoredName,
   loadSongs,
   saveSongs,
+  songEditedFields,
   toSongListResult,
+  withSongMeta,
 } from "../services/storage.js";
 
 /**
@@ -22,6 +30,7 @@ import {
  *   GET    /api/songs           列表（访客及以上，LB-04）
  *   GET    /api/songs/:id/lyrics 内嵌歌词原文（访客及以上，LR-02）
  *   POST   /api/songs/upload    上传（管理员，LB-01/02/03）
+ *   PUT    /api/songs/:id       改标题/歌手/专辑（管理员，AD-02）
  *   DELETE /api/songs/:id       删除曲目与文件（管理员，LB-05）
  *   POST   /api/songs/reindex   扫 uploads 重建索引（管理员，LB-11 / AD-05）
  *
@@ -138,6 +147,35 @@ export function createSongsRouter(config: AppConfig): Router {
     }),
   );
 
+  router.put(
+    "/:id",
+    requireAccess("admin"),
+    asyncHandler(async (req, res) => {
+      const id = String(req.params.id);
+      const songs = await loadSongs(config.dataDir);
+      const song = songs.find((entry) => entry.id === id);
+      if (!song) {
+        sendFail(res, 404, "这首曲目不在曲库里");
+        return;
+      }
+
+      const patch = validateSongMeta(req.body);
+      if (!patch.ok) {
+        sendFail(res, 400, patch.message);
+        return;
+      }
+
+      // 只改索引、不动文件里的标签：改写音频标签是另一件事（要重写容器，风险高），
+      // 这里的语义是“曲库里显示的元信息”，而 editedFields 会保证重建索引不会把它冲掉
+      const updated = withSongMeta(song, patch.value);
+      await saveSongs(
+        config.dataDir,
+        songs.map((entry) => (entry.id === id ? updated : entry)),
+      );
+      sendOk(res, updated);
+    }),
+  );
+
   router.delete(
     "/:id",
     requireAccess("admin"),
@@ -190,11 +228,17 @@ export function createSongsRouter(config: AppConfig): Router {
         if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
         else await removeLyrics(config.dataDir, id);
 
+        // 手动改过的字段（AD-02）必须保住：重建索引是拿文件里的标签重抽的，
+        // 不记账的话用户填的歌名/歌手会被一次 reindex 冲回原样
+        const edited = previous ? songEditedFields(previous) : [];
+        const keep = (field: "title" | "artist" | "album", parsedValue: string): string =>
+          previous && edited.includes(field) ? previous[field] : parsedValue;
+
         songs.push({
           id,
-          title: parsed.title,
-          artist: parsed.artist,
-          album: parsed.album,
+          title: keep("title", parsed.title),
+          artist: keep("artist", parsed.artist),
+          album: keep("album", parsed.album),
           duration: parsed.duration,
           coverUrl: coverName ? `/covers/${coverName}` : (previous?.coverUrl ?? null),
           originalName,
@@ -202,6 +246,7 @@ export function createSongsRouter(config: AppConfig): Router {
           size: info.size,
           uploadedAt: previous?.uploadedAt ?? info.mtime.toISOString(),
           hasLyrics: parsed.lyrics !== null,
+          ...(edited.length > 0 ? { editedFields: [...edited] } : {}),
         });
         if (!previous) added += 1;
       }

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Song } from "@qingting/shared";
 import { deleteSong, fetchSongs, libraryErrorMessage } from "@/api/songs";
+import { usePlayerStore } from "@/stores/player";
 
 export type LibraryStatus = "idle" | "loading" | "ready" | "error";
 
@@ -21,6 +22,34 @@ export const useLibraryStore = defineStore("library", () => {
     totalSize.value = songs.value.reduce((sum, song) => sum + song.size, 0);
   }
 
+  /**
+   * 用最新的曲库信息校准队列里那几首云端曲目（AD-02）。
+   * 队列是存盘的（PL-07）：刷新后恢复的那份里存的是**当时**的歌名、歌手、专辑，
+   * 曲目信息被手动改过之后就会跟曲库对不上（“我改了名，刷新一下播放条又变回旧的”）。
+   * 所以每次曲库加载完都拿它校准一次 —— 幂等，只动能对上的云端曲目（本地曲目的 id 不共享）。
+   */
+  function syncQueueMetadata(list: readonly Song[]): void {
+    const player = usePlayerStore();
+    const byId = new Map(list.map((song) => [song.id, song]));
+    for (const track of player.queue) {
+      if (track.source !== "server") continue;
+      const song = byId.get(track.id);
+      if (!song) continue;
+      if (
+        track.title === song.title &&
+        track.artist === song.artist &&
+        track.album === song.album
+      ) {
+        continue;
+      }
+      player.patchTrack(track.id, {
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+      });
+    }
+  }
+
   /** 载入列表；force 用于"重建索引"后强制刷新 */
   async function load(force = false): Promise<void> {
     if (status.value === "loading") return;
@@ -31,6 +60,7 @@ export const useLibraryStore = defineStore("library", () => {
       const result = await fetchSongs();
       songs.value = result.songs;
       totalSize.value = result.totalSize;
+      syncQueueMetadata(result.songs);
       error.value = "";
       status.value = "ready";
     } catch (err) {
@@ -53,9 +83,33 @@ export const useLibraryStore = defineStore("library", () => {
     recalcTotalSize();
   }
 
+  /**
+   * 手动改完元信息后（AD-02）：就地换掉列表里那一条（不动顺序，列表是按上传时间排的），
+   * 顺带把**队列/正在播放**那一份也改掉 —— 曲目可能已经在队列里了，
+   * 不同步的话会出现“列表改了、播放条上还是旧名字”。
+   */
+  function applyUpdated(song: Song): void {
+    songs.value = songs.value.map((item) => (item.id === song.id ? song : item));
+    usePlayerStore().patchTrack(song.id, {
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+    });
+  }
+
   function clearError(): void {
     error.value = "";
   }
 
-  return { songs, totalSize, status, error, load, applyUploaded, remove, clearError };
+  return {
+    songs,
+    totalSize,
+    status,
+    error,
+    load,
+    applyUploaded,
+    applyUpdated,
+    remove,
+    clearError,
+  };
 });

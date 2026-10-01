@@ -104,6 +104,31 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
     expect(entry.state).toBe("online-off");
     expect(entry.track).toBeNull();
   });
+
+  it("显示用的歌名/歌手优先用实时曲目（AD-02：曲库改过名，歌单里不能还是旧的）", () => {
+    const edited = song({ title: "海阔天空（现场版）", artist: "BEYOND 1993" });
+    const entry = resolvePlaylistEntry(cloudItem, { songs: [edited], queue: [] });
+
+    expect(entry.title).toBe("海阔天空（现场版）");
+    expect(entry.artist).toBe("BEYOND 1993");
+    expect(entry.item.title).toBe("海阔天空"); // 歌单里存的快照不动，只是不拿来显示
+  });
+
+  it("对不上实时曲目时退回歌单里存的快照（离线/被删时至少还有名字）", () => {
+    const missing = resolvePlaylistEntry(cloudItem, { songs: [], queue: [] });
+    expect(missing.title).toBe("海阔天空");
+    expect(missing.artist).toBe("BEYOND");
+
+    const local = resolvePlaylistEntry(localItem, { songs: [], queue: [] });
+    expect(local.title).toBe("夜行");
+    expect(local.artist).toBe("林晚");
+
+    const online = resolvePlaylistEntry(
+      { source: "online", refId: "netease:9", title: "在线歌", artist: "某某" },
+      { songs: [], queue: [] },
+    );
+    expect(online.title).toBe("在线歌");
+  });
 });
 
 describe("resolvePlaylist / playableTracks / playlistTotalDuration", () => {

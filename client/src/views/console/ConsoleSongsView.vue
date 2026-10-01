@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import type { Song } from "@qingting/shared";
 import IconListDashes from "~icons/ph/list-dashes";
 import IconMagnifyingGlass from "~icons/ph/magnifying-glass";
+import IconPencilSimple from "~icons/ph/pencil-simple";
 import IconSortAscending from "~icons/ph/sort-ascending";
 import IconSortDescending from "~icons/ph/sort-descending";
 import IconTrash from "~icons/ph/trash";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import EmptyState from "@/components/EmptyState.vue";
+import SongMetaDialog from "@/components/SongMetaDialog.vue";
 import { useLibraryStore } from "@/stores/library";
 import { confirmAction } from "@/utils/confirm";
 import { formatDateTime, formatSize } from "@/utils/format";
@@ -37,6 +40,21 @@ const actionError = ref("");
 const rows = computed(() =>
   sortSongs(filterSongs(library.songs, keyword.value), sortKey.value, direction.value),
 );
+
+/** 正在编辑的那一条（AD-02）：弹窗由两个入口共用，这里只管“编辑哪首” */
+const editing = ref<Song | null>(null);
+const metaOpen = ref(false);
+
+function startEdit(song: Song): void {
+  editing.value = song;
+  metaOpen.value = true;
+}
+
+/** 保存成功：就地换掉列表里那一条，并在队列里同步（曲目可能正在唱） */
+function onMetaSaved(song: Song): void {
+  library.applyUpdated(song);
+}
+
 const allSelected = computed(
   () => rows.value.length > 0 && rows.value.every((s) => selected.value.has(s.id)),
 );
@@ -259,6 +277,15 @@ async function removeSelected(): Promise<void> {
             <button
               class="ctl"
               :disabled="busy"
+              title="编辑曲目信息"
+              aria-label="编辑曲目信息"
+              @click="startEdit(song)"
+            >
+              <IconPencilSimple class="icon" />
+            </button>
+            <button
+              class="ctl"
+              :disabled="busy"
               title="删除这首歌"
               @click="askRemoveOne(song.id, song.title)"
             >
@@ -268,6 +295,8 @@ async function removeSelected(): Promise<void> {
         </div>
       </div>
     </div>
+
+    <SongMetaDialog v-model:open="metaOpen" :song="editing" @saved="onMetaSaved" />
   </section>
 </template>
 

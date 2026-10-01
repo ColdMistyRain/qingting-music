@@ -1,7 +1,15 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { nanoid } from "nanoid";
-import type { Song, SongListResult } from "@qingting/shared";
+import {
+  SONG_EDITABLE_FIELDS,
+  UNKNOWN_ALBUM,
+  UNKNOWN_ARTIST,
+  type Song,
+  type SongEditableField,
+  type SongListResult,
+  type SongMetaPatch,
+} from "@qingting/shared";
 
 /**
  * 曲库索引读写（LB-04 / LB-11，PRD 12 数据目录结构）。
@@ -55,8 +63,49 @@ export function toSongListResult(songs: readonly Song[]): SongListResult {
   };
 }
 
-/** 运行期校验：手工改坏的 songs.json 里混进脏对象时不至于把接口带崩 */
-function isSong(value: unknown): value is Song {
+/**
+ * 读出“手动改过的字段”。
+ * 一律过这一处清洗：手改坏的 json 里它可能是字符串（`"title".includes(...)` 又恰好为真），
+ * 不拦一下会算出 `["t","i","t","l","e"]` 这种脏值。
+ */
+export function songEditedFields(song: Song): SongEditableField[] {
+  if (!Array.isArray(song.editedFields)) return [];
+  return SONG_EDITABLE_FIELDS.filter((field) => song.editedFields?.includes(field));
+}
+
+/**
+ * 应用一次手动编辑（AD-02）。
+ *
+ * 改哪个字段就把哪个字段记进 `editedFields` —— 重建索引（LB-11）是按文件里的标签重抽的，
+ * 不记账的话一次 reindex 就会把人手动填的歌名/歌手冲掉。
+ * 歌手与专辑允许清空：退到“未知歌手 / 未知专辑”，列表里不会出现空白行。
+ * 注意**不动 `uploadedAt`**：编辑不是重新上传，不该把曲目在“按上传时间”排序里挪位置。
+ */
+export function withSongMeta(song: Song, patch: SongMetaPatch): Song {
+  const edited = new Set(songEditedFields(song));
+  const next: Song = { ...song };
+
+  if (patch.title !== undefined) {
+    next.title = patch.title;
+    edited.add("title");
+  }
+  if (patch.artist !== undefined) {
+    next.artist = patch.artist || UNKNOWN_ARTIST;
+    edited.add("artist");
+  }
+  if (patch.album !== undefined) {
+    next.album = patch.album || UNKNOWN_ALBUM;
+    edited.add("album");
+  }
+
+  // 按固定顺序输出，方便直接看 json
+  next.editedFields = SONG_EDITABLE_FIELDS.filter((field) => edited.has(field));
+  return next;
+}
+
+/** 运行期校验：手工改坏的 songs.json 里混进脏对象时不至于把接口带崩 */ function isSong(
+  value: unknown,
+): value is Song {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   return (

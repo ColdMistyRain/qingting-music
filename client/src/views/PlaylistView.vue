@@ -221,7 +221,7 @@ async function removePlaylist(): Promise<void> {
           <button
             class="pl-main"
             :disabled="!entry.track"
-            :title="entry.track ? `播放 ${entry.item.title}` : entry.reason"
+            :title="entry.track ? `播放 ${entry.title}` : entry.reason"
             @click="playFrom(entry)"
           >
             <span class="pl-index">{{ index + 1 }}</span>
@@ -230,8 +230,8 @@ async function removePlaylist(): Promise<void> {
               <IconPlaylist v-else class="icon" />
             </span>
             <span class="pl-text">
-              <b>{{ entry.item.title }}</b>
-              <small>{{ entry.track ? entry.item.artist : entry.reason }}</small>
+              <b>{{ entry.title }}</b>
+              <small>{{ entry.track ? entry.artist : entry.reason }}</small>
             </span>
             <span class="pl-time">{{ formatTime(entry.item.duration ?? null) }}</span>
           </button>
@@ -239,7 +239,7 @@ async function removePlaylist(): Promise<void> {
           <button
             class="pl-remove"
             :disabled="busy"
-            :title="`把《${entry.item.title}》移出歌单`"
+            :title="`把《${entry.title}》移出歌单`"
             @click="removeEntry(entry)"
           >
             <IconX class="icon" />

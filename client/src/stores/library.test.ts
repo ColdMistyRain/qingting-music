@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import type { Song } from "@qingting/shared";
+import type { Song, Track } from "@qingting/shared";
+import { usePlayerStore } from "./player";
 import { useLibraryStore } from "./library";
 
 function song(id: string, size = 100): Song {
@@ -126,5 +127,96 @@ describe("曲库 store", () => {
 
     await expect(library.remove("b")).rejects.toThrow("曲目不存在");
     expect(library.songs.map((s) => s.id)).toEqual(["b"]);
+  });
+});
+
+describe("曲库 store · applyUpdated（AD-02 编辑元信息）", () => {
+  /** 队列里的云端曲目：id 与曲库里的 song.id 同一套（播放/歌词都按它找） */
+  function cloudTrack(overrides: Partial<Track> = {}): Track {
+    return {
+      id: "a",
+      source: "server",
+      url: "/audio/a.mp3",
+      title: "曲目 a",
+      artist: "歌手",
+      album: "专辑",
+      cover: null,
+      duration: 120,
+      ...overrides,
+    };
+  }
+
+  it("就地换掉那一条，顺序不变、占用空间也不重算", () => {
+    const library = useLibraryStore();
+    library.songs = [song("a", 100), song("b", 200)];
+    library.totalSize = 300;
+
+    library.applyUpdated({ ...song("a", 100), title: "改过的名字", artist: "新歌手" });
+
+    expect(library.songs.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(library.songs[0]).toMatchObject({ title: "改过的名字", artist: "新歌手" });
+    expect(library.totalSize).toBe(300);
+  });
+
+  it("队列里那一份也跟着改：不然列表改了、播放条上还是旧名字", () => {
+    const library = useLibraryStore();
+    const player = usePlayerStore();
+    library.songs = [song("a", 100)];
+    player.setQueue([cloudTrack()]);
+
+    library.applyUpdated({ ...song("a", 100), title: "改过的名字" });
+
+    expect(player.queue[0].title).toBe("改过的名字");
+  });
+
+  it("队列里没有这条（只改了别的歌）：不会凭空塞进去", () => {
+    const library = useLibraryStore();
+    const player = usePlayerStore();
+    library.songs = [song("a", 100)];
+    player.setQueue([cloudTrack({ id: "b" })]);
+
+    library.applyUpdated({ ...song("a", 100), title: "改过的名字" });
+
+    expect(player.queue).toHaveLength(1);
+    expect(player.queue[0].title).toBe("曲目 a");
+  });
+
+  it("列表还没加载完（列表为空）：不新增行，只同步队列", () => {
+    const library = useLibraryStore();
+    const player = usePlayerStore();
+    player.setQueue([cloudTrack()]);
+
+    library.applyUpdated({ ...song("a", 100), title: "改过的名字" });
+
+    expect(library.songs).toEqual([]);
+    expect(player.queue[0].title).toBe("改过的名字");
+  });
+
+  it("加载曲库时校准队列：刷新后恢复的存档里可能还是旧名字", async () => {
+    const player = usePlayerStore();
+    // 播放存档里存的是“改名前”那一份（歌名/歌手/专辑都是旧的）
+    player.setQueue([
+      cloudTrack({ title: "曲目 a", artist: "歌手", album: "专辑" }),
+      { ...cloudTrack({ id: "local-1" }), source: "local", title: "本地歌" },
+    ]);
+    stubFetch(() =>
+      jsonResponse(200, {
+        code: 0,
+        data: {
+          songs: [{ ...song("a", 100), title: "改过的名字", artist: "新歌手", album: "新专辑" }],
+          totalSize: 100,
+        },
+      }),
+    );
+    const library = useLibraryStore();
+
+    await library.load();
+
+    expect(player.queue[0]).toMatchObject({
+      title: "改过的名字",
+      artist: "新歌手",
+      album: "新专辑",
+    });
+    expect(player.queue[1].title).toBe("本地歌"); // 本地曲目不参与（id 不共享，别乱改）
   });
 });

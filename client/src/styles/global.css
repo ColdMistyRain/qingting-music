@@ -136,7 +136,7 @@ select {
    必须用 margin：padding 只收窄内容盒，块自己的底色/描边仍然满宽，卡片还是对不齐。
    表头也吃这条规则，所以它的列与滚动区里的行天然对齐（两边各写一份就会漂）。 */
 .page-frame > *:not(.page-frame__scroll) {
-  margin-right: var(--scrollbar-size);
+  margin-right: var(--scrollbar-size, 0px);
 }
 
 /* 只有这一层滚动；负边距让它铺到岛边（滚动条贴岛），内边距再把内容缩回来 */

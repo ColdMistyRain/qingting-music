@@ -14,7 +14,7 @@ describe("scrollbarSizeFrom", () => {
     expect(scrollbarSizeFrom(100.5, 88.2)).toBe(12);
   });
 
-  it("overlay 滚动条（量不到，差值为 0）→ 0，调用方保留 CSS 兜底值", () => {
+  it("overlay 滚动条 / 引擎不预留槽（差值为 0）→ 0（这是有效结果，调用方会写进令牌关掉补偿）", () => {
     expect(scrollbarSizeFrom(100, 100)).toBe(0);
   });
 

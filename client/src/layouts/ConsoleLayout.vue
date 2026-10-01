@@ -89,7 +89,7 @@ const navItems: ConsoleNavItem[] = [
 .cs-nav {
   flex: 1 1 auto;
   min-height: 0;
-  margin-right: calc(var(--scrollbar-size) * -1);
+  margin-right: calc(var(--scrollbar-size, 0px) * -1);
   padding-bottom: 6px;
   overflow-x: hidden;
   overflow-y: auto;

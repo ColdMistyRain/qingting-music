@@ -11,16 +11,20 @@
  * 与 `--dpr` 同一个原则：JS 只写一个**原始值**，怎么用留在 CSS。
  */
 
-/** 从「外框宽 − 内容盒宽」得出滚动条宽度；量不到（overlay 滚动条）或值不合理时返回 0。 */
+/** 从「外框宽 − 内容盒宽」得出滚动条宽度；量不到 / 值明显不合理时返回 0。
+ *  **0 也是有效结果**（“本引擎不占滚动条位”），调用方要照写进令牌 —— 不能当“没量到”跳过，
+ *  否则 CSS 兑底值会给一个根本不需要补偿的引擎多减一道（v5.31 修）。 */
 export function scrollbarSizeFrom(offsetWidth: number, clientWidth: number): number {
   const size = offsetWidth - clientWidth;
-  if (!Number.isFinite(size) || size <= 0 || size > 40) return 0;
+  if (!Number.isFinite(size) || size < 0 || size > 40) return 0;
   return Math.round(size);
 }
 
 /**
- * 实测一次并写进 `--scrollbar-size`（返回量到的值，0 = 没量到、保留 CSS 兜底值）。
+ * 实测一次并写进 `--scrollbar-size`（返回量到的值）。
  * 探针放视口外、`overflow: scroll` 保证一定有滚动条可量；量完立即移除。
+ * ⚠️ **0 也要写**：0 = “本引擎不占滚动条位”，侧栏/页框的
+ * `margin-right: calc(var(--scrollbar-size, 0px) * -1)` 就该归零 —— 不写就会退回 CSS 兑底值。
  */
 export function syncScrollbarSize(host: HTMLElement = document.documentElement): number {
   const probe = document.createElement("div");
@@ -30,6 +34,6 @@ export function syncScrollbarSize(host: HTMLElement = document.documentElement):
   host.appendChild(probe);
   const size = scrollbarSizeFrom(probe.offsetWidth, probe.clientWidth);
   probe.remove();
-  if (size) host.style.setProperty("--scrollbar-size", `${size}px`);
+  host.style.setProperty("--scrollbar-size", `${size}px`);
   return size;
 }

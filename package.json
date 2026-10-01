@@ -2,6 +2,7 @@
   "name": "qingting-music",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "description": "轻听音乐 —— 可私有部署的 Web 音乐播放器（本地 + 自有云端 + 在线聚合）",
   "type": "module",
   "engines": {

@@ -84,3 +84,11 @@ $env:USER_PASSWORD='guest123'; $env:ADMIN_PASSWORD='admin123'; npm run dev
 **当前状态：M1 进行中** —— 工程骨架与访问门禁已完成并验证；**播放器核心（播放/暂停/切歌/进度/音量/播放模式）与本地播放（拖入文件或文件夹、ID3 标签与内嵌封面、本地临时列表）已可用**，真实曲库实测通过。云端曲库、歌词、沉浸式播放页尚未实现。
 
 进度明细、验证记录、留白清单与下一步开工要点统一维护在 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)（单一事实来源，本文不再重复）。
+
+## 许可
+
+本项目以 **AGPL-3.0-only** 分发（见 [`LICENSE`](./LICENSE)）。
+
+原因：沉浸页歌词的渲染与动效直接使用 **AMLL**（[amll-dev/applemusic-like-lyrics](https://github.com/amll-dev/applemusic-like-lyrics)，`@applemusic-like-lyrics/core` / `vue`，**AGPL-3.0-only**，v4.84 接入）。AGPL 具传染性，且本软件是网络服务（AGPL §13 要求向使用者提供完整源码）——这与本项目的定位一致（可私有部署、开源）。
+
+只有这一个第三方强拷贝依赖；其余依赖（Vue / Vite / Express / Reka UI / Phosphor 图标等）均为宽松许可。**新加依赖前先看 `npm view <pkg> license`**。

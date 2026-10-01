@@ -14,7 +14,7 @@
 
 ## 铁律（不要擅自更改）
 
-1. **技术选型已定稿**（PRD 5.1）：前端 Vue 3 + Vite + TS + Pinia + Vue Router；样式手写 CSS + CSS 变量，**不引入带样式的组件库**；复杂交互件用 Reka UI（无样式行为层）；图标只用 **Iconify + Phosphor**（`~icons/ph/xxx`，构建期打包）。后端 Node + Express + TS，multer 上传，music-metadata 解析标签，JSON 文件存储。
+1. **技术选型已定稿**（PRD 5.1）：前端 Vue 3 + Vite + TS + Pinia + Vue Router；样式手写 CSS + CSS 变量，**不引入带样式的组件库**；复杂交互件用 Reka UI（无样式行为层）；图标只用 **Iconify + Phosphor**（`~icons/ph/xxx`，构建期打包）。**唯一例外：沉浸页歌词的渲染与动效直接用 AMLL**（`@applemusic-like-lyrics/core` + `vue`，AGPL-3.0，v4.84 需求方定案）——它是行为层与视觉层一体的成品，别自己重写（见坑 10）。后端 Node + Express + TS，multer 上传，music-metadata 解析标签，JSON 文件存储。
 2. **界面以"美观 + 易用"为准，需求方的感受是最终裁决权；原型是参考与素材库，不是教条。** `docs/design/mockup/` 提供令牌、配方与视觉语言（`css/mockup.css`）。改样式不必先改原型，但必须：① 保持单一视觉语言，不出现两套互相矛盾的样式；② 改动后同步更新原型与需求文档决策记录，避免下次有人照着旧原型改回去。**不要**照搬原型里的单页 CSS 类切换（已被证明会产生层叠逃逸 bug，见 v3.9 修订记录），沉浸页三布局必须拆成三个独立 Vue 组件（VS-09 / v4.0 决策）。
    **简约优先（v4.30 需求方定调）**：能用层级与间距说清的不加线、不加底、不加装饰图标；同一个页面的分隔方式只留一套；颜色只用于表达状态（播放中/失败/选中），不做装饰；每加一个元素都要能回答"它承载什么信息"，答不出就删掉。
 3. **取色只注入原始色源**：JS 只写 `--cover-src` / `--cover-src-2`，一切调校在 CSS 用 OKLCH 相对颜色语法派生。**严禁 JS 写内联 background**（会覆盖多层图层，原型踩过两次）。
@@ -77,14 +77,14 @@ client/src/views/         login/local/library/online/playlist/settings + immersi
 client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、QueuePopover（PL-06，Reka Popover）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、
                           TrackRow（通用曲目行）、EmptyState、
-                          immersive/{LyricsView,ImTitle,ImControls}（沉浸页三布局的共享件：歌词引擎/标题/控制栏）
+                          immersive/{LyricsView,ImTitle,ImControls}（沉浸页三布局共享件：歌词壳层（内包 AMLL）/ 标题 / 控制栏）
                           + ImLayoutDuo / ImLayoutCenter / ImLayoutPoster（布局只管自己的版式与专属视觉层 - VS-09）
 client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 ```
 
 ## 当前进度
 
-**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）**；前后端类型检查、生产构建、**292 个单测**（server 103 + client 189）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
+**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词接入 AMLL（v4.84：渲染与动效交给 `@applemusic-like-lyrics/core`+`vue`，仓库随之改为 AGPL-3.0-only；自研引擎已删）**；前后端类型检查、生产构建、**282 个单测**（server 103 + client 179）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
 
 **下一步**（建议顺序）：歌单（3.6，需服务端）→ 在线音源（3.5，需服务端）→ 移动端专属适配（RT-08）→ 生产静态托管（服务端）。
 
@@ -100,6 +100,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 6. **Teleport 出去的内容没有 scoped 属性**：用 Reka 等库做弹层时，内容会被 Teleport 到 `body`，而 Vue 的 `<style scoped>` 生成的是 `.cls[data-v-x]`——**元素上没有 `data-v-x`，规则直接不匹配**，表现是“弹层弹得出来但完全没样式”（不是被覆盖，是从没生效）。弹层样式一律写在**非 scoped** 的 `<style>` 里，隔离靠类名前缀。v4.60 实测：两个弹层同时中招。
 7. **原生 `input[type=range]` 旋转后拖不动**：加 `transform: rotate(-90deg)` 做竖向滑杆时，**点击映射是对的、拖动不跟手**（浏览器用未旋转的几何算位移；实测从底拖到顶只动 1%）。竖向滑杆一律自绘（pointer 事件 + 自己算比例），键盘与 `role="slider"` 一并自己补。v4.64 实测。
 8. **页面不可见（`visibility: hidden` / 后台标签）时 CSS `transition` 不推进**：`getComputedStyle(el).transform` 读到的是**动画开始前的旧值**（与已知的「不可见时 rAF 不触发」同源）。v4.82 实测——我因此一度误判歌词列表“位移慢一拍”，其实内联 `style` 一直是对的。判断这类问题**看 `el.getAttribute("style")`（绑定值），不要看 computed（动画中间值）**。
+9. **许可（v4.84）**：本项目因**接入 AMLL**（歌词渲染与动效，`@applemusic-like-lyrics/core`+`vue`）整体采用 **AGPL-3.0-only**（根 `LICENSE` + `package.json`，需求方 2026-10-01 定案：不商用、后续开源）。引入任何新依赖前先 `npm view <pkg> license`：宽松许可都可用，**不要再引入第二套强拷贝依赖**，也不要抄入许可不明的代码。
+10. **AMLL 的根是「包裹层」、真正的播放器在里层**（v4.84 实测）：`<LyricPlayer class="x">` 里的 class 落在包裹层上，内层 `.amll-lyric-player` 是 `height: 100%`——**包裹层必须给确定高度**，否则百分比高度对着 `auto` 解析成 0，它会把所有行当“不在可视区”剔除（DOM 里只剩间奏点与底栏，看着像根本没渲染）。同理它的 `mix-blend-mode: plus-lighter` 是为**深色**底设计的，浅底（浅色封面 + 浅色主题）会把歌词冲淡到看不见，得用 `:deep()` 改回 `normal`。
 
 ## 文档索引
 

@@ -1,4 +1,5 @@
 import { createPinia, setActivePinia } from "pinia";
+import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Track } from "@qingting/shared";
 import { NOTICE_TTL_MS, usePlayerStore } from "./player";
@@ -329,6 +330,97 @@ class FakeAudio {
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("手动歌词库（LR-02 第三条来源，v4.87）", () => {
+  /** node 环境没有 localStorage，给一个够用的内存版 */
+  const memory = new Map<string, string>();
+
+  beforeEach(() => {
+    memory.clear();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => void memory.set(key, value),
+      removeItem: (key: string) => void memory.delete(key),
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const LRC = "[00:01.00]手动第一句\n[00:03.00]手动第二句";
+
+  it("导入后成为最高优先级来源，清掉则退回内嵌那份", () => {
+    const player = usePlayerStore();
+    player.addTracks([{ ...track("a"), lyrics: "[00:01.00]内嵌" }]);
+    player.playAt(0);
+
+    expect(player.lyricsSource).toBe("[00:01.00]内嵌");
+    expect(player.hasImportedLyrics).toBe(false);
+
+    expect(player.importLyrics(LRC)).toBe(true);
+    expect(player.hasImportedLyrics).toBe(true);
+    expect(player.lyricsSource).toBe(LRC);
+
+    player.clearImportedLyrics();
+    expect(player.hasImportedLyrics).toBe(false);
+    expect(player.lyricsSource).toBe("[00:01.00]内嵌");
+  });
+
+  it("解析不出歌词的文本不写入（返回 false，交给界面提示用户）", () => {
+    const player = usePlayerStore();
+    player.addTracks([track("a")]);
+    player.playAt(0);
+
+    expect(player.importLyrics("这不是歌词，一个时间标签都没有")).toBe(false);
+    expect(player.hasImportedLyrics).toBe(false);
+  });
+
+  it("按曲目各记各的：切歌不串歌词", () => {
+    const player = usePlayerStore();
+    player.addTracks([track("a"), track("b")]);
+    player.playAt(0);
+    player.importLyrics("[00:01.00]A 的手动歌词");
+
+    player.playAt(1);
+    expect(player.hasImportedLyrics).toBe(false);
+    player.importLyrics("[00:01.00]B 的手动歌词");
+
+    player.playAt(0);
+    expect(player.lyricsSource).toBe("[00:01.00]A 的手动歌词");
+  });
+
+  it("存进 localStorage（本地曲目用“歌手|曲名”当键：id 每次都会重新生成）", async () => {
+    const player = usePlayerStore();
+    player.addTracks([track("a")]);
+    player.playAt(0);
+    player.importLyrics(LRC);
+    await nextTick(); // 落盘走的是 watch，默认异步
+
+    const stored: Record<string, string> = JSON.parse(memory.get("qt-lyrics") ?? "{}");
+    expect(stored["local:测试歌手|曲目 a"]).toBe(LRC);
+  });
+
+  it("restore 时把手动歌词库读回来（刷新后还在）", () => {
+    memory.set("qt-lyrics", JSON.stringify({ "local:测试歌手|曲目 a": LRC }));
+    const player = usePlayerStore();
+    player.restore();
+    player.addTracks([track("a")]);
+    player.playAt(0);
+
+    expect(player.hasImportedLyrics).toBe(true);
+    expect(player.lyricsSource).toBe(LRC);
+  });
+
+  it("存档坏掉（不是 JSON / 全是垃圾条目）也不会崩，只是什么都没有", () => {
+    memory.set("qt-lyrics", "{{{ 不是 JSON");
+    const player = usePlayerStore();
+    player.restore();
+
+    expect(player.importedLyrics).toEqual({});
+
+    memory.set("qt-lyrics", JSON.stringify({ 坏条目: "没有时间标签", 好东西: LRC }));
+    player.restore();
+    expect(Object.keys(player.importedLyrics)).toEqual(["好东西"]);
+  });
+});
 
 describe("与 audio 元素的接线", () => {
   beforeEach(() => {

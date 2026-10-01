@@ -3,6 +3,9 @@
  *
  * 纯函数、不碰 DOM，便于单测（后续歌词引擎只消费这里的输出）。
  * - LRC：`[mm:ss.xx]歌词`，一行可挂多个时间标签；支持 `[offset:±ms]`。
+ * - 增强型 LRC：行内再带词级标签 `[mm:ss.xx]<mm:ss.xx>字<mm:ss.xx>字…`（v4.87 补上）。
+ *   这类文件很常见（各地歌词站导出、K 歌软件），末尾那个没有文字的标签就是**收尾标记**，
+ *   所以最后一个字的时长靠它落定；没有收尾标签时用下一句的开始时间兜底。
  * - yrc（网易云逐字）：行头 `[起始ms,时长ms]`，行内 `(偏移ms,时长ms,0)字`。
  * - 认不出来的行一律跳过（真实歌词文件里总有空行、注释、乱七八糟的标签）。
  */
@@ -30,12 +33,16 @@ export interface ParsedLyrics {
 
 /** `[mm:ss.xx]` / `[mm:ss:xx]` / `[mm:ss]`，一行里可能连着好几个 */
 const LRC_TIMESTAMP = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
+/** 增强型 LRC 的词级标签 `<mm:ss.xx>`（同一个正则也用于行首时间标签） */
+const WORD_TAG = /<(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?>/g;
 /** yrc 行头：`[起始ms,时长ms]` */
 const YRC_LINE = /^\[(\d+),(\d+)\](.*)$/;
 /** yrc 行内的逐字片段：`(偏移ms,时长ms,0)字` */
 const YRC_WORD = /\((\d+),(\d+),-?\d+\)([^()]*)/g;
 /** 元信息标签：`[ti:歌名]` 之类 */
 const LRC_META = /^\[([a-z]{2,8}):(.*)\]$/i;
+/** 末字拿不到时长时的兜底（秒）：宁可能亮起来，也不要它一直不亮 */
+const WORD_FALLBACK_SECONDS = 0.2;
 
 /** 把 "ss.xx" 里的小数部分换算成秒（1 位是 0.1s，2 位 0.01s，3 位 0.001s） */
 function fractionToSeconds(fraction: string | undefined): number {
@@ -43,6 +50,48 @@ function fractionToSeconds(fraction: string | undefined): number {
   const digits = fraction.replace(/[.:]/, "");
   const value = Number(`0.${digits}`);
   return Number.isFinite(value) ? value : 0;
+}
+
+/** `mm:ss(.xx)` 三段 → 秒；非法返回 NaN */
+function stampSeconds(minutes: string, seconds: string, fraction?: string): number {
+  const value = Number(minutes) * 60 + Number(seconds) + fractionToSeconds(fraction);
+  return Number.isFinite(value) ? value : Number.NaN;
+}
+
+/**
+ * 归整到毫秒。歌词时间本来就是毫秒精度，而时间相减会留下浮点尾巴
+ * （`12.8 − 12 = 0.8000000000000007`）——这个尾巴会一路带到逐字填充与辉光时长上，纯属噪音。
+ */
+function roundMs(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+/**
+ * 增强型 LRC 的词级拆分：标签之间的文字就是那个字/词的文本。
+ * `base` 传所在行**首个时间标签**的秒数（不带 offset），返回的 `start` 相对行首——与 yrc 同一口径。
+ * 行首挂了多个时间标签时，每个副本共用这套相对时间（标签的差量是一样的；
+ * 两边的 offset 一起抵消，所以 offset 不会影响词。
+ * 末尾那个没有文字的收尾标签会被跳过，于是前一个字的时长正好落在它身上。
+ */
+function parseWordTags(body: string, base: number): LyricWord[] | null {
+  const tags = [...body.matchAll(WORD_TAG)];
+  if (tags.length === 0) return null;
+
+  const words: LyricWord[] = [];
+  tags.forEach((tag, index) => {
+    const start = stampSeconds(tag[1]!, tag[2]!, tag[3]) - base;
+    const next = tags[index + 1];
+    const end = next ? stampSeconds(next[1]!, next[2]!, next[3]) - base : Number.NaN;
+    const text = body.slice(tag.index! + tag[0].length, next ? next.index! : body.length).trim();
+    if (!text) return;
+    words.push({
+      start: roundMs(Math.max(0, start)),
+      duration: Number.isFinite(end) ? roundMs(Math.max(0, end - start)) : 0,
+      text,
+    });
+  });
+
+  return words.length > 0 ? words : null;
 }
 
 export function parseLyrics(raw: string): ParsedLyrics {
@@ -69,6 +118,8 @@ export function parseLyrics(raw: string): ParsedLyrics {
       const startMs = Number(yrc[1]);
       const text = yrc[3]!.trim();
       if (!Number.isFinite(startMs)) continue;
+      // offset 是整份文件级的，yrc 也要跟着走（此前只有 LRC 那一支吃了 offset）
+      const time = startMs / 1000 + offsetMs / 1000;
 
       const words: LyricWord[] = [];
       for (const match of yrc[3]!.matchAll(YRC_WORD)) {
@@ -81,9 +132,9 @@ export function parseLyrics(raw: string): ParsedLyrics {
 
       if (words.length > 0) {
         hasWordTiming = true;
-        lines.push({ time: startMs / 1000, text: words.map((word) => word.text).join(""), words });
+        lines.push({ time, text: words.map((word) => word.text).join(""), words });
       } else if (text) {
-        lines.push({ time: startMs / 1000, text });
+        lines.push({ time, text });
       }
       continue;
     }
@@ -92,19 +143,43 @@ export function parseLyrics(raw: string): ParsedLyrics {
     const stamps = [...line.matchAll(LRC_TIMESTAMP)];
     if (stamps.length === 0) continue; // 不认识的行走掉（容错）
 
-    const text = line.replace(LRC_TIMESTAMP, "").trim();
+    const body = line.replace(LRC_TIMESTAMP, "");
+    const base = stamps[0] ? stampSeconds(stamps[0][1]!, stamps[0][2]!, stamps[0][3]) : Number.NaN;
+    // 行内带词级标签就是增强型 LRC；词一律按“相对首个时间标签”算
+    const words = Number.isFinite(base) ? parseWordTags(body, base) : null;
+    // 没拆出词时也要把词级标签剔掉，否则它们会被当成歌词正文显示出来
+    const text = words
+      ? words.map((word) => word.text).join("")
+      : body.replace(WORD_TAG, "").trim();
     if (!text) continue;
 
     for (const stamp of stamps) {
-      const minutes = Number(stamp[1]);
-      const seconds = Number(stamp[2]);
-      const time = minutes * 60 + seconds + fractionToSeconds(stamp[3]) + offsetMs / 1000;
-      if (Number.isFinite(time)) lines.push({ time, text });
+      const raw = stampSeconds(stamp[1]!, stamp[2]!, stamp[3]);
+      if (!Number.isFinite(raw)) continue;
+      const time = raw + offsetMs / 1000;
+      if (words) {
+        hasWordTiming = true;
+        // 每个副本给一份自己的词对象：末字时长兑底要按各自的行时间算
+        lines.push({ time, text, words: words.map((word) => ({ ...word })) });
+      } else {
+        lines.push({ time, text });
+      }
     }
   }
 
   // 真实歌词文件常常不是按时间排的（多标签展开后更明显）
   lines.sort((a, b) => a.time - b.time);
+
+  /* 末字时长兜底：没有收尾标签时它会是 0，那样最后一个字永远不会亮（其余字都亮了，
+     停在倒数第二个字上很明显）。用"下一句开始 − 这句开始"剩下的时间，至少给 0.2s。 */
+  for (const [index, item] of lines.entries()) {
+    const words = item.words;
+    const last = words?.[words.length - 1];
+    if (!last || last.duration > 0) continue;
+    const next = lines[index + 1];
+    const end = next ? next.time : item.time + LINE_FALLBACK_SECONDS;
+    last.duration = roundMs(Math.max(end - (item.time + last.start), WORD_FALLBACK_SECONDS));
+  }
 
   return { lines, hasWordTiming };
 }

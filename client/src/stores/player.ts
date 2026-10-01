@@ -11,9 +11,19 @@ import {
 } from "@/utils/player";
 import { applyCoverColors } from "@/utils/coverColor";
 import { forgetLocalSource } from "@/utils/localFiles";
+import {
+  lyricsKey,
+  pickLyricsSource,
+  sanitizeImportedLyrics,
+  withImportedLyric,
+  withoutImportedLyric,
+  type ImportedLyrics,
+} from "@/utils/lyricsLibrary";
 import { parseSnapshot, sanitizeSnapshot } from "@/utils/playerState";
 
 const STORAGE_KEY = "qt-player";
+/** 手动歌词库单独一份：它是偏好类数据，不该混进播放存档（存档要保持“小”） */
+const IMPORTED_LYRICS_KEY = "qt-lyrics";
 /** PL-07：进度存盘节流（timeupdate 约 4Hz，每 5 秒写一次就够；写得再勤只是浪费） */
 const PROGRESS_PERSIST_INTERVAL_MS = 5000;
 /** PL-02：播放超过该秒数后按"上一首"回到本曲开头 */
@@ -55,6 +65,11 @@ export const usePlayerStore = defineStore("player", () => {
    * 沉浸页只从这里取，不自己去找文件/接口——数据来源变了，页面不用动。
    */
   const lyricsText = ref("");
+  /**
+   * 手动导入的歌词（LR-02 的第三条来源，v4.87）：按曲目存，刷新后还在。
+   * 键的推导见 `utils/lyricsLibrary`：服务器/在线用 id，本地曲目用“歌手|曲名”（id 每次重生成）。
+   */
+  const importedLyrics = ref<ImportedLyrics>({});
 
   let audio: HTMLAudioElement | null = null;
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -110,6 +125,63 @@ export const usePlayerStore = defineStore("player", () => {
   function setLyrics(text: string): void {
     lyricsText.value = text;
   }
+
+  /* ---------- 手动歌词库（LR-02「用户手动上传 .lrc」的落点） ---------- */
+  /** 当前曲目的手动歌词键；没有曲目时是空串 */
+  const importedKey = computed(() => (currentTrack.value ? lyricsKey(currentTrack.value) : ""));
+  /** 当前这首带手动歌词吗（菜单据此决定要不要给“恢复自带歌词”） */
+  const hasImportedLyrics = computed(
+    () => importedKey.value !== "" && importedKey.value in importedLyrics.value,
+  );
+  /**
+   * 沉浸页只看这一个来源（优先级：手动 > 内嵌 > 在线，理由见 `utils/lyricsLibrary`）。
+   * 页面不自己去找文件/接口——数据来源变了，页面不用动。
+   */
+  const lyricsSource = computed(() =>
+    pickLyricsSource({
+      imported: importedLyrics.value[importedKey.value],
+      embedded: currentTrack.value?.lyrics,
+      online: lyricsText.value,
+    }),
+  );
+
+  /** 导入一份歌词文本；解析不出任何行时返回 false（调用方据此提示用户） */
+  function importLyrics(text: string): boolean {
+    const next = withImportedLyric(importedLyrics.value, importedKey.value, text);
+    if (next === importedLyrics.value) return false;
+    importedLyrics.value = next;
+    notify("已导入歌词，这首歌将优先使用它");
+    return true;
+  }
+
+  /** 清掉当前曲目的手动歌词，退回曲目自带/在线那份 */
+  function clearImportedLyrics(): void {
+    const next = withoutImportedLyric(importedLyrics.value, importedKey.value);
+    if (next === importedLyrics.value) return;
+    importedLyrics.value = next;
+    notify("已恢复曲目自带的歌词");
+  }
+
+  /** 载入手动歌词库（读回来的东西一律过一遍 sanitize） */
+  function restoreImportedLyrics(): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      const raw = localStorage.getItem(IMPORTED_LYRICS_KEY);
+      importedLyrics.value = sanitizeImportedLyrics(raw ? JSON.parse(raw) : null);
+    } catch {
+      importedLyrics.value = {};
+    }
+  }
+
+  // 改了就存（每次都是换新对象，浅监听就够）
+  watch(importedLyrics, (map) => {
+    if (typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem(IMPORTED_LYRICS_KEY, JSON.stringify(map));
+    } catch {
+      // 配额满就不存：手动歌词是锦上添花，不该影响播放
+    }
+  });
 
   /** 换曲即清空歌词：歌词永远属于当前曲目，留着会挂在新歌上 */
   watch(currentIndex, () => {
@@ -433,6 +505,7 @@ export const usePlayerStore = defineStore("player", () => {
    * 摆好曲目与进度、等用户按一下即可。
    */
   function restore(): void {
+    restoreImportedLyrics();
     if (typeof localStorage === "undefined") return;
     const raw = localStorage.getItem(STORAGE_KEY);
     const snapshot = parseSnapshot(raw);
@@ -485,8 +558,13 @@ export const usePlayerStore = defineStore("player", () => {
     displaySeconds,
     displayRatio,
     lyricsText,
+    importedLyrics,
+    hasImportedLyrics,
+    lyricsSource,
     sampleTime,
     setLyrics,
+    importLyrics,
+    clearImportedLyrics,
     // 动作
     play,
     pause,

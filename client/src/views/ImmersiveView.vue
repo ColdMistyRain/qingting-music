@@ -2,11 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import IconCaretDown from "~icons/ph/caret-down";
+import IconFileText from "~icons/ph/file-text";
 import IconMusicNotes from "~icons/ph/music-notes";
 import ImControls from "@/components/immersive/ImControls.vue";
 import ImLayoutCenter from "@/components/immersive/ImLayoutCenter.vue";
 import ImLayoutDuo from "@/components/immersive/ImLayoutDuo.vue";
 import ImLayoutPoster from "@/components/immersive/ImLayoutPoster.vue";
+import LyricsSourceMenu from "@/components/immersive/LyricsSourceMenu.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
@@ -64,11 +66,12 @@ const coverUrl = computed(() => track.value?.cover ?? null);
 
 /**
  * LR-01/LR-02：歌词原文 → 时间轴。
- * 来源优先级按 LR-02：先曲目自带（内嵌），再 store 的 lyricsText（在线 / 手动 .lrc 的落点）。
+ * 来源统一由 store 给（优先级：手动导入 > 曲目内嵌 > 在线，定在 `utils/lyricsLibrary`），
+ * 页面不自己去找文件/接口——数据来源变了，页面不用动：
+ * 之前这里是 `track.lyrics ?? player.lyricsText`，加上手动导入后这种就地判断会立刻缴不清。
  * 非法行容错在解析器里，这里不做二次判断。
  */
-const lyricsSource = computed(() => track.value?.lyrics ?? player.lyricsText);
-const lines = computed(() => parseLyrics(lyricsSource.value).lines);
+const lines = computed(() => parseLyrics(player.lyricsSource).lines);
 
 /**
  * 时间采样：timeupdate 只有 ~4Hz，直接喂给逐字填充会一跳一跳。
@@ -136,7 +139,14 @@ onBeforeUnmount(() => {
         <IconCaretDown class="icon" />
       </button>
       <span class="im-top__label">正在播放</span>
-      <span class="im-top__pad" aria-hidden="true"></span>
+      <!-- 歌词来源 / 导入 .lrc、.yrc（LR-02）：与左侧关闭按钮同尺寸，标题才真的居中 -->
+      <LyricsSourceMenu>
+        <template #trigger>
+          <button class="ctl" title="歌词来源 / 导入歌词">
+            <IconFileText class="icon" />
+          </button>
+        </template>
+      </LyricsSourceMenu>
     </header>
 
     <div v-if="!player.hasTrack" class="im-empty">
@@ -227,8 +237,8 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
 }
 
-/* 与左侧关闭按钮等宽，label 才真的居中（不是靠 padding 凑） */
-.im-top__pad {
+/* 顶栏左右两个按钮等宽，label 才真的居中（不是靠 padding 凑） */
+.im-top .ctl {
   width: 21px;
 }
 

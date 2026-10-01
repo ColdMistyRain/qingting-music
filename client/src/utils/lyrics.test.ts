@@ -99,6 +99,60 @@ describe("parseLyrics（yrc 逐字）", () => {
   });
 });
 
+describe("parseLyrics（增强型 LRC：行内词级标签，v4.87）", () => {
+  it("按词级标签拆字，收尾标签决定最后一个字的时长", () => {
+    const { lines, hasWordTiming } = parseLyrics("[00:12.00]<00:12.00>你<00:12.80>好<00:13.60>");
+
+    expect(hasWordTiming).toBe(true);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.time).toBe(12);
+    expect(lines[0]?.text).toBe("你好");
+    expect(lines[0]?.words).toEqual([
+      { start: 0, duration: 0.8, text: "你" },
+      { start: 0.8, duration: 0.8, text: "好" },
+    ]);
+  });
+
+  it("没有收尾标签：末字时长用下一句开始兜底", () => {
+    const { lines } = parseLyrics("[00:10.00]<00:10.00>你<00:10.50>好\n[00:13.00]下一句");
+
+    expect(lines[0]?.words?.[1]?.duration).toBeCloseTo(2.5, 6);
+  });
+
+  it("末句且没有下一句：至少给 0.2s，不会永远是 0", () => {
+    const { lines } = parseLyrics("[00:10.00]<00:10.00>你<00:10.50>好");
+
+    expect(lines[0]?.words?.[1]?.duration).toBeGreaterThanOrEqual(0.2);
+  });
+
+  it("一行多时间标签：词时间跟着平移", () => {
+    const { lines } = parseLyrics("[00:10.00][00:20.00]<00:10.00>甲<00:10.40>乙<00:10.90>");
+
+    expect(lines.map((item) => [item.time, item.words?.map((word) => word.start)])).toEqual([
+      [10, [0, 0.4]],
+      [20, [0, 0.4]],
+    ]);
+  });
+
+  it("offset 对行与词一起生效（词相对行首，不受影响）", () => {
+    const { lines } = parseLyrics("[offset:500]\n[00:10.00]<00:10.00>甲<00:10.40>乙<00:10.90>");
+
+    expect(lines[0]?.time).toBe(10.5);
+    expect(lines[0]?.words?.[1]).toEqual({ start: 0.4, duration: 0.5, text: "乙" });
+  });
+
+  it("yrc 也吃 offset（此前只有 LRC 那一支吃）", () => {
+    const { lines } = parseLyrics("[offset:500]\n[1000,2000](0,500,0)你(500,500,0)好");
+
+    expect(lines[0]?.time).toBe(1.5);
+    expect(lines[0]?.words?.[0]?.start).toBe(0);
+  });
+
+  it("只有时间标签、没有文字的增强行不产生空行（也不把标签当正文）", () => {
+    expect(parseLyrics("[00:10.00]<00:10.00><00:10.40>").lines).toEqual([]);
+  });
+});
+
 describe("currentLineIndex（LR-06 自动居中 / LR-04 景深都靠它）", () => {
   const { lines } = parseLyrics("[00:10.00]一\n[00:20.00]二\n[00:30.00]三");
 

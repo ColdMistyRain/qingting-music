@@ -72,19 +72,21 @@ client/src/stores/        auth、config、theme、player（播放器单例：队
 client/src/utils/         player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
-                          playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）
+                          playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
+                          lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
+                          spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）
 client/src/views/         login/local/library/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
 client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、QueuePopover（PL-06，Reka Popover）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、
                           TrackRow（通用曲目行）、EmptyState、
-                          immersive/{LyricsView,ImTitle,ImControls}（沉浸页三布局共享件：歌词壳层（内包 AMLL）/ 标题 / 控制栏）
+                          immersive/{LyricsView,ImTitle,ImControls,LyricsSourceMenu}（沉浸页三布局共享件：歌词壳层（自研）/ 标题 / 控制栏 / 歌词来源菜单）
                           + ImLayoutDuo / ImLayoutCenter / ImLayoutPoster（布局只管自己的版式与专属视觉层 - VS-09）
 client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 ```
 
 ## 当前进度
 
-**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.85：按 AMLL 的实现移植 `utils/spring.ts`，包含它的参数策略，署名保留；不装它的包）**；前后端类型检查、生产构建、**304 个单测**（server 103 + client 201）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
+**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.86：按公式自行实现 `utils/spring.ts`，只参考思路不搬代码）** + **歌词来源打开与滚动键盘化（v4.87：支持增强型 LRC、可手动导入 `.lrc`/`.yrc`（按曲目记忆、GBK 回退）、歌词区键盘滚动；顺带修好开发环境封面一直没加载出来的代理缺陷）**；前后端类型检查、生产构建、**341 个单测**（server 103 + client 238）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
 
 **下一步**（建议顺序）：歌单（3.6，需服务端）→ 在线音源（3.5，需服务端）→ 移动端专属适配（RT-08）→ 生产静态托管（服务端）。
 
@@ -102,6 +104,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 8. **页面不可见（`visibility: hidden` / 后台标签）时 CSS `transition` 不推进**：`getComputedStyle(el).transform` 读到的是**动画开始前的旧值**（与已知的「不可见时 rAF 不触发」同源）。v4.82 实测——我因此一度误判歌词列表“位移慢一拍”，其实内联 `style` 一直是对的。判断这类问题**看 `el.getAttribute("style")`（绑定值），不要看 computed（动画中间值）**。
 9. **许可（v4.86）**：本项目自身未指定开源许可，且**不含 AGPL / GPL 代码**（v4.84 曾接入 AMLL 的 npm 包 → v4.85 改为移植其代码 → v4.86 连移植也换成**按公式/按效果自行实现**）。装新依赖前先 `npm view <pkg> license`，**不要再引入强拷贝依赖**；想拄某个实现必须先看许可（AGPL 不能拄，只能参考思路）。
 10. **逐帧推进的动画在页面不可见时会停住（rAF 不触发）**（v4.85）：歌词列表位移改成弹簧逐帧推之后，后台标签页里弹簧不推进、位置会停在旧值。所以 `driveTo()` 在 `document.visibilityState !== "visible"` 时直接落位（不做动画）；其它新加的逐帧动画也要给这条退路。
+11. **后端挂在根路径下的媒体路由，开发代理要同步补一条（v4.87）**：`client/vite.config.ts` 只代理了 `/api` 与 `/audio`，**漏了 `/covers`**——漏了不会报错，而是被 Vite 的 SPA 兜底成 `index.html`（200 `text/html`），表现是“封面静默加载不出来”＋取色退回默认色（实测 `<img>.naturalWidth` 一直是 0）。**以后后端每加一个根路径路由（如 `/lyrics`），代理里同时加一条**；判断这类问题看响应类型（`text/html` 就是被兜底了），不要只看状态码。
 
 ## 文档索引
 

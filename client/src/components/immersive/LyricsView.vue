@@ -64,7 +64,7 @@ function setLineRef(el: Element | null, index: number): void {
   else lineEls.delete(index);
 }
 
-/* ---------- 弹簧（移植自 AMLL，见 `utils/spring.ts`） ----------
+/* ---------- 弹簧（按公式自行实现，见 `utils/spring.ts`） ----------
    CSS 过渡是固定曲线，句与句之间只能“滑过去”；弹簧从**当前位置与当前速度**续算，
    中途改目标不会顿一下，句子间隔短时还会自然带一点过冲——这是它比过渡“活”的原因。 */
 const spring = new Spring(0, POS_Y_SPRING_BASE);
@@ -195,6 +195,9 @@ watch(
 const RESUME_DELAY_MS = 6000;
 /** 拖动超过这个距离就算“滑动”，不再触发点击跳转（否则滑一下就把歌跳走了） */
 const DRAG_THRESHOLD_PX = 6;
+/** 键盘滚动的步长（视窗高的比例）：↑/↓ 走一行左右，PgUp/PgDn 走一屏左右 */
+const KEY_STEP_RATIO = 0.12;
+const KEY_PAGE_RATIO = 0.8;
 
 const manual = ref(false);
 const manualShift = ref(0);
@@ -255,7 +258,30 @@ function onWheel(event: WheelEvent): void {
   beginManual();
   applyManual(manualShift.value + event.deltaY);
 }
+/**
+ * 键盘滚动（LR-07，v4.87）。只在本区获得焦点时才接管，并 **stopPropagation**：
+ * 全局的 ↑/↓ 是调音量（PL-08），焦点在歌词上时用户想要的是“翻歌词”——
+ * 不拦住向上冒泡的话，一下会既滚歌词又调音量。
+ */
+function onKeydown(event: KeyboardEvent): void {
+  const viewH = viewportRef.value?.clientHeight ?? 0;
+  const step = Math.max(24, viewH * KEY_STEP_RATIO);
+  const page = Math.max(step, viewH * KEY_PAGE_RATIO);
+  let target: number | null = null;
 
+  if (event.key === "ArrowUp") target = displayShift.value - step;
+  else if (event.key === "ArrowDown") target = displayShift.value + step;
+  else if (event.key === "PageUp") target = displayShift.value - page;
+  else if (event.key === "PageDown") target = displayShift.value + page;
+  else if (event.key === "Home") target = 0;
+  else if (event.key === "End") target = maxShift.value;
+  if (target === null) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  beginManual();
+  applyManual(target);
+}
 function onPointerDown(event: PointerEvent): void {
   if (event.button !== 0) return;
   dragging.value = true;
@@ -289,6 +315,8 @@ function onLineClick(line: LyricLine): void {
     return;
   }
   emit("seek", line.time);
+  // 手动浏览中点某一行 = “就听这里”，于是退出手动、回到自动居中（LR-07）
+  if (manual.value) resume();
 }
 
 /* ---------- 逐字"瞬时辉光爆发"（LR-05 强调，v4.86） ----------
@@ -365,7 +393,15 @@ onBeforeUnmount(() => {
        `.ly-view` 才是“视窗”（负责上下渐隐遮罩与裁剪）——
        遮罩必须只罩歌词，否则底部的回位按钮会被一起淡掉（实测踩过）。 -->
   <div class="ly" @wheel="onWheel">
-    <div ref="viewportRef" class="ly-view" :style="{ '--ly-fade-top': fadeTop }">
+    <div
+      ref="viewportRef"
+      class="ly-view"
+      tabindex="0"
+      role="group"
+      aria-label="歌词（可用方向键 / PageUp / PageDown 翻动，点行跳转）"
+      :style="{ '--ly-fade-top': fadeTop }"
+      @keydown="onKeydown"
+    >
       <p v-if="lines.length === 0" class="ly-empty">暂无歌词</p>
 
       <div
@@ -419,6 +455,8 @@ onBeforeUnmount(() => {
         type="button"
         @pointerenter="holdResume"
         @pointerleave="scheduleResume"
+        @focus="holdResume"
+        @blur="scheduleResume"
         @click="resume"
       >
         <IconArrowDown class="icon" />
@@ -456,15 +494,26 @@ onBeforeUnmount(() => {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent,
-    #000 var(--ly-fade),
+    #000 var(--ly-fade-top),
     #000 calc(100% - var(--ly-fade)),
     transparent
   );
 }
 
-/* 列表位移不再用 CSS 过渡：改由**弹簧**逐帧推（JS 写 transform）。
+/* 歌词区可聚焦（LR-07 键盘滚动）：默认轮廓去掉，键盘操作时才给一圈主题色焦点环 */
+.ly-view {
+  outline: none;
+}
+
+.ly-view:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 6px;
+  border-radius: 14px;
+}
+
+/* 列表位移不用 CSS 过渡，改由**弹簧**逐帧推（JS 写 transform）。
    过渡是固定曲线，只能“滑过去”；弹簧从当前位置与速度续算，句子间隔短时自然带一点
-   过冲，跳转时换慢速参数也不会甩——这些过渡都做不到（v4.85，移植自 AMLL）。 */
+   过冲，跳转时换慢速参数也不会甩——这些过渡都做不到（v4.85 移植、v4.86 改为自研实现）。 */
 .ly-list {
   will-change: transform;
 }

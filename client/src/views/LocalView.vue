@@ -1,16 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import IconCloudArrowUp from "~icons/ph/cloud-arrow-up";
 import IconFolderOpen from "~icons/ph/folder-open";
 import IconShieldCheck from "~icons/ph/shield-check";
 import IconTrash from "~icons/ph/trash";
 import IconUploadSimple from "~icons/ph/upload-simple";
 import TrackList from "@/components/TrackList.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
+import { useAuthStore } from "@/stores/auth";
 import { usePlayerStore } from "@/stores/player";
+import { useTransferStore } from "@/stores/transfer";
 import { confirmAction } from "@/utils/confirm";
 import { collectFilesFromEntries, type EntryLike } from "@/utils/fileSystem";
 import { formatTime } from "@/utils/format";
-import { pickAudioFiles, probeDuration, toLocalTrack } from "@/utils/localFiles";
+import {
+  localSourceFor,
+  pickAudioFiles,
+  probeDuration,
+  rememberLocalSource,
+  toLocalTrack,
+} from "@/utils/localFiles";
 import { coverUrlFrom, readAudioTags } from "@/utils/metadata";
 
 /**
@@ -19,6 +29,9 @@ import { coverUrlFrom, readAudioTags } from "@/utils/metadata";
  * 不上传、不落盘；清空列表或移除曲目时立即 revokeObjectURL（LC-06）。
  */
 const player = usePlayerStore();
+const auth = useAuthStore();
+const transfer = useTransferStore();
+const router = useRouter();
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const dragging = ref(false);
@@ -35,6 +48,30 @@ function pickFiles(): void {
   fileInput.value?.click();
 }
 
+/**
+ * 可转存到音乐库的曲目（LC-07）：只有**本地来源**且还拿得到原始 File 的才算。
+ * 注意 `localSourceFor` 是普通 Map（非响应式），所以这里靠 player.queue 的变化重算——
+ * 加入/移除曲目都会触发，够用。
+ */
+const transferable = computed(() =>
+  player.queue.filter(
+    (track) => track.source === "local" && localSourceFor(track.id) !== undefined,
+  ),
+);
+/** LC-07：仅管理员可见——转存本质是把文件传到服务器上 */
+const canTransfer = computed(() => auth.isAdmin && transferable.value.length > 0);
+
+/** 把本地列表交给管理台上传页（带上文件），由那边用现成的队列/进度/重试来传 */
+async function transferToLibrary(): Promise<void> {
+  const files = transferable.value
+    .map((track) => localSourceFor(track.id))
+    .filter((file): file is File => file !== undefined);
+  if (files.length === 0) return;
+  if (!(await confirmAction(`把本地列表里的 ${files.length} 首上传到音乐库？`))) return;
+  transfer.queue(files);
+  await router.push({ name: "console-upload" });
+}
+
 function onFileInput(event: Event): void {
   const input = event.target as HTMLInputElement;
   addFiles(Array.from(input.files ?? []));
@@ -48,6 +85,13 @@ function addFiles(files: readonly File[]): void {
 
   const tracks = audioFiles.map((file) => toLocalTrack(file, URL.createObjectURL(file)));
   player.addTracks(tracks);
+
+  // LC-07：把原始 File 登记下来（转存到音乐库需要它的内容）。
+  // 放在 addTracks 之后：重复曲目会在那里面被丢掉并释放，避免给不存在的曲目留 File。
+  audioFiles.forEach((file, index) => {
+    const track = tracks[index];
+    if (track) rememberLocalSource(track.id, file);
+  });
 
   // 读内嵌标签（LC-04）：成功则覆盖文件名解析结果并拿到封面；失败退回探测时长（LC-03）
   audioFiles.forEach((file, index) => {
@@ -159,6 +203,12 @@ async function clearAll(): Promise<void> {
         <button class="btn" title="支持 MP3 · FLAC · WAV · OGG · M4A · OPUS" @click="pickFiles">
           <IconFolderOpen class="icon" />
           选择文件
+        </button>
+        <!-- LC-07：本地列表 → 音乐库。只在真的能传（有原始文件、且是管理员）时出现，
+             不做“点了没反应”的置灰按钮 -->
+        <button v-if="canTransfer" class="btn" @click="transferToLibrary">
+          <IconCloudArrowUp class="icon" />
+          上传到音乐库
         </button>
         <button class="btn btn-danger" @click="clearAll">
           <IconTrash class="icon" />

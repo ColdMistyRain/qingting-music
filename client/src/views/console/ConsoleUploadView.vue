@@ -11,6 +11,7 @@ import { ApiError } from "@/api/http";
 import { isRetryableUploadError, uploadSong } from "@/api/upload";
 import { useConfigStore } from "@/stores/config";
 import { useLibraryStore } from "@/stores/library";
+import { useTransferStore } from "@/stores/transfer";
 import { formatSize } from "@/utils/format";
 
 /**
@@ -56,16 +57,22 @@ let keySeed = 0;
 let running = false;
 const controllers = new Map<string, AbortController>();
 
-const limitLabel = computed(() => (config.maxUploadSize ? formatSize(config.maxUploadSize, 0) : "300 MB"));
+const limitLabel = computed(() =>
+  config.maxUploadSize ? formatSize(config.maxUploadSize, 0) : "300 MB",
+);
 /** 格式与上限只说一处：空态里写进投放卡，队列非空时挂在"选择文件"的 tooltip 上 */
 const formatHint = computed(
   () => `支持 MP3 · FLAC · WAV · OGG · M4A · OPUS · 单个最大 ${limitLabel.value}`,
 );
 const doneCount = computed(() => items.value.filter((item) => item.status === "done").length);
-const duplicateCount = computed(() => items.value.filter((item) => item.status === "duplicate").length);
+const duplicateCount = computed(
+  () => items.value.filter((item) => item.status === "duplicate").length,
+);
 const failedCount = computed(() => items.value.filter((item) => item.status === "failed").length);
 /** 只有“可重试的失败”才计入，用于汇总与“全部重试” */
-const retryableItems = computed(() => items.value.filter((item) => item.status === "failed" && item.retryable));
+const retryableItems = computed(() =>
+  items.value.filter((item) => item.status === "failed" && item.retryable),
+);
 const busy = computed(() =>
   items.value.some((item) => item.status === "waiting" || item.status === "uploading"),
 );
@@ -78,7 +85,9 @@ const summaryText = computed(() => {
   if (failedCount.value > 0) parts.push(`失败 ${failedCount.value}`);
   return parts.join(" · ");
 });
-const clearable = computed(() => items.value.some((item) => item.status === "done" || item.status === "skipped"));
+const clearable = computed(() =>
+  items.value.some((item) => item.status === "done" || item.status === "skipped"),
+);
 
 /** 把可重试的失败全部重新排回队列 */
 function retryAll(): void {
@@ -141,6 +150,9 @@ onMounted(() => {
   window.addEventListener("dragover", onWindowDragOver);
   window.addEventListener("dragleave", onWindowDragLeave);
   window.addEventListener("drop", onDrop);
+  // LC-07：本地列表转存过来的文件在这里接上，直接进队列开传
+  const handedOver = useTransferStore().take();
+  if (handedOver.length > 0) addFiles(handedOver);
 });
 
 onUnmounted(() => {
@@ -150,7 +162,8 @@ onUnmounted(() => {
 });
 
 function statusText(item: UploadItem): string {
-  if (item.status === "uploading") return `${STATUS_LABELS.uploading} ${Math.round(item.progress * 100)}%`;
+  if (item.status === "uploading")
+    return `${STATUS_LABELS.uploading} ${Math.round(item.progress * 100)}%`;
   return item.message || STATUS_LABELS[item.status];
 }
 
@@ -280,78 +293,86 @@ function clearFinished(): void {
 
     <!-- 只有队列滚动（方案 A）：页头固定在上部 -->
     <div class="page-frame__scroll">
-    <div class="queue card">
-      <div class="queue__head">
-        <b>上传队列</b>
-        <span
-          class="queue__summary"
-          :class="{ 'queue__summary--warn': failedCount > 0 }"
-          aria-live="polite"
-        >
-          {{ summaryText }}
-        </span>
-        <button v-if="retryableItems.length > 0 && !busy" class="btn btn-quiet" @click="retryAll">
-          <IconArrowsClockwise class="icon" />
-          全部重试（{{ retryableItems.length }}）
-        </button>
-        <button v-if="clearable" class="btn btn-quiet" @click="clearFinished">清空已完成</button>
-      </div>
-
-      <p v-if="skippedFiles > 0" class="queue__skip">已忽略 {{ skippedFiles }} 个非音频文件</p>
-
-      <p v-if="items.length === 0" class="queue__empty">
-        拖入文件后，这里会逐个显示上传进度与结果
-      </p>
-
-      <div v-else class="up-list">
-        <div v-for="item in items" :key="item.key" class="up" :class="`up--${item.status}`">
-          <span class="up__icon">
-            <IconCheckCircle v-if="item.status === 'done'" class="icon" />
-            <IconWarningCircle v-else-if="item.status === 'failed'" class="icon" />
-            <IconUploadSimple v-else class="icon" />
+      <div class="queue card">
+        <div class="queue__head">
+          <b>上传队列</b>
+          <span
+            class="queue__summary"
+            :class="{ 'queue__summary--warn': failedCount > 0 }"
+            aria-live="polite"
+          >
+            {{ summaryText }}
           </span>
+          <button v-if="retryableItems.length > 0 && !busy" class="btn btn-quiet" @click="retryAll">
+            <IconArrowsClockwise class="icon" />
+            全部重试（{{ retryableItems.length }}）
+          </button>
+          <button v-if="clearable" class="btn btn-quiet" @click="clearFinished">清空已完成</button>
+        </div>
 
-          <div class="up__info">
-            <div class="up__title" :title="item.file.name">{{ item.file.name }}</div>
+        <p v-if="skippedFiles > 0" class="queue__skip">已忽略 {{ skippedFiles }} 个非音频文件</p>
 
-            <!-- 结果行紧贴文件名：不用把眼睛跨到最右边去找失败原因 -->
-            <div v-if="item.status === 'uploading'" class="up__progress">
-              <div class="bar up__bar">
-                <div class="bar__fill" :style="{ width: `${Math.round(item.progress * 100)}%` }" />
+        <p v-if="items.length === 0" class="queue__empty">
+          拖入文件后，这里会逐个显示上传进度与结果
+        </p>
+
+        <div v-else class="up-list">
+          <div v-for="item in items" :key="item.key" class="up" :class="`up--${item.status}`">
+            <span class="up__icon">
+              <IconCheckCircle v-if="item.status === 'done'" class="icon" />
+              <IconWarningCircle v-else-if="item.status === 'failed'" class="icon" />
+              <IconUploadSimple v-else class="icon" />
+            </span>
+
+            <div class="up__info">
+              <div class="up__title" :title="item.file.name">{{ item.file.name }}</div>
+
+              <!-- 结果行紧贴文件名：不用把眼睛跨到最右边去找失败原因 -->
+              <div v-if="item.status === 'uploading'" class="up__progress">
+                <div class="bar up__bar">
+                  <div
+                    class="bar__fill"
+                    :style="{ width: `${Math.round(item.progress * 100)}%` }"
+                  />
+                </div>
+                <span class="up__percent">{{ Math.round(item.progress * 100) }}%</span>
               </div>
-              <span class="up__percent">{{ Math.round(item.progress * 100) }}%</span>
+              <div v-else class="up__result">{{ statusText(item) }}</div>
             </div>
-            <div v-else class="up__result">{{ statusText(item) }}</div>
-          </div>
 
-          <div class="up__actions">
-            <template v-if="item.status === 'duplicate'">
-              <button class="btn btn-quiet" @click="overwrite(item)">覆盖</button>
-              <button class="btn btn-quiet" @click="skip(item)">跳过</button>
-            </template>
-            <!-- 不可重试的错误（文件不合规）不给重试：重试永远不会成功，只会误导 -->
-            <button
-              v-else-if="item.status === 'failed' && item.retryable"
-              class="btn btn-quiet"
-              @click="retry(item)"
-            >
-              <IconArrowsClockwise class="icon" />
-              重试
-            </button>
-            <button v-if="item.status === 'uploading'" class="ctl" title="取消上传" @click="cancel(item)">
-              <IconX class="icon" />
-            </button>
-            <button v-else class="ctl" title="从队列移除" @click="removeItem(item)">
-              <IconX class="icon" />
-            </button>
+            <div class="up__actions">
+              <template v-if="item.status === 'duplicate'">
+                <button class="btn btn-quiet" @click="overwrite(item)">覆盖</button>
+                <button class="btn btn-quiet" @click="skip(item)">跳过</button>
+              </template>
+              <!-- 不可重试的错误（文件不合规）不给重试：重试永远不会成功，只会误导 -->
+              <button
+                v-else-if="item.status === 'failed' && item.retryable"
+                class="btn btn-quiet"
+                @click="retry(item)"
+              >
+                <IconArrowsClockwise class="icon" />
+                重试
+              </button>
+              <button
+                v-if="item.status === 'uploading'"
+                class="ctl"
+                title="取消上传"
+                @click="cancel(item)"
+              >
+                <IconX class="icon" />
+              </button>
+              <button v-else class="ctl" title="从队列移除" @click="removeItem(item)">
+                <IconX class="icon" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <p v-if="items.length > 0 && !busy" class="queue__foot">
-        这一批处理完了，去<RouterLink :to="{ name: 'console-songs' }">曲库管理</RouterLink>看看。
-      </p>
-    </div>
+        <p v-if="items.length > 0 && !busy" class="queue__foot">
+          这一批处理完了，去<RouterLink :to="{ name: 'console-songs' }">曲库管理</RouterLink>看看。
+        </p>
+      </div>
     </div>
   </section>
 </template>

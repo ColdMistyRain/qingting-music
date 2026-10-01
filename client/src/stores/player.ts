@@ -10,6 +10,7 @@ import {
   type PlayMode,
 } from "@/utils/player";
 import { applyCoverColors } from "@/utils/coverColor";
+import { forgetLocalSource } from "@/utils/localFiles";
 import { parseSnapshot, sanitizeSnapshot } from "@/utils/playerState";
 
 const STORAGE_KEY = "qt-player";
@@ -389,6 +390,9 @@ export const usePlayerStore = defineStore("player", () => {
   function releaseTrack(track: Track): void {
     revokeBlob(track.url);
     if (track.cover) revokeBlob(track.cover);
+    // LC-07：原始 File 也跟着忘掉（登记处与 Blob URL 的生命周期保持一致，
+    // 否则转存时拿着一个早已移除的曲目的 File）
+    forgetLocalSource(track.id);
   }
 
   function revokeBlob(url: string): void {

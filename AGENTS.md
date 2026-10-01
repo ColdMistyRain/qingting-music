@@ -40,7 +40,7 @@
 | --- | --- |
 | `npm.cmd install` | 装齐三个包（workspace） |
 | `npm.cmd run dev` | 前端 5173 + 后端 3000 同时启动 |
-| `npm.cmd run test` | 全量单测（server 103 例 + client 178 例） |
+| `npm.cmd run test` | 全量单测（server 103 例 + client 182 例） |
 | `npm.cmd run typecheck` | `tsc --noEmit` + `vue-tsc --noEmit` |
 | `npm.cmd run build` | 后端 tsup → `server/dist`，前端 vite → `client/dist` |
 | `npm.cmd run format` | Prettier 全量格式化 |
@@ -67,7 +67,8 @@ client/src/styles/        tokens.css（令牌 + OKLCH 取色核心）、global.c
                           material.css（材质双模式：islands 玻璃浮岛 / flat 实心面板，含 Apple 实测配方）
 client/src/layouts/       PlayerLayout（侧栏+内容+播放条，含空格键快捷键）、ConsoleLayout（控制台独立布局）
 client/src/router/        路由表 + 守卫（身份决定可达页面）
-client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）
+client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、
+                          library、transfer（本地列表→上传页的 File 交接 - LC-07）
 client/src/utils/         player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
@@ -83,9 +84,9 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 ## 当前进度
 
-**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~05，含 ID3 标签与内嵌封面）** + **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）**；前后端类型检查、生产构建、**281 个单测**（server 103 + client 178）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色与刷新恢复。
+**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）**；前后端类型检查、生产构建、**285 个单测**（server 103 + client 182）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复与转存。
 
-**下一步**（建议顺序）：LC-07 快捷转存到音乐库 → 歌单（3.6，需服务端）→ 在线音源（3.5，需服务端）→ 移动端专属适配（RT-08）→ 生产静态托管。
+**下一步**（建议顺序）：歌单（3.6，需服务端）→ 在线音源（3.5，需服务端）→ 移动端专属适配（RT-08）→ 生产静态托管（服务端）。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 

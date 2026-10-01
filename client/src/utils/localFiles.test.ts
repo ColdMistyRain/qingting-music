@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  forgetLocalSource,
+  localSourceFor,
   localTrackId,
   parseLocalFileName,
   pickAudioFiles,
   probeDuration,
+  rememberLocalSource,
   toLocalTrack,
 } from "./localFiles";
 
@@ -22,7 +25,12 @@ describe("parseLocalFileName（shared 的别名）", () => {
 
 describe("pickAudioFiles", () => {
   it("只留下白名单内的音频文件（LC-02）", () => {
-    const files = [{ name: "a.mp3" }, { name: "cover.jpg" }, { name: "b.FLAC" }, { name: "note.txt" }];
+    const files = [
+      { name: "a.mp3" },
+      { name: "cover.jpg" },
+      { name: "b.FLAC" },
+      { name: "note.txt" },
+    ];
     expect(pickAudioFiles(files).map((file) => file.name)).toEqual(["a.mp3", "b.FLAC"]);
   });
 
@@ -101,5 +109,39 @@ describe("probeDuration", () => {
     element.emit("error");
     element.emit("loadedmetadata");
     await expect(pending).resolves.toBeNull();
+  });
+});
+
+/** LC-07：本地曲目的原始 File 登记处（转存到音乐库要用） */
+describe("本地 File 登记处", () => {
+  function fakeFile(name: string): File {
+    return { name, size: 1, lastModified: 1 } as File;
+  }
+
+  it("记住之后能按 id 取回", () => {
+    const file = fakeFile("a.mp3");
+    rememberLocalSource("t1", file);
+    expect(localSourceFor("t1")).toBe(file);
+    forgetLocalSource("t1");
+  });
+
+  it("同一个 id 后写的覆盖先写的（重复加入同一首歌）", () => {
+    const first = fakeFile("a.mp3");
+    const second = fakeFile("a.mp3");
+    rememberLocalSource("t2", first);
+    rememberLocalSource("t2", second);
+    expect(localSourceFor("t2")).toBe(second);
+    forgetLocalSource("t2");
+  });
+
+  it("释放后就取不到了（与 revokeObjectURL 同步）", () => {
+    rememberLocalSource("t3", fakeFile("a.mp3"));
+    forgetLocalSource("t3");
+    expect(localSourceFor("t3")).toBeUndefined();
+  });
+
+  it("没登记过的 id 返回 undefined（不抛）", () => {
+    expect(localSourceFor("不存在")).toBeUndefined();
+    expect(() => forgetLocalSource("不存在")).not.toThrow();
   });
 });

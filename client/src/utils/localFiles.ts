@@ -71,3 +71,22 @@ export function probeDuration(
     element.src = url;
   });
 }
+
+/* ---------- 原始 File 登记处（LC-07 转存到音乐库） ----------
+   `Track.url` 只是 Blob URL，转存必须拿到原始 File 才能上传，而 File 只在
+   用户拖入/选择文件的那一刻存在。登记处放**模块作用域**：LocalView 离开再回来
+   （切页面）时队列还在，File 不会跟着丢。
+   清理时机与 Blob URL 完全一致——player store 的 releaseTrack() 里一起忘掉。 */
+const sources = new Map<string, File>();
+
+export function rememberLocalSource(id: string, file: File): void {
+  sources.set(id, file);
+}
+
+export function localSourceFor(id: string): File | undefined {
+  return sources.get(id);
+}
+
+export function forgetLocalSource(id: string): void {
+  sources.delete(id);
+}

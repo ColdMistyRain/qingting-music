@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { currentLineIndex, lineProgress, parseLyrics, wordFillProgress } from "./lyrics";
+import {
+  centerShift,
+  clampManualShift,
+  currentLineIndex,
+  lineProgress,
+  parseLyrics,
+  wordFillProgress,
+} from "./lyrics";
 
 /** LR-01 / PRD 11.2：LRC + yrc 解析，非法行容错 */
 describe("parseLyrics（LRC 行级）", () => {
@@ -60,7 +67,9 @@ describe("parseLyrics（LRC 行级）", () => {
 
 describe("parseLyrics（yrc 逐字）", () => {
   it("解析逐字片段：行时间与字时间都换算成秒，行文本由字拼接", () => {
-    const { lines, hasWordTiming } = parseLyrics("[1000,2000](0,500,0)你(500,500,0)好(1000,1000,0)世界");
+    const { lines, hasWordTiming } = parseLyrics(
+      "[1000,2000](0,500,0)你(500,500,0)好(1000,1000,0)世界",
+    );
 
     expect(hasWordTiming).toBe(true);
     expect(lines).toHaveLength(1);
@@ -81,7 +90,9 @@ describe("parseLyrics（yrc 逐字）", () => {
   });
 
   it("同一份歌词里混着 LRC 与 yrc 也不崩（极端情况，按行各自解析）", () => {
-    const { lines, hasWordTiming } = parseLyrics("[00:01.00]普通行\n[2000,1000](0,400,0)逐(400,600,0)字");
+    const { lines, hasWordTiming } = parseLyrics(
+      "[00:01.00]普通行\n[2000,1000](0,400,0)逐(400,600,0)字",
+    );
 
     expect(hasWordTiming).toBe(true);
     expect(lines.map((line) => line.text)).toEqual(["普通行", "逐字"]);
@@ -148,5 +159,46 @@ describe("lineProgress（LR-05 降级：整句渐亮）", () => {
   it("越界索引返回 0（不抛错）", () => {
     expect(lineProgress(lines, 9, 100)).toBe(0);
     expect(lineProgress([], 0, 1)).toBe(0);
+  });
+});
+
+/** LR-06 自动居中的夹取 + LR-07 手动滚动的位移夹取 */
+describe("centerShift（自动居中不许推出两端）", () => {
+  it("开头几句：想要负位移就贴在顶部（不把第一行推到中线）", () => {
+    expect(centerShift(-120, 2000, 400)).toBe(0);
+  });
+
+  it("中间：原样返回", () => {
+    expect(centerShift(500, 2000, 400)).toBe(500);
+  });
+
+  it("末尾：不超过列表高度减窗口高度（否则下面留白）", () => {
+    expect(centerShift(5000, 2000, 400)).toBe(1600);
+  });
+
+  it("歌词比窗口还短：位移恒为 0", () => {
+    expect(centerShift(300, 200, 400)).toBe(0);
+  });
+
+  it("非法输入不抛错", () => {
+    expect(centerShift(Number.NaN, 2000, 400)).toBe(0);
+    expect(centerShift(100, Number.NaN, 400)).toBe(0);
+  });
+});
+
+describe("clampManualShift（手动滚动夹取）", () => {
+  it("上下两端都夹住", () => {
+    expect(clampManualShift(-50, 800)).toBe(0);
+    expect(clampManualShift(9999, 800)).toBe(800);
+    expect(clampManualShift(300, 800)).toBe(300);
+  });
+
+  it("没什么可滚的时候只能停在 0", () => {
+    expect(clampManualShift(120, 0)).toBe(0);
+  });
+
+  it("非法输入不抛错", () => {
+    expect(clampManualShift(Number.NaN, 800)).toBe(0);
+    expect(clampManualShift(100, Number.NaN)).toBe(0);
   });
 });

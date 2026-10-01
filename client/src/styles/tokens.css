@@ -118,6 +118,25 @@
   --cover-deep: var(--cover-src);
   --cover-deep: oklch(from var(--cover-src) 0.3 clamp(0.07, c, 0.15) h);
 
+  /* 彩胶盘面（VS-09 海报布局）：**同一个源色只做 Tone 漩涡**，那就是彩胶的质感。
+     放在这里而不是组件里——它和 --cv1/--cv2 是同一条取色管线的产物，
+     VS-02 接上后整盘自动随封面换色。 */
+  --vinyl-gradient: conic-gradient(from 140deg, var(--cover-src), var(--cover-src));
+  --vinyl-gradient: conic-gradient(
+    from 140deg,
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.03), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(
+      from var(--cover-src) clamp(0.4, calc(l + 0.07), 0.62) clamp(0.07, calc(c - 0.01), 0.15) h
+    ),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.08), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(
+      from var(--cover-src) clamp(0.4, calc(l + 0.04), 0.62) clamp(0.07, calc(c - 0.02), 0.15) h
+    ),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.05), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.1), 0.62) clamp(0.07, c, 0.15) h),
+    oklch(from var(--cover-src) clamp(0.4, calc(l - 0.03), 0.62) clamp(0.07, c, 0.15) h)
+  );
+
   /* 光效（v4.67）：主题色柔光，只用在**可交互**（悬浮/聚焦）与**播放中/选中**两种状态上——
      它承载信息（"这里能点" / "正在放"），不是装饰（需求方 v4.30：颜色只用于表达状态）。
      全部由 --accent 派生，VS-02 取色管线接上后自动跟着封面走。 */

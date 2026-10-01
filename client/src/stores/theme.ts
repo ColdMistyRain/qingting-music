@@ -10,12 +10,8 @@ export type ThemeMode = "dark" | "light";
  */
 export type MaterialMode = "islands" | "flat";
 
-/**
- * 沉浸页布局（VS-09）：经典双栏 / 沉浸歌词。
- * 海报背景（彩胶）待实现后再加入这个联合类型——**不先写上**，
- * 否则切到它会渲染出空白（类型允许、组件不存在）。
- */
-export type ImLayout = "duo" | "center";
+/** 沉浸页布局（VS-09，三形态齐了）：经典双栏 / 沉浸歌词 / 海报背景（彩胶） */
+export type ImLayout = "duo" | "center" | "poster";
 
 const STORAGE_KEY = "qt-theme";
 const MATERIAL_KEY = "qt-material";
@@ -36,9 +32,12 @@ function resolveInitialMaterial(): MaterialMode {
   return localStorage.getItem(MATERIAL_KEY) === "islands" ? "islands" : "flat";
 }
 
-/** 歌词页布局默认经典双栏（VS-09 的原型默认） */
+/** 歌词页布局默认经典双栏（VS-09 的原型默认）。
+    逐个白名单校验而不是只判一个特例：localStorage 里可能留着旧版本删除的布局名，
+    那种脏值会让页面拿着 undefined 去 `<component :is>`（渲染空白且不报错）。 */
 function resolveInitialLayout(): ImLayout {
-  return localStorage.getItem(LAYOUT_KEY) === "center" ? "center" : "duo";
+  const saved = localStorage.getItem(LAYOUT_KEY);
+  return saved === "center" || saved === "poster" ? saved : "duo";
 }
 
 export const useThemeStore = defineStore("theme", () => {

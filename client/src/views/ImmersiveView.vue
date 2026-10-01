@@ -6,6 +6,7 @@ import IconMusicNotes from "~icons/ph/music-notes";
 import ImControls from "@/components/immersive/ImControls.vue";
 import ImLayoutCenter from "@/components/immersive/ImLayoutCenter.vue";
 import ImLayoutDuo from "@/components/immersive/ImLayoutDuo.vue";
+import ImLayoutPoster from "@/components/immersive/ImLayoutPoster.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
@@ -22,8 +23,26 @@ import { parseLyrics } from "@/utils/lyrics";
 const player = usePlayerStore();
 const theme = useThemeStore();
 
-/** VS-09：布局是**组件切换**，不是同一套 DOM 换类名（原型那套类切换已证明会产生层叠逃逸） */
-const layoutComponent = computed(() => (theme.layout === "center" ? ImLayoutCenter : ImLayoutDuo));
+/**
+ * VS-09：布局是**组件切换**，不是同一套 DOM 换类名（原型那套类切换已证明会产生层叠逃逸）。
+ *
+ * 表里除了组件，还记着"这一布局要不要页面级的右下环境光"：海报布局下彩胶的有机光晕是
+ * 画面唯一主光源，右下那束光与它同色却脱离光源孤立存在，读起来像**一块色渍**
+ * （PRD v4.3 实测结论）。所以在这里关掉它——而不是让布局组件去盖一层不透明底，
+ * 那样会在顶栏/底栏处留下一条接缝。
+ */
+const LAYOUTS = {
+  duo: { component: ImLayoutDuo, ambient2: true },
+  center: { component: ImLayoutCenter, ambient2: true },
+  poster: { component: ImLayoutPoster, ambient2: false },
+} as const;
+
+const current = computed(() => LAYOUTS[theme.layout]);
+const layoutComponent = computed(() => current.value.component);
+/** 只有需要关光的布局才写内联变量，其余布局不写——让 CSS 里的令牌当唯一默认值 */
+const ambientStyle = computed(() =>
+  current.value.ambient2 ? undefined : { "--im-glow-2": "transparent" },
+);
 const router = useRouter();
 
 const track = computed(() => player.currentTrack);
@@ -100,7 +119,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="im">
+  <div class="im" :style="ambientStyle">
     <header class="im-top">
       <button class="ctl" title="收起（Esc）" @click="close">
         <IconCaretDown class="icon" />
@@ -146,12 +165,17 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   color: var(--text-1);
-  /* 背景＝封面取色（VS-02 的变量，暂用默认色源）+ 主题底色；
-     与列表页的 .bg-glow 是同一套取色管线，不在这里写死颜色 */
+  /* 页面级环境光：左上主光 + 右下副光，色源都来自封面（VS-02 的变量，暂用默认色源）；
+     与列表页的 .bg-glow 是同一套取色管线，不在这里写死颜色。
+     --im-glow-2 会被海报布局置为 transparent（理由见 LAYOUTS）。 */
+  --im-glow-1: var(--cv1);
+  --im-glow-2: var(--cv2);
   background:
-    radial-gradient(120% 90% at 16% 0%, var(--cv1), transparent 62%),
-    radial-gradient(110% 80% at 88% 100%, var(--cv2), transparent 58%),
-    var(--bg-base);
+    radial-gradient(120% 90% at 16% 0%, var(--im-glow-1), transparent 62%),
+    radial-gradient(110% 80% at 88% 100%, var(--im-glow-2), transparent 58%), var(--bg-base);
+  /* 海报布局的大彩胶要从右上角**伸出屏幕**：本页是固定的全屏页，
+     裁在视口上就好，不能让它变成页面滚动区域 */
+  overflow: hidden;
   animation: im-in 0.36s var(--ease-ios);
 }
 

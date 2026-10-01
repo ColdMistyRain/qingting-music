@@ -5,7 +5,7 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import IconSignOut from "~icons/ph/sign-out";
 import { useAuthStore } from "@/stores/auth";
 import { useConfigStore } from "@/stores/config";
-import { useThemeStore } from "@/stores/theme";
+import { useThemeStore, type ImLayout } from "@/stores/theme";
 
 /** 设置页（PRD 3.8）：顶部 Tab 形态，管理 Tab 仅管理员可见 */
 const auth = useAuthStore();
@@ -32,6 +32,13 @@ const tabs = computed<SettingsTab[]>(() => {
 });
 
 const active = ref("appearance");
+
+/** VS-09：三种沉浸页布局，设置页用**缩略图卡片**让需求方先看到版式再选（不是只给个名字） */
+const layouts: { key: ImLayout; label: string }[] = [
+  { key: "duo", label: "经典双栏" },
+  { key: "center", label: "沉浸歌词" },
+  { key: "poster", label: "海报背景" },
+];
 
 const roleLabel = computed(() => {
   if (!auth.authEnabled) return "门禁关闭（全功能开放）";
@@ -102,24 +109,26 @@ async function signOut(): Promise<void> {
         </div>
         <div class="set-card card">
           <b>歌词页布局</b>
-          <div class="set-row">
+          <div class="set-row set-row--stack">
             <span>沉浸式播放页</span>
-            <div class="seg">
-              <button :class="{ active: theme.layout === 'duo' }" @click="theme.setLayout('duo')">
-                经典双栏
-              </button>
+            <div class="lay-cards">
               <button
-                :class="{ active: theme.layout === 'center' }"
-                @click="theme.setLayout('center')"
+                v-for="item in layouts"
+                :key="item.key"
+                class="lay-card"
+                :class="{ active: theme.layout === item.key }"
+                :aria-pressed="theme.layout === item.key"
+                @click="theme.setLayout(item.key)"
               >
-                沉浸歌词
+                <span class="lay-thumb" :class="`lay-thumb--${item.key}`" aria-hidden="true" />
+                <b>{{ item.label }}</b>
               </button>
             </div>
           </div>
           <div class="set-note">
-            在播放条点左侧展开沉浸页即可看到，选择按设备记忆。 经典双栏＝封面左 ·
-            歌词右；沉浸歌词＝纯歌词居中。<br />
-            海报背景（彩胶）随后续版本加入（VS-09）。
+            在播放条点左侧展开沉浸页即可看到，选择按设备记忆。<br />
+            经典双栏＝封面左 · 歌词右；沉浸歌词＝纯歌词居中；海报背景＝歌词左 +
+            右上角一张悬出画面的大彩胶唱片（盘面颜色跟着封面走）。
           </div>
         </div>
       </TabsContent>
@@ -232,5 +241,118 @@ kbd {
   font-family: inherit;
   font-size: 11.5px;
   color: var(--text-2);
+}
+
+/* ---------- 歌词页布局：缩略图卡片（VS-09） ----------
+   卡片里画的是**版式本身**（封面/彩胶在哪、歌词在哪），不是装饰：
+   需求方选的是“歌词摆在哪”，一张小图比一个名字信息量大得多。
+   线条用一条重复渐变画（同一套行节奏），三种布局只换摆位。 */
+.set-row--stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.lay-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lay-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 8px 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-control);
+  background: var(--glass-bg);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.lay-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
+}
+
+.lay-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.lay-card b {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.lay-card.active b {
+  color: var(--text-1);
+}
+
+.lay-thumb {
+  position: relative;
+  width: 92px;
+  height: 54px;
+  border-radius: 6px;
+  /* 缩略图 = 一块“屏幕”，所以用页面底色，不用卡片色 */
+  background: var(--bg-base);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+
+/* 歌词三行 */
+.lay-thumb::after {
+  content: "";
+  position: absolute;
+  height: 20px;
+  background: repeating-linear-gradient(180deg, var(--text-3) 0 2px, transparent 2px 7px);
+  opacity: 0.6;
+}
+
+/* 经典双栏：左封面 + 右三行 */
+.lay-thumb--duo::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, var(--cv1), var(--cv2));
+}
+
+.lay-thumb--duo::after {
+  left: 42px;
+  right: 8px;
+  top: 17px;
+}
+
+/* 沉浸歌词：只有居中的三行 */
+.lay-thumb--center::after {
+  left: 26px;
+  right: 26px;
+  top: 17px;
+}
+
+/* 海报背景：右上角一张**悬出画面**的彩胶 + 左边三行（彩胶被框边裁掉一角，正是它的版式） */
+.lay-thumb--poster::before {
+  content: "";
+  position: absolute;
+  right: -9px;
+  top: -9px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: conic-gradient(from 140deg, var(--cv1), var(--cv2), var(--cv1));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.lay-thumb--poster::after {
+  left: 8px;
+  right: 46px;
+  top: 17px;
 }
 </style>

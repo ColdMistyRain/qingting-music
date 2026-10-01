@@ -2315,7 +2315,14 @@ kbd {
    外壳 .vinyl-assembly（不转、不裁剪：光晕=::before 溢出盘外，边缘环=::after）
    > 旋转盘 .v-disc（转 + overflow:hidden 裁剪）> 盘体/纹理/标签；
    高光 .v-gloss 为外壳子元素（固定光源，不随盘转）。
-   转速 8s/圈（45°/s 顺时针）——2026-09-30 对照 QQ 实机视频实测修正 */
+   转速 8s/圈（45°/s 顺时针）——2026-09-30 对照 QQ 实机视频实测修正
+
+   ⚠️ Vue 版（正式实现）在 v4.74 有三处**故意**不同，别照着本文件改回去（见 PRD v4.74）：
+   ① `.im-cover-wrap::after` 那层左实右虚的全页遮罩**已去掉**（淡到 70% 处会把彩胶左侧掠白；
+      可读性由页面既有的统一薄雾负责）；
+   ② 盘径补了宽度上限（`min(86vh, 62vw)`，下面 --vinyl-d 是原型值，在 1226×935 下盘左缘
+      618px 会贴住歌词列右缘 613px）；
+   ③ 页面级右下环境光改由沉浸页的 LAYOUTS 表按布局关掉（原来靠这层遮罩掩盖色渍）。 */
 .immersive.layout-poster .vinyl-assembly {
   position: absolute;
   top: var(--vinyl-t);

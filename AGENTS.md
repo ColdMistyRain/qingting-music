@@ -40,7 +40,7 @@
 | --- | --- |
 | `npm.cmd install` | 装齐三个包（workspace） |
 | `npm.cmd run dev` | 前端 5173 + 后端 3000 同时启动 |
-| `npm.cmd run test` | 全量单测（server 41 例 + client 7 例） |
+| `npm.cmd run test` | 全量单测（server 103 例 + client 140 例） |
 | `npm.cmd run typecheck` | `tsc --noEmit` + `vue-tsc --noEmit` |
 | `npm.cmd run build` | 后端 tsup → `server/dist`，前端 vite → `client/dist` |
 | `npm.cmd run format` | Prettier 全量格式化 |
@@ -74,16 +74,16 @@ client/src/views/         login/local/library/online/playlist/settings + immersi
 client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、QueuePopover（PL-06，Reka Popover）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、
                           TrackRow（通用曲目行）、EmptyState、
-                          immersive/{LyricsView,ImTitle,ImControls,ImLayoutDuo}（沉浸页：歌词引擎/标题/控制栏为共享件，
-                          布局只负责自己的版式与专属视觉层 - VS-09）
+                          immersive/{LyricsView,ImTitle,ImControls}（沉浸页三布局的共享件：歌词引擎/标题/控制栏）
+                          + ImLayoutDuo / ImLayoutCenter / ImLayoutPoster（布局只管自己的版式与专属视觉层 - VS-09）
 client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 ```
 
 ## 当前进度
 
-**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~05，含 ID3 标签与内嵌封面）** + **云端曲库前后端（LB-01~06/10/11、AD-01~04）**：上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放（206/416）、删除连同文件、索引重建、存储统计；前后端类型检查、生产构建、**221 个单测**全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）浏览器实测播放与上传。
+**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~05，含 ID3 标签与内嵌封面）** + **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶）** + **播放队列弹层（PL-06）**；前后端类型检查、生产构建、**243 个单测**（server 103 + client 140）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）浏览器实测播放、上传、歌词与彩胶。
 
-**下一步**（建议顺序）：沉浸式播放页与歌词（3.7 / VS-03/09）→ 播放队列弹层（PL-06）与曲目级持久化（PL-07）→ 歌单（3.6）与在线音源（3.5）。
+**下一步**（建议顺序）：封面取色（VS-02——管线已就位，接上后彩胶盘体 / 外圈光晕 / 页面环境光 / 主题色光效一起随封面变）→ 曲目级持久化（PL-07）→ 歌单（3.6）→ 在线音源（3.5）→ 生产静态托管。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 

@@ -62,25 +62,44 @@ function measure(): void {
   textWidth.value = measureTextWidth(props.text, style.font, measureHost);
 }
 
+/**
+ * 量尺寸要合到**下一帧**再做：`measure()` 会往 body 插一个离屏探针（改布局），
+ * 而 ResizeObserver 回调里改布局会让本帧的通知“送不出去”，控制台就会刷
+ * “ResizeObserver loop completed with undelivered notifications.”（实测刷屏）。
+ * 同时做一次合并：一帧内多次触发只量一次。
+ */
+let pendingMeasure = 0;
+
+function scheduleMeasure(): void {
+  if (pendingMeasure) return;
+  pendingMeasure = requestAnimationFrame(() => {
+    pendingMeasure = 0;
+    measure();
+  });
+}
+
 let boxObserver: ResizeObserver | null = null;
 
 onMounted(() => {
   measure();
   // 首帧字形宽度可能还没稳定（布局/字体就绪前）→ 下一帧再量一次
-  requestAnimationFrame(measure);
-  void document.fonts?.ready.then(measure);
+  scheduleMeasure();
+  void document.fonts?.ready.then(scheduleMeasure);
 
   // 容器宽度会随侧栏折叠、窗口缩放变化（这些都不是 window resize），用 RO 最可靠
   if (typeof ResizeObserver !== "undefined" && boxRef.value) {
-    boxObserver = new ResizeObserver(measure);
+    boxObserver = new ResizeObserver(scheduleMeasure);
     boxObserver.observe(boxRef.value);
   }
 });
 
-onUnmounted(() => boxObserver?.disconnect());
+onUnmounted(() => {
+  boxObserver?.disconnect();
+  if (pendingMeasure) cancelAnimationFrame(pendingMeasure);
+});
 
 // 换歌 / 文本变化后重量（等 DOM 更新完）
-watch(() => props.text, measure, { flush: "post" });
+watch(() => props.text, scheduleMeasure, { flush: "post" });
 </script>
 
 <template>

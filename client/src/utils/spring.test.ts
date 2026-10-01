@@ -6,7 +6,6 @@ import {
   posYSpringParams,
   solveSpring,
 } from "./spring";
-
 /** 推进若干帧，返回轨迹（用于断言过冲 / 收敛） */
 function run(spring: Spring, frames = 240, dt = 1 / 60): number[] {
   const track: number[] = [];
@@ -17,7 +16,7 @@ function run(spring: Spring, frames = 240, dt = 1 / 60): number[] {
   return track;
 }
 
-describe("Spring（弹簧求解，移植自 AMLL）", () => {
+describe("Spring（弹簧求解，按阻尼简谐振子自行实现）", () => {
   it("欠阻尼参数会冲过目标再回弹——这正是它和 CSS 过渡的区别", () => {
     // 阻力取小值 → 欠阻尼；stiffness 100 / damping 2 必定过冲
     const spring = new Spring(0, { mass: 1, damping: 2, stiffness: 100 });
@@ -31,11 +30,23 @@ describe("Spring（弹簧求解，移植自 AMLL）", () => {
     expect(Math.abs(track.at(-1)! - 100)).toBeLessThan(overshoot / 3);
   });
 
-  it("过阻尼（soft）单调逼近，不过冲", () => {
-    const spring = new Spring(0, { mass: 1, damping: 10, stiffness: 100, soft: true });
+  it("过阻尼（ζ>1）单调逼近，不过冲", () => {
+    // ζ = 40 / (2·√(100·1)) = 2
+    const spring = new Spring(0, { mass: 1, damping: 40, stiffness: 100 });
     spring.setTarget(100);
     const track = run(spring);
 
+    expect(Math.max(...track)).toBeLessThanOrEqual(100.0001);
+    expect(track.at(-1)).toBeCloseTo(100, 1);
+  });
+
+  it("临界阻尼（ζ=1）不除零、也不过冲", () => {
+    // ζ = 20 / (2·√(100·1)) = 1，两个实根重合，是最容易写出 NaN 的一支
+    const spring = new Spring(0, { mass: 1, damping: 20, stiffness: 100 });
+    spring.setTarget(100);
+    const track = run(spring);
+
+    expect(track.every((x) => Number.isFinite(x))).toBe(true);
     expect(Math.max(...track)).toBeLessThanOrEqual(100.0001);
     expect(track.at(-1)).toBeCloseTo(100, 1);
   });
@@ -85,7 +96,7 @@ describe("Spring（弹簧求解，移植自 AMLL）", () => {
     spring.setTarget(200);
     run(spring, 6);
     const before = spring.position;
-    spring.setParams({ stiffness: 200, damping: Math.sqrt(200) * 2.2 });
+    spring.setParams({ stiffness: 200, damping: Math.sqrt(200) * 2.3 });
     expect(spring.position).toBeCloseTo(before, 6);
     run(spring, 600);
     expect(spring.position).toBe(200);
@@ -97,29 +108,29 @@ describe("Spring（弹簧求解，移植自 AMLL）", () => {
   });
 });
 
-describe("posYSpringParams（参数策略，移植自 AMLL）", () => {
+describe("posYSpringParams（我们自己的参数策略）", () => {
   it("跳转 / 首末句（拿不到间隔）用慢速参数", () => {
-    expect(posYSpringParams({ seeking: true })).toMatchObject({ stiffness: 90, damping: 15 });
-    expect(posYSpringParams({})).toMatchObject({ stiffness: 90, damping: 15 });
+    expect(posYSpringParams({ seeking: true })).toMatchObject({ stiffness: 100, damping: 16 });
+    expect(posYSpringParams({})).toMatchObject({ stiffness: 100, damping: 16 });
   });
 
   it("歌曲结束用中速参数", () => {
-    expect(posYSpringParams({ endOfSong: true })).toMatchObject({ stiffness: 140, damping: 22 });
+    expect(posYSpringParams({ endOfSong: true })).toMatchObject({ stiffness: 150, damping: 24 });
   });
 
   it("句间间隔越短弹力越大（跟得越紧）", () => {
-    const tight = posYSpringParams({ intervalSeconds: 0.1 });
-    const loose = posYSpringParams({ intervalSeconds: 0.8 });
+    const tight = posYSpringParams({ intervalSeconds: 0.12 });
+    const loose = posYSpringParams({ intervalSeconds: 0.7 });
 
     expect(tight.stiffness).toBeGreaterThan(loose.stiffness!);
-    expect(tight.stiffness).toBeLessThanOrEqual(220);
-    expect(loose.stiffness).toBeGreaterThanOrEqual(170);
+    expect(tight.stiffness).toBeLessThanOrEqual(230);
+    expect(loose.stiffness).toBeGreaterThanOrEqual(180);
   });
 
-  it("阻力由弹力反推（过冲幅度保持稳定），并带上纵向基础参数", () => {
+  it("阻力由弹力反推（过冲幅度保持稳定），并带上纵向质量", () => {
     const params = posYSpringParams({ intervalSeconds: 0.3 });
 
-    expect(params.damping).toBeCloseTo(Math.sqrt(params.stiffness!) * 2.2, 6);
+    expect(params.damping).toBeCloseTo(Math.sqrt(params.stiffness!) * 2.3, 6);
     expect(params.mass).toBe(POS_Y_SPRING_BASE.mass);
   });
 });

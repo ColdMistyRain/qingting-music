@@ -162,27 +162,27 @@ describe("lineProgress（LR-05 降级：整句渐亮）", () => {
   });
 });
 
-/** LR-06 自动居中的夹取 + LR-07 手动滚动的位移夹取 */
-describe("centerShift（自动居中不许推出两端）", () => {
-  it("开头几句：想要负位移就贴在顶部（不把第一行推到中线）", () => {
-    expect(centerShift(-120, 2000, 400)).toBe(0);
+/** LR-06 自动居中的夹取 + LR-07 手动滚动的位移夹取（正值 = 列表上移） */
+describe("centerShift（自动居中：上端夹住、往上到末句到中线为止）", () => {
+  it("开头几句：还想往上挪就贴着顶部不动（不把第一行推到中线）", () => {
+    expect(centerShift(-120, 1600)).toBe(0);
   });
 
   it("中间：原样返回", () => {
-    expect(centerShift(500, 2000, 400)).toBe(500);
+    expect(centerShift(500, 1600)).toBe(500);
   });
 
-  it("末尾：不超过列表高度减窗口高度（否则下面留白）", () => {
-    expect(centerShift(5000, 2000, 400)).toBe(1600);
+  it("末尾：不超过上移上限（末句刚好到中线，再往上会露出下留白）", () => {
+    expect(centerShift(5000, 1600)).toBe(1600);
   });
 
-  it("歌词比窗口还短：位移恒为 0", () => {
-    expect(centerShift(300, 200, 400)).toBe(0);
+  it("歌词太短、根本不需要上移时，位移恒为 0", () => {
+    expect(centerShift(300, 0)).toBe(0);
   });
 
   it("非法输入不抛错", () => {
-    expect(centerShift(Number.NaN, 2000, 400)).toBe(0);
-    expect(centerShift(100, Number.NaN, 400)).toBe(0);
+    expect(centerShift(Number.NaN, 1600)).toBe(0);
+    expect(centerShift(100, Number.NaN)).toBe(0);
   });
 });
 

@@ -165,21 +165,19 @@ export function lineProgress(lines: readonly LyricLine[], index: number, time: n
 const LINE_FALLBACK_SECONDS = 6;
 
 /**
- * 自动居中的位移（LR-06 + v4.69 夹取）：把当前句挪到窗口垂直中线，但不许把列表推出两端。
- * 前几句从顶部开始排（刚开头就把第一行推到中线，上面会空一大片），
- * 末句也不把列表推过头——Apple / Spotify 同款行为。
+ * 自动居中的位移（LR-06）：把当前句挪到窗口垂直中线。
+ * **正值 = 列表向上移**（DOM 那边写 `-shift`）——所以：
+ * - 上端夹住：刚开头的几句若也推到中线，标题与第一句之间会空出一大片（需求方实拍定稿）；
+ * - 上移到「末句刚好到中线」为止（`maxUp` 由调用方按量出来的行位置算好），
+ *   再往上就把列表下留白露出来了。
  */
-export function centerShift(desired: number, listHeight: number, viewportHeight: number): number {
+export function centerShift(desired: number, maxUp: number): number {
   if (!Number.isFinite(desired)) return 0;
-  // 量出来的高度也可能是 NaN（DOM 还没布局完）——那就当作“没什么可滚”，
-  // 而不是把 NaN 传出去（NaN 的 transform 会让整条歌词消失）
-  const safeList = Number.isFinite(listHeight) ? listHeight : 0;
-  const safeViewport = Number.isFinite(viewportHeight) ? viewportHeight : 0;
-  const max = Math.max(0, safeList - safeViewport);
-  return Math.min(Math.max(desired, 0), max);
+  const limit = Number.isFinite(maxUp) ? Math.max(0, maxUp) : 0;
+  return Math.min(Math.max(desired, 0), limit);
 }
 
-/** 手动滚动的位移夹取（LR-07）：滚到两端就停住，不能让列表飞出窗口 */
+/** 手动滚动的位移夹取（LR-07）：同样是正值 = 上移，两端夹住 */
 export function clampManualShift(value: number, maxShift: number): number {
   if (!Number.isFinite(value)) return 0;
   const max = Number.isFinite(maxShift) ? Math.max(0, maxShift) : 0;

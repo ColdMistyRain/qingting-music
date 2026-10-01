@@ -9,6 +9,7 @@ import {
   wordFillProgress,
   type LyricLine,
 } from "@/utils/lyrics";
+import { emphasisKeyframes, emphasisParams } from "@/utils/lyricEmphasis";
 import { POS_Y_SPRING_BASE, Spring, posYSpringParams } from "@/utils/spring";
 
 /**
@@ -138,14 +139,17 @@ function measure(seeking = false): void {
     list.style.paddingTop = "0px";
     list.style.paddingBottom = `${padBottom}px`;
   }
-  // 行的 offsetTop 是相对外层窗口的（.ly 是最近的定位祖先）：位移 = 行中线 - 窗口中线
+  // 行的 offsetTop 是相对外层窗口的（.ly 是最近的定位祖先）：位移 = 行中线 − 窗口中线
   const desired = line.offsetTop + line.offsetHeight / 2 - viewH / 2;
   /* **上端必须夹住**：整首歌刚开头时把第一行推到中线，上面会空出一大片（需求方实拍
      “隔太远”）；下端不夹——末句要能到中线，靠上面那块下留白提供行程。 */
   const last = lineEls.get(props.lines.length - 1);
-  const listHeight = last ? last.offsetTop + last.offsetHeight + padBottom : 0;
-  maxShift.value = Math.max(0, listHeight - viewH);
-  const target = centerShift(desired, listHeight, viewH);
+  /* 可上移的上限：让**末句中心**刚好挪到中线为止——列表下留白就是半屏，正好当它的行程。
+     不能用“内容总高 − 窗口高”：末句到中线时，内容（含下留白）往往还比窗口矮，
+     那样算出来的上限是 0，整个列表就永远不动（v4.86 实测踩到：自动居中与手动滚动一起废）。 */
+  const lastCenter = last ? last.offsetTop + last.offsetHeight / 2 : 0;
+  maxShift.value = Math.max(0, lastCenter - viewH / 2);
+  const target = centerShift(desired, maxShift.value);
   shift.value = target;
   driveTo(target, seeking);
   // 手动浏览中如果窗口尺寸变了，把手动位移也夹进新范围
@@ -286,6 +290,53 @@ function onLineClick(line: LyricLine): void {
   }
   emit("seek", line.time);
 }
+
+/* ---------- 逐字"瞬时辉光爆发"（LR-05 强调，v4.86） ----------
+   某个字刚唱完时跑一次一次性的关键帧动画（参数与关键帧在 `utils/lyricEmphasis.ts`）：
+   常驻的 `.done` 辉光负责"唱过的字一直亮着"，爆发负责"刚亮起来"那一下。 */
+let lastWordProgress: number[] = [];
+let lastBurstTime = 0;
+
+function burstCompletedWords(): void {
+  const words = activeWords.value;
+  const previous = lastWordProgress;
+  lastWordProgress = [...words];
+  const jumped = Math.abs(props.time - lastBurstTime) > 0.5;
+  lastBurstTime = props.time;
+  if (reduceMotion.value || jumped || words.length === 0) return;
+
+  // 先算谁刚唱完，再去查 DOM——这个回调每秒要跑几十次，不要每次去戳布局
+  const completed = words
+    .map((progress, index) => (progress >= 1 && (previous[index] ?? 0) < 1 ? index : -1))
+    .filter((index) => index >= 0);
+  if (completed.length === 0) return;
+
+  const chars = listRef.value?.querySelectorAll<HTMLElement>(".lyline.current .ch");
+  const line = props.lines[activeIndex.value];
+  if (!chars?.length) return;
+
+  for (const index of completed) {
+    const el = chars[index];
+    if (!el || typeof el.animate !== "function") continue;
+    const params = emphasisParams({
+      durationSeconds: line?.words?.[index]?.duration ?? 0,
+      charCount: words.length,
+      isLastWord: index === words.length - 1,
+    });
+    el.animate(emphasisKeyframes({ charIndex: index, charCount: words.length, params }), {
+      duration: params.durationMs,
+      // 峰形已在关键帧里（`emphasisProfile`），这里用线性，别再叠一条缓动
+      easing: "linear",
+      fill: "none",
+    });
+  }
+}
+
+watch(activeWords, burstCompletedWords, { flush: "post" });
+// 换句：进度的“上一帧”对新句没有意义（否则新句第一个字会被当成“刚唱完”而白闪一下）
+watch(activeIndex, () => {
+  lastWordProgress = [];
+});
 
 let observer: ResizeObserver | null = null;
 onMounted(() => {

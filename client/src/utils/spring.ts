@@ -1,13 +1,16 @@
 /**
  * 弹簧动画（物理插值）。
  *
- * **改编自 AMLL**（`@applemusic-like-lyrics/core` 的 `utils/spring.ts`，AGPL-3.0），
- * 它的求解器又标注为 pushkine 的 MIT 实现（github.com/pushkine）。本项目因此整体以
- * AGPL-3.0-only 分发（见根 `LICENSE` 与 `README`）。与 AMLL 版的差异只在我们这边的减法：
- * - 去掉它的 `Duration` 包装层，统一用**秒**（本项目的时间单位本来就是秒）；
- * - 去掉延迟队列（逐行错峰我们用不上）；
- * - **求解公式、`arrived()` 的判定阈值与自停条件保持一致**——那正是它“弹”而 CSS
- *   过渡只是“滑”的原因，也是我们抄它的唯一目的。
+ * **按公式自行实现**：这里的求解器就是阻尼简谐振子的解析解——
+ *   `m·x'' + c·x' + k·x = k·target` → `u = x - target`，`ω₀ = √(k/m)`，`ζ = c / (2√(mk))`；
+ *   ζ ≥ 1 两个实根（过阻尼/临界，单调逼近）、ζ < 1 一对共轭复根（欠阻尼，带衰减的振荡）。
+ *   解法是教科书内容；**实现思路参考了 pushkine 的 MIT 实现**（github.com/pushkine，它的文件头标注
+ *   `MIT License`），与它、以及 AMLL 的版本不同之处在于：
+ *   - 过阻尼不再「用临界公式近似」，而是老老实实解两个实根（ζ 大时更准）；
+ *   - 不要它的 `soft` 开关——那个开关的作用，判 ζ 就已经天然分开了；
+ *   - 时间单位统一用**秒**（本项目本来就是秒），不要 `Duration` 包装层；
+ *   - 不要延迟队列（逐行错峰我们用不上）。
+ * **本文件不含 AGPL / GPL 代码**（v4.86；详见 `AGENTS.md` 铁律 9）。
  *
  * 纯计算、不碰 DOM，便于单测（PRD 11.2）。
  */
@@ -19,19 +22,19 @@ export interface SpringParams {
   damping: number;
   /** 弹力 */
   stiffness: number;
-  /** 强制使用过阻尼解（阻力很小的时候有用） */
-  soft?: boolean;
 }
 
-/** 默认参数（AMLL 的默认值：mass 1 / damping 10 / stiffness 100） */
-export const DEFAULT_SPRING_PARAMS: SpringParams = { mass: 1, damping: 10, stiffness: 100 };
+/** 默认参数：接近临界的略微欠阻尼（ζ≈0.92），干净利落、只留一点回弹 */
+export const DEFAULT_SPRING_PARAMS: SpringParams = { mass: 1, damping: 26, stiffness: 200 };
 
-/** AMLL 纵向滚动用的基础参数（它同样用了 0.9 的质量，比默认更“沉”一点） */
-export const POS_Y_SPRING_BASE: SpringParams = { mass: 0.9, damping: 15, stiffness: 90 };
+/** 歌词列表纵向滚动的质量：比默认略大一点（“沉”一些，长句位移不会显得跳） */
+const LYRIC_MASS = 0.9;
+/** 兜底参数 = 正常播放那一档的上沿（拿不到句间间隔时直接用它） */
+export const POS_Y_SPRING_BASE: SpringParams = { mass: LYRIC_MASS, damping: 35, stiffness: 230 };
 
-/** 数值求导的步长（与 AMLL 一致） */
+/** 数值求导的步长：解析式已给出，这里只用来取速度与加速度做“停稳”判定 */
 const DERIVATIVE_STEP = 0.001;
-/** “已到位”的阈值：位置、速度、加速度都要小于它（与 AMLL 一致） */
+/** “已到位”的阈值：位置、速度、加速度都要小于它（只看位置会把慢速末端误判成已停） */
 const ARRIVED_EPSILON = 0.01;
 
 function derivative(f: (t: number) => number): (t: number) => number {
@@ -40,7 +43,7 @@ function derivative(f: (t: number) => number): (t: number) => number {
 
 /**
  * 求弹簧的解析解：给定起点、初速度、终点与参数，返回“t 秒后位置”的函数。
- * 两支分开算：**过阻尼**指数逼近（不过冲）、**欠阻尼**带指数衰减的振荡（能看见回弹）。
+ * 按阻尼比分两支：ζ ≥ 1 两个实根（单调逼近，不过冲）、ζ < 1 共轭复根（过冲再回弹）。
  */
 export function solveSpring(
   from: number,
@@ -48,23 +51,33 @@ export function solveSpring(
   to: number,
   params: SpringParams = DEFAULT_SPRING_PARAMS,
 ): (t: number) => number {
-  const { mass, damping, stiffness, soft = false } = params;
-  const delta = to - from;
+  const { mass, damping, stiffness } = params;
+  const omega = Math.sqrt(stiffness / mass);
+  const zeta = damping / (2 * Math.sqrt(stiffness * mass));
+  /** 相对目标的初始位移（目标的“偏差”） */
+  const offset = from - to;
 
-  if (soft || 1 <= damping / (2 * Math.sqrt(stiffness * mass))) {
-    // 过阻尼：单调逼近目标
-    const angularFrequency = -Math.sqrt(stiffness / mass);
-    const leftover = -angularFrequency * delta - velocity;
-    return (t) => to - (delta + t * leftover) * Math.E ** (t * angularFrequency);
+  if (zeta >= 1) {
+    // 过阻尼 / 临界：两个实根（ζ = 1 时重合，回到临界公式）
+    if (Math.abs(zeta - 1) < 1e-9) {
+      return (t) => to + (offset + (velocity + omega * offset) * t) * Math.E ** (-omega * t);
+    }
+    const root = omega * Math.sqrt(zeta * zeta - 1);
+    const r1 = -zeta * omega + root;
+    const r2 = -zeta * omega - root;
+    const head = (velocity - r2 * offset) / (r1 - r2);
+    const tail = offset - head;
+    return (t) => to + head * Math.E ** (r1 * t) + tail * Math.E ** (r2 * t);
   }
 
   // 欠阻尼：会冲过目标再回弹
-  const dampingFrequency = Math.sqrt(4 * mass * stiffness - damping ** 2);
-  const leftover = (damping * delta - 2 * mass * velocity) / dampingFrequency;
-  const dfm = (0.5 * dampingFrequency) / mass;
-  const dm = -(0.5 * damping) / mass;
+  const omegaDamped = omega * Math.sqrt(1 - zeta * zeta);
+  const cosine = offset;
+  const sine = (velocity + zeta * omega * offset) / omegaDamped;
   return (t) =>
-    to - (Math.cos(t * dfm) * delta + Math.sin(t * dfm) * leftover) * Math.E ** (t * dm);
+    to +
+    Math.E ** (-zeta * omega * t) *
+      (cosine * Math.cos(omegaDamped * t) + sine * Math.sin(omegaDamped * t));
 }
 
 export class Spring {
@@ -139,7 +152,7 @@ export class Spring {
     if (this.arrived()) this.snap(this.targetValue);
   }
 
-  /** 位置、速度、加速度都足够小就算到位（与 AMLL 同口径） */
+  /** 位置、速度、加速度都足够小就算到位（只比位置会在慢速末端提前停住） */
   arrived(): boolean {
     return (
       Math.abs(this.targetValue - this.currentValue) < ARRIVED_EPSILON &&
@@ -149,19 +162,22 @@ export class Spring {
   }
 }
 
-/* ---------- 参数策略（移植自 AMLL 的 `getPosYSpringPolicy`） ----------
-   它的思路：跳转/间奏/首末句用**慢速**（稳，不甩），歌曲结束用**中速**，
-   正常播放则按“当前句与上一句的时间间隔”动态给弹力——间隔越短弹力越大
-   （句子追得紧时要更快跟上），并用 `sqrt(stiffness) * 2.2` 反推阻力，
-   这样无论弹力怎么变，**过冲幅度都保持稳定**（这是它调好的关键）。 */
-const SLOW = { stiffness: 90, damping: 15 };
-const MEDIUM = { stiffness: 140, damping: 22 };
-const MIN_INTERVAL_MS = 100;
-const MAX_INTERVAL_MS = 800;
-const MIN_STIFFNESS = 170;
-const MAX_STIFFNESS = 220;
-const DAMPING_MULTIPLIER = 2.2;
-const INTERVAL_EXPONENT = 0.2;
+/* ---------- 参数策略（我们自己的数值） ----------
+   思路（物理直觉 + 实测手感，不是拄来的常数）：三种场景分别要不同的“稳”与“快”；
+   正常播放时再按句间间隔微调——句子追得紧就弹快一点，间隔长就慢一点，免得抢拍。
+   阻力用 `√stiffness × 系数` 反推，这样改弹力时**过冲幅度基本不变**（试过固定阻力：
+   弹力一高就甩得过头）。 */
+/** 跳转 / 首末句：稳为先，不要甩 */
+const SLOW = { stiffness: 100, damping: 16 };
+/** 歌曲结束：介乎两者之间 */
+const MEDIUM = { stiffness: 150, damping: 24 };
+/** 正常播放的弹力区间与间隔区间（毫秒） */
+const MIN_INTERVAL_MS = 120;
+const MAX_INTERVAL_MS = 700;
+const MIN_STIFFNESS = 180;
+const MAX_STIFFNESS = 230;
+const DAMPING_MULTIPLIER = 2.3;
+const INTERVAL_EXPONENT = 0.25;
 
 export interface PosYSpringOptions {
   /** 本次是不是跳转（点击歌词行、拖进度条）：跳转用慢速，免得甩得晕 */
@@ -173,9 +189,9 @@ export interface PosYSpringOptions {
 }
 
 export function posYSpringParams(options: PosYSpringOptions = {}): SpringParams {
-  if (options.seeking) return { ...POS_Y_SPRING_BASE, ...SLOW };
-  if (options.endOfSong) return { ...POS_Y_SPRING_BASE, ...MEDIUM };
-  if (options.intervalSeconds == null) return { ...POS_Y_SPRING_BASE, ...SLOW };
+  if (options.seeking) return { mass: LYRIC_MASS, ...SLOW };
+  if (options.endOfSong) return { mass: LYRIC_MASS, ...MEDIUM };
+  if (options.intervalSeconds == null) return { mass: LYRIC_MASS, ...SLOW };
 
   const intervalMs = Math.min(
     Math.max(options.intervalSeconds * 1000, MIN_INTERVAL_MS),
@@ -186,7 +202,7 @@ export function posYSpringParams(options: PosYSpringOptions = {}): SpringParams 
     (1 - (intervalMs - MIN_INTERVAL_MS) / (MAX_INTERVAL_MS - MIN_INTERVAL_MS)) ** INTERVAL_EXPONENT;
   const stiffness = MIN_STIFFNESS + ratio * (MAX_STIFFNESS - MIN_STIFFNESS);
   return {
-    ...POS_Y_SPRING_BASE,
+    mass: LYRIC_MASS,
     stiffness,
     damping: Math.sqrt(stiffness) * DAMPING_MULTIPLIER,
   };

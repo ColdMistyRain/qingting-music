@@ -87,10 +87,8 @@ $env:USER_PASSWORD='guest123'; $env:ADMIN_PASSWORD='admin123'; npm run dev
 
 ## 许可
 
-本项目以 **AGPL-3.0-only** 分发（见 [`LICENSE`](./LICENSE)）。
+本项目自身未指定开源许可（私有项目）——**不含任何 AGPL / GPL 代码**，将来怎么定都行。
 
-原因：沉浸页歌词中的**弹簧动画**（`client/src/utils/spring.ts`）改编自 **AMLL**（[amll-dev/applemusic-like-lyrics](https://github.com/amll-dev/applemusic-like-lyrics)，AGPL-3.0；其求解器本源是 [pushkine](https://github.com/pushkine) 的 MIT 实现）。AGPL 具传染性，且本软件是网络服务（AGPL §13 要求向使用者提供完整源码）——这与本项目的定位一致（可私有部署、开源）。
+唯一需要保留署名的地方：`client/src/utils/spring.ts` 的弹簧求解器是**阻尼简谐振子的解析解**（教科书公式），实现方式参考了 [pushkine](https://github.com/pushkine) 的 **MIT** 实现，文件头已注明。其余依赖（Vue / Vite / Express / Reka UI / Phosphor 图标等）均为宽松许可。
 
-**没有安装 AMLL 的 npm 包**（v4.84 曾装、v4.85 已回退）：只把其中值得拄的机制移植进我们自己的代码并保留署名，界面风格、主题色与锦线策略都是本项目的。
-
-其它依赖（Vue / Vite / Express / Reka UI / Phosphor 图标等）均为宽松许可。**新加依赖前先看 `npm view <pkg> license`**。
+**新加依赖前先看 `npm view <pkg> license`**：不要再引入强拷贝（AGPL / GPL）依赖。

@@ -338,20 +338,31 @@ async function removeSelected(): Promise<void> {
 
 .songs {
   padding: 6px 10px 10px;
-  /* 行间不再画线（v4.90，与曲目列表同一套语言）：分隔交给整条列表的 gap */
+  /* 行间距跟着“宽/窄”换档（v4.91，与曲目列表同一套口径）：
+     宽屏 gap 为 0（细线正落在行的上沿），窄屏（列收起）改由间距承担。 */
   display: flex;
   flex-direction: column;
-  gap: var(--row-list-gap);
+  gap: 0;
+}
+
+@media (max-width: 1024px) {
+  .songs {
+    gap: var(--row-list-gap);
+  }
 }
 
 /* 列：勾选 / 封面 / 曲目 / 大小 / 上传时间 / 操作 */
 .sg {
+  /* 分隔线用伪元素画，需要定位上下文 */
+  position: relative;
   display: grid;
   grid-template-columns: 24px 40px minmax(0, 1fr) 90px 148px auto;
   align-items: center;
   gap: 14px;
-  /* 与上传队列、曲目行同一套行节奏：两行文字不塞在 54px 里 */
-  min-height: 62px;
+  /* 与上传队列、曲目行同一套行节奏：两行文字不塞在 54px 里。
+     **高度取 4 的倍数**（v4.92）：本列表的细线是行的 `::before`，行距就是行高，
+     行高不是 4 的倍数时，125% 缩放下每条线的相位会循环（有的粗有的细）。 */
+  min-height: 64px;
   padding: 8px 8px;
   border-radius: var(--radius-row);
 }
@@ -360,8 +371,27 @@ async function removeSelected(): Promise<void> {
   background: var(--hover);
 }
 
-/* 数据行之间不再画线（v4.90）：集合型列表与任务型列表（上传队列，行带状态底色）
-   现在都不画线，两者只差“行块本身的底色”，语言统一。 */
+/* 数据行之间的细线（v4.91：宽表靠它引导视线不串行；两端按行内边距内缩，不顶到圆角）。
+   不用 border-top：行有圆角，线会沿圆角拐下去、两端各留一段弧。
+   窄屏（列收起）不画线，分隔交给 .songs 的 gap。 */
+.sg:not(.sg--head) + .sg:not(.sg--head)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: var(--glass-border);
+  /* 同上：恒等于 1 个设备像素，避免“有的细线粗有的细” */
+  transform: scaleY(var(--px-scale));
+  transform-origin: top center;
+}
+
+@media (max-width: 1024px) {
+  .sg:not(.sg--head) + .sg:not(.sg--head)::before {
+    display: none;
+  }
+}
 
 .sg--head {
   /* 与曲目列表表头同一规则：不吸顶、不加底色（吸顶要不透明底，

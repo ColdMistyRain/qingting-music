@@ -92,7 +92,7 @@ onBeforeUnmount(() => {
     </PopoverTrigger>
 
     <PopoverPortal>
-      <PopoverContent class="q-pop" side="top" align="end" :side-offset="10">
+      <PopoverContent class="q-pop" side="top" align="end" :side-offset="10" force-mount>
         <QueuePanel @close="open = false" />
       </PopoverContent>
     </PopoverPortal>
@@ -159,15 +159,28 @@ onBeforeUnmount(() => {
   border: 1px solid var(--glass-border);
   box-shadow: var(--panel-sheen), var(--panel-shadow);
   color: var(--text-1);
-  transform-origin: bottom right;
-  animation: q-in 0.18s var(--ease-ios);
+  /* 进出场都改成**状态驱动的过渡**（原来是只播一次的 `animation: q-in`）：
+     Reka 的 Popover 默认一关就卸载，根本没有能播退场动画的元素 —— 于是加了 `force-mount`
+     把节点留在 DOM 里，而 `animation` 只会在挂载那一次播，所以进出场交给 `data-state` 驱动。
+     只做 `opacity`：面板带 `backdrop-filter`，动 transform 会让浏览器每帧重算模糊
+     （v5.54 确认框就是这么改的，同一个道理）；为了一点点“弹一下”不值得每秒重算几十次。
+     `visibility: hidden` 必须写：关闭态 `opacity: 0` **不等于不可点**，否则面板会隐形地
+     压住播放条右下角那一片（v5.50 的遮罩就是这么拦住全页点击的）。 */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    visibility 0s 0.18s;
 }
 
-@keyframes q-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.97);
-  }
+.q-pop[data-state="open"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 0.18s var(--ease-ios),
+    visibility 0s;
 }
 
 /* ---------- 手机：半屏底部抽屉 ----------

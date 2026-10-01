@@ -1,10 +1,10 @@
-/** 秒 → `m:ss`；时长未知或非法返回 `--:--`（PRD 11.2 必测基础函数） */
+/** 秒 → `mm:ss`（分钟也补零，行内一列时间左对齐时不会跳）；时长未知或非法返回 `--:--`（PRD 11.2 必测基础函数） */
 export function formatTime(seconds: number | null | undefined): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "--:--";
   const total = Math.floor(seconds);
   const minutes = Math.floor(total / 60);
   const rest = total % 60;
-  return `${minutes}:${String(rest).padStart(2, "0")}`;
+  return `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
 }
 
 /** 字节 → 人读大小（默认 1 位小数；B 取整）；非法值返回 `—`。digits 可指定小数位（如上限提示用 0 位） */

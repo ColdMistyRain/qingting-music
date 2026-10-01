@@ -2,16 +2,18 @@ import { describe, expect, it } from "vitest";
 import { formatDateTime, formatSize, formatTime } from "./format";
 
 describe("formatTime", () => {
-  it("按 m:ss 输出，秒数补零", () => {
-    expect(formatTime(0)).toBe("0:00");
-    expect(formatTime(9)).toBe("0:09");
-    expect(formatTime(65)).toBe("1:05");
-    expect(formatTime(225)).toBe("3:45");
+  it("按 mm:ss 输出，分与秒都补零（v5.57 需求方：“时间改成两位显示”）", () => {
+    expect(formatTime(0)).toBe("00:00");
+    expect(formatTime(9)).toBe("00:09");
+    expect(formatTime(65)).toBe("01:05");
+    expect(formatTime(225)).toBe("03:45");
     expect(formatTime(3600)).toBe("60:00");
+    expect(formatTime(6000)).toBe("100:00");
+    expect(formatTime(59 * 60 + 59)).toBe("59:59");
   });
 
   it("小数秒向下取整", () => {
-    expect(formatTime(59.9)).toBe("0:59");
+    expect(formatTime(59.9)).toBe("00:59");
   });
 
   it("未知或非法时长返回占位符", () => {

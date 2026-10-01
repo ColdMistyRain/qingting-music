@@ -13,7 +13,6 @@ import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
 import { handleShortcut } from "@/utils/shortcuts";
-import { withViewTransition } from "@/utils/viewTransition";
 
 /**
  * 沉浸式播放页（VS-03 + 3.7 歌词）。
@@ -48,14 +47,6 @@ const ambientStyle = computed(() =>
   current.value.ambient2 ? undefined : { "--im-glow-2": "transparent" },
 );
 const router = useRouter();
-
-/**
- * 这次进本页有没有走 View Transition（封面飞入）？
- * 有的话就**不要**再播自己的入场动画：飞入的封面已经是主角，页面再淡入一遍就是“闪一下”
- * （v5.21 修的：原来是“过渡期间把 animation 覆盖掉、结束后撤掉”，撤掉会让动画重头播）。
- * 在 setup 里读一次就定型 —— 整个页面实例都不再放入场动画，而不是跟着过渡的生死开关。
- */
-const skipEnter = typeof document !== "undefined" && document.documentElement.dataset.vt === "on";
 
 /** PL-01 / PL-08：本页是独立路由（不挂主壳），快捷键自己接——但判定用共享的那一份 */
 const shortcuts = {
@@ -116,21 +107,14 @@ watch(
 );
 
 /** 关掉沉浸页：有来路就回到来路（保留用户的浏览位置），直接进本页时回首页。
- *  同样用 View Transition 包：封面飞回播放条（与展开是同一对 `.vt-cover`）。
  *
- *  ⚠️ 这里用 `router.replace(来路)` 而不是 `router.back()`（v5.18 实测）：
- *  **后退（history traversal）会把手动起的 View Transition 掐掉** —— 同一次点击，
- *  `back()` 时过渡在 ready 后 11ms 就被跳过（伪元素动画从 6 个变 0 个，`finished` 只花 11ms），
- *  而 `replace()` 时 6 个动画正常跑满 435ms。原因在浏览器：遍历导航提交时，
- *  本次手动过渡会被当作“让位给导航自己的过渡”而 skip 掉。
- *  `replace` 的副作用正好是我们想要的：`/now` 这条历史被来路替换（而不是再压一条），
- *  关掉之后按浏览器后退键回到的是**来沉浸页之前**那一页，不会又跳回沉浸页。 */
+ *  ⚠️ 用 `router.replace(来路)` 而不是 `router.back()`：`replace` 的副作用正是我们要的 ——
+ *  `/now` 这条历史被来路替换（不再压一条），关掉之后按浏览器后退键回到的是
+ *  **来沉浸页之前**那一页，不会又跳回沉浸页。 */
 function close(): void {
-  void withViewTransition(() => {
-    const back = window.history.state?.back as string | undefined;
-    if (back) router.replace(back);
-    else router.push({ name: "home" });
-  }, "out");
+  const back = window.history.state?.back as string | undefined;
+  if (back) router.replace(back);
+  else router.push({ name: "home" });
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -154,7 +138,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="im" :class="{ 'no-enter': skipEnter }" :style="ambientStyle">
+  <div class="im" :style="ambientStyle">
     <header class="im-top">
       <button class="ctl" title="收起（Esc）" @click="close">
         <IconCaretDown class="icon" />
@@ -219,14 +203,6 @@ onBeforeUnmount(() => {
      裁在视口上就好，不能让它变成页面滚动区域 */
   overflow: hidden;
   animation: im-in 0.36s var(--ease-ios);
-}
-
-/* 走 View Transition 进来时**不再放入场动画**（v5.21）：
-   飞入的封面就是这段时间的主角，页面自己再淡入一遍会变成“闪一下”。
-   注意这里用的是**持久类**而不是“过渡期间覆盖 animation、结束后撤掉”——
-   撤掉覆盖会让被取消的动画重新从头播（实测就是需求方看到的那一下闪烁）。 */
-.im.no-enter {
-  animation: none;
 }
 
 /* 薄雾：封面颜色不可控，文字必须始终可读。用主题底色而不是写死黑/白，

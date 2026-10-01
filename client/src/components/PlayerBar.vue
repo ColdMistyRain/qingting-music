@@ -17,7 +17,6 @@ import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
 import { formatTime } from "@/utils/format";
 import type { PlayMode } from "@/utils/player";
-import { withViewTransition } from "@/utils/viewTransition";
 
 /**
  * 常驻底部播放条（PRD 3.8 + PL-01~05）。
@@ -27,11 +26,10 @@ const player = usePlayerStore();
 const router = useRouter();
 
 /** VS-03：点击播放条左侧（封面 / 歌曲信息）展开沉浸式播放页。
- *  用 View Transition 包一下：封面元素（`.vt-cover`）会从播放条飞进沉浸页；
- *  不支持 API / 用户要求减少动效时就是普通跳页（withViewTransition 内部降级）。 */
+ *  就是一次普通跳页 —— 跳页的动效由沉浸页自己的入场动画（`im-in`）负责。 */
 function openImmersive(): void {
   if (!player.hasTrack) return;
-  void withViewTransition(() => router.push({ name: "now" }), "in");
+  void router.push({ name: "now" });
 }
 
 const MODE_ICONS: Record<PlayMode, Component> = {
@@ -93,7 +91,7 @@ const marqueeActive = computed(() => player.playing || hovering.value);
       @mouseenter="hovering = true"
       @mouseleave="hovering = false"
     >
-      <div class="cover vt-cover">
+      <div class="cover">
         <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
         <IconMusicNotes v-else class="icon" />
       </div>

@@ -34,7 +34,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   <div class="duo">
     <div class="cover-wrap">
       <!-- 暂停就缩一点（状态靠“形”说），class 只表达状态，数值在 CSS 里 -->
-      <div class="cover vt-cover" :class="{ paused: !playing }">
+      <div class="cover" :class="{ paused: !playing }">
         <img v-if="coverUrl" :src="coverUrl" :alt="`${title} 封面`" />
         <IconMusicNotes v-else class="icon" />
       </div>

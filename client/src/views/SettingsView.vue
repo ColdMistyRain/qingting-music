@@ -63,8 +63,15 @@ const inkStyle = computed(() => ({
 // 写成 CSS 变量挂在 TabsRoot 上（只写原始值 ±1，具体滑多少在 CSS）。
 const dir = ref(1);
 
+/** 面板滑入只在**真的切过 Tab** 之后才挂（v5.29）。
+ *  动画是挂在面板内容上的（Reka 面板懒挂载，内容每次切换都重新创建），但这也意味着
+ *  **整页重挂时会白播一次**：从沉浸页退回设置页就是这种情况 —— 一进去就看到内容从右边
+ *  滑进来，像刚切过 Tab 一样。所以用持久标记闸住（与下划线那条 is-ready 同一个思路）。 */
+const switched = ref(false);
+
 // 点／键盘切换、以及“管理”Tab 因身份变化而出现时，都要重量一次
 watch(active, (to, from) => {
+  switched.value = true;
   dir.value = tabSlideDirection(
     tabs.value.map((t) => t.key),
     to,
@@ -129,7 +136,11 @@ async function signOut(): Promise<void> {
          样式仍然全是我们自己的（global.css 的 .tabs/.tab，选中态挂 data-state="active"）。
          aria-label 得自己给：Reka 会给 tablist 角色，但不会替你起名字（v5.4 实测补上）——
          没有名字时屏幕阅读器只会念“标签列表”，不知道这组标签是干什么的。 -->
-    <TabsRoot v-model="active" :style="{ '--panel-dir': dir }">
+    <TabsRoot
+      v-model="active"
+      :class="{ 'is-switching': switched }"
+      :style="{ '--panel-dir': dir }"
+    >
       <div :ref="setTabsWrap" class="tabs-wrap" :class="{ 'is-ready': inkReady }">
         <TabsList class="tabs" aria-label="设置分组">
           <TabsTrigger v-for="tab in tabs" :key="tab.key" :value="tab.key" class="tab">

@@ -959,14 +959,8 @@ select {
     transform: scale(1);
     will-change: auto;
   }
-  /* 切 Tab 时内容也不做滑入，直接出现 */
-  .tabs-wrap ~ [role="tabpanel"] > * {
-    animation: none;
-  }
-  /* 下划线不滑，直接到位 */
-  .tabs-wrap.is-ready .tabs__ink {
-    transition: none;
-  }
+  /* 切 Tab 时内容也不做滑入、下划线也不滑（这两条的覆盖必须跟在原规则后面，
+     所以实际写在“设置页：顶部 Tab”那一节里 —— 见那里的 ⚠️ 注释） */
 }
 
 .pb-right {
@@ -1043,11 +1037,14 @@ select {
    所以动画要挂在**内容**上：挂在面板壳上不会播（壳一直存在、不重新挂载）。
    只做 opacity + 10px 位移、0.2s ease-out：目的是让眼睛知道“内容从哪边来的”。
    方向来自 --panel-dir（±1，JS 只写这个原始值）。
+   ⚠️ 必须加 `.is-switching` 这个持久标记（v5.29）：动画挂在**内容**上，而内容每次切换都会
+   重建 —— 这本来是想要的，但**整页重挂时也会白播一次**（从沉浸页退回设置页：Reka 懒挂载 +
+   页面重建，一进去就看见内容从右边滑进来）。所以只有用户真的切过 Tab，才给面板加动画。
    选择器用 `.tabs-wrap ~` 限定在这一组 Tab 上 —— 注意 v5.6 给 TabsList 裹了 .tabs-wrap 之后，
    面板变成 .tabs-wrap 的兄弟、不再是 .tabs 的兄弟，原来的 `.tabs ~ [role="tabpanel"]`
    于是一夜之间永不匹配（内容淡入静默失效，需求方 v5.7：“tabs 内容切换能有过渡效果吗”）。
    教训：靠 DOM 结构写的选择器，动结构后要回头验证旧的那条还在不在。 */
-.tabs-wrap ~ [role="tabpanel"] > * {
+.is-switching .tabs-wrap ~ [role="tabpanel"] > * {
   animation: tab-panel-in 0.2s ease-out;
 }
 
@@ -1055,6 +1052,19 @@ select {
   from {
     opacity: 0;
     transform: translateX(calc(var(--panel-dir, 1) * 10px));
+  }
+}
+
+/* ⚠️ 这一块必须跟在被覆盖的规则**后面**（v5.29）：同一个文件里 @media 不增加优先级，
+   两者同优先级时靠**源码顺序**决胜 —— 这两条以前写在文件前面那个“通用 reduced-motion 块”
+   里，结果被后面出现的原规则按顺序压掉，等于没写（减少动效下 Tab 面板照旧滑入）。 */
+@media (prefers-reduced-motion: reduce) {
+  .is-switching .tabs-wrap ~ [role="tabpanel"] > * {
+    animation: none;
+  }
+
+  .tabs-wrap.is-ready .tabs__ink {
+    transition: none;
   }
 }
 

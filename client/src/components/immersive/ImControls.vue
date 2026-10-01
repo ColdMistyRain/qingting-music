@@ -73,10 +73,11 @@ function onPointerUp(event: PointerEvent): void {
   <div class="im-ctl">
     <div class="im-ctrls">
       <!-- 三组结构在桌面与手机共用，只是**排布**不同：
-           桌面挤成一行（模式 上一首 播放 下一首 音量，组间间距与键间距同为 20px，看不出分组），
-           手机换行后走带键在前、其余两枚小组走到第二排小键。
-           队列入口只在手机上出现：迷你条把队列键收起了，这里是手机唯一入口。 -->
-      <div class="im-ctrls__row im-ctrls__row--secondary">
+           桌面一行：模式 上一首 播放 下一首 音量（组间间距与键间距同为 20px，看不出分组）；
+           手机也一行，但把队列换到最右：模式 上一首 播放 下一首 队列
+           —— 需求方指定（模式在上一曲左侧、列表在下一首右侧），音量交给系统音量键，整枚收起。
+           所以队列与音量放同一组、顺序相邻：桌面显音量（队列 v-if 不渲染）。 -->
+      <div class="im-ctrls__row">
         <button
           class="ctl mode"
           :title="`播放模式：${player.modeLabel}`"
@@ -84,14 +85,6 @@ function onPointerUp(event: PointerEvent): void {
         >
           <component :is="modeIcon" class="icon" />
         </button>
-
-        <QueuePopover v-if="isMobile">
-          <template #trigger>
-            <button class="ctl" :title="`播放队列（${player.queue.length} 首）`">
-              <IconQueue class="icon" />
-            </button>
-          </template>
-        </QueuePopover>
       </div>
 
       <div class="im-ctrls__row im-ctrls__row--primary">
@@ -111,9 +104,19 @@ function onPointerUp(event: PointerEvent): void {
         </button>
       </div>
 
-      <div class="im-ctrls__row im-ctrls__row--secondary">
+      <div class="im-ctrls__row">
+        <!-- 队列入口只在手机上出现：迷你条把队列键收起了，这里是手机唯一入口 -->
+        <QueuePopover v-if="isMobile">
+          <template #trigger>
+            <button class="ctl" :title="`播放队列（${player.queue.length} 首）`">
+              <IconQueue class="icon" />
+            </button>
+          </template>
+        </QueuePopover>
+
         <!-- 音量：与播放条共用同一个控件（components/VolumeControl.vue，v4.62）——
-             两边不再各写一套，否则一定会走偏（这里原来是一条横条）。 -->
+             两边不再各写一套，否则一定会走偏（这里原来是一条横条）。
+             手机整枚收起（样式在下面），音量由系统音量键接管。 -->
         <VolumeControl />
       </div>
     </div>
@@ -181,25 +184,28 @@ function onPointerUp(event: PointerEvent): void {
     order: -1;
   }
 
-  /* 手机：走带键独占一排（排在最上、间距拉开、主键再大一点，拇指好按），
-     模式/队列/静音降为下一排小键（图标 19px、间距松一点、颜色已由 .ctl 的 --text-2 管）。
-     这就是 Salt Player 的控件分布：常用动作一条排，其余收进次排。 */
+  /* 一排五个键：模式 / 上一曲 / 播放 / 下一曲 / 队列（需求方指定：模式在上一曲左侧、
+     列表在下一首右侧）—— 靠 DOM 顺序就是对的（三组依次是 模式 / 走带键 / 队列+音量），
+     不用 order 去搬。图标统一 22px（不存在“次级键”了）。
+     ⚠️ 音量要抬到 (0,3,0)：组件 scoped 的 .vctl 是运行时注入的，同特异性压不过。 */
   .im-ctrls {
-    flex-wrap: wrap;
-    gap: 6px 18px;
+    flex-wrap: nowrap;
+    gap: 0 22px;
+    --ctl-icon-size: 22px;
+  }
+
+  /* 音量整枚收起（音量由系统音量键接管）。
+     ⚠️ 必须用 :deep()：`.vctl` 是 VolumeControl 的根元素，**没有本组件的 data-v 属性** ——
+     直接写 `.im-ctrls .vctl` 会被 scoped 编译成带 data-v 的选择器，永远匹配不上
+     （实测没藏住，而且没有任何报错）。:deep 同时把特异性抬到 (0,3,0)，压过组件自己的 (0,2,0)。 */
+  .im-ctrls :deep(.vctl) {
+    display: none;
   }
 
   .im-ctrls__row--primary {
-    order: 1;
     gap: 26px;
     --ctl-play-size: 56px;
     --ctl-play-icon: 32px;
-  }
-
-  .im-ctrls__row--secondary {
-    order: 2;
-    gap: 22px;
-    --ctl-icon-size: 19px;
   }
 }
 

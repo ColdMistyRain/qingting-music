@@ -46,7 +46,11 @@ const navItems: ConsoleNavItem[] = [
       </div>
     </aside>
     <main class="cs-main glass">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <Transition name="page">
+          <component :is="Component" />
+        </Transition>
+      </RouterView>
     </main>
   </div>
 </template>

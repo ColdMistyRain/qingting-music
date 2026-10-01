@@ -207,15 +207,28 @@ onBeforeUnmount(() => {
 /* 沉浸页开合：从底部升起 / 反向沉下（v5.27，需求方指定）。
    过渡类由 App.vue 的 `<Transition name="im-sheet">` 挂在路由根元素上 —— 写在**本组件的
    scoped 样式**里，就只可能命中本页（主壳的 `.app` 拿不到这枚 scope id），所以两个方向
-   都只有这张 sheet 在动；开与关用同一时长与曲线，看上去就是同一段动画反过来播。 */
+   都只有这张 sheet 在动；开与关用同一时长与曲线，看上去就是同一段动画反过来播。
+   圆角与投影**只在飞行期间**存在：出发/终点是 18px 圆角（面板语言），升到铺满时收回直角 ——
+   所以落地那一帧不会把圆角“啪”地弹平；投影用面板那套配方、方向朝上。 */
 .im-sheet-enter-active,
 .im-sheet-leave-active {
-  transition: transform 0.42s var(--ease-ios);
+  transition:
+    transform 0.42s var(--ease-ios),
+    border-radius 0.42s var(--ease-ios);
+  border-radius: 0;
+  box-shadow: 0 -18px 44px -16px rgba(20, 28, 60, 0.34);
 }
 
 .im-sheet-enter-from,
 .im-sheet-leave-to {
   transform: translateY(100%);
+  border-radius: 18px 18px 0 0;
+}
+
+/* 深色主题用面板那套深投影（黑 + 更大一点），与 --panel-shadow 的口径一致 */
+:root[data-theme="dark"] .im-sheet-enter-active,
+:root[data-theme="dark"] .im-sheet-leave-active {
+  box-shadow: 0 -20px 46px -16px rgba(0, 0, 0, 0.6);
 }
 
 /* 薄雾：封面颜色不可控，文字必须始终可读。用主题底色而不是写死黑/白，

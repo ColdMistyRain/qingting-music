@@ -443,16 +443,43 @@ select {
       与清理逻辑，也就不再有“过渡不结束 / 停在某一帧 / 落地那一帧硬切”这类环境差异。
    想再做回来：约定文档里有归档小结，代码见 git 历史 v5.18~v5.25。 */
 
-/* 沉浸页从底部升起时，主壳要**原地留住**：它压在下层（`.app` z-index 1 < `.im` 60），
-   被 sheet 盖住就行。Vue 的 `<Transition>` 靠“元素上声明出来的 transform 时长”决定何时拆除
-   离场元素，所以这条只声明时长、不改任何属性：这 0.42s 里它一动不动，等 sheet 盖住了再被拆。
-   少了它，主壳会在过渡一开始就消失（sheet 就会升到一片空白上）。 */
+/* 沉浸页 sheet 与主壳之间（v5.27/v5.28）：主壳**原地留住**、并且被压暗一档（scrim），
+   退回时反过来亮回来 —— 两级状态用 filter 表达，不用额外加一层遮罩元素。
+   ⚠️ 时长必须声明出来：Vue 的 `<Transition>` 靠元素上算出来的 transition 时长决定何时拆除
+   离场元素 —— 少了 `leave-active` 这条，主壳会在 sheet 刚升起时就被移除（升到一片空白上）。 */
 .app.im-sheet-leave-active {
-  transition: transform 0.42s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+  transition:
+    transform 0.42s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+    filter 0.42s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+}
+
+.app.im-sheet-leave-to,
+.app.im-sheet-enter-from {
+  filter: brightness(0.68);
+}
+
+.app.im-sheet-enter-active {
+  transition: filter 0.42s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+}
+
+/* 内页切换（主壳 / 控制台里的页面互切）：淡入 + 上移 0.32s，数字沿用原型 `page-in`。
+   **只做进场、不做离场**：两页同时在场会叠字、也会把内容高度撑成两份，所以旧页直接让位
+  （`<Transition>` 不给 leave 类 → 时长 0 → 下一帧移除）。 */
+.page-enter-active {
+  transition:
+    opacity 0.32s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+    transform 0.32s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app.im-sheet-leave-active {
+  .app.im-sheet-leave-active,
+  .app.im-sheet-enter-active,
+  .page-enter-active {
     transition: none;
   }
 }

@@ -38,7 +38,11 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
   <div class="app" :class="{ collapsed }">
     <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
     <main class="content glass">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <Transition name="page">
+          <component :is="Component" />
+        </Transition>
+      </RouterView>
     </main>
     <PlayerBar />
   </div>

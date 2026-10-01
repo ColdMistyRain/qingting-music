@@ -28,7 +28,9 @@ onMounted(() => void library.load());
 
 const tracks = computed(() => filterSongs(library.songs, keyword.value).map(songToTrack));
 const isSearching = computed(() => keyword.value.trim().length > 0);
-const summary = computed(() => `云端曲库 · ${library.songs.length} 首 · ${formatSize(library.totalSize)}`);
+const summary = computed(
+  () => `云端曲库 · ${library.songs.length} 首 · ${formatSize(library.totalSize)}`,
+);
 const showEmptyState = computed(() => library.status === "ready" && library.songs.length === 0);
 const showErrorPanel = computed(() => library.status === "error" && library.songs.length === 0);
 
@@ -86,7 +88,10 @@ function playAt(index: number): void {
 
     <!-- 只有列表滚动：页头与工具条固定在上部（方案 A） -->
     <div class="page-frame__scroll">
-      <div v-if="library.status === 'loading' && library.songs.length === 0" class="page-frame__fill">
+      <div
+        v-if="library.status === 'loading' && library.songs.length === 0"
+        class="page-frame__fill"
+      >
         <p class="note">正在读取曲库…</p>
       </div>
 
@@ -113,7 +118,9 @@ function playAt(index: number): void {
         </EmptyState>
       </div>
 
-      <p v-else-if="isSearching && tracks.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
+      <p v-else-if="isSearching && tracks.length === 0" class="note">
+        没有匹配的歌曲，换个关键词试试。
+      </p>
 
       <TrackList
         v-else
@@ -197,4 +204,3 @@ function playAt(index: number): void {
   margin-left: auto;
 }
 </style>
-

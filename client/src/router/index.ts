@@ -25,7 +25,12 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: "", name: "home", component: Blank },
       // 未登录唯一可用入口（AC-01）
-      { path: "local", name: "local", component: () => import("@/views/LocalView.vue"), meta: { anonymous: true } },
+      {
+        path: "local",
+        name: "local",
+        component: () => import("@/views/LocalView.vue"),
+        meta: { anonymous: true },
+      },
       { path: "library", name: "library", component: () => import("@/views/LibraryView.vue") },
       { path: "online", name: "online", component: () => import("@/views/OnlineView.vue") },
       {
@@ -91,7 +96,9 @@ router.beforeEach(async (to) => {
   // 管理台：仅 admin（AD-04）。未登录去登录页；已登录但角色不足（visitor）回音乐库，
   // 对应接口侧的 401 / 403 两级语义（AC-03）
   if (to.matched.some((record) => record.meta.admin) && !auth.isAdmin) {
-    return auth.canUseServer ? { name: "library" } : { name: "login", query: { redirect: to.fullPath } };
+    return auth.canUseServer
+      ? { name: "library" }
+      : { name: "login", query: { redirect: to.fullPath } };
   }
 
   return true;

@@ -18,7 +18,9 @@ const server = app.listen(config.port, () => {
   const mode = describeAuthMode(config.userPassword, config.adminPassword);
   console.log(`[server] 轻听音乐后端已启动：http://localhost:${config.port}`);
   console.log(`[server] 门禁模式：${mode}${mode === "closed" ? "（全功能开放）" : ""}`);
-  console.log(`[server] 在线音源：${config.onlineEnabled ? config.neteaseApiBase : "未配置（功能隐藏）"}`);
+  console.log(
+    `[server] 在线音源：${config.onlineEnabled ? config.neteaseApiBase : "未配置（功能隐藏）"}`,
+  );
   console.log(`[server] 数据目录：${config.dataDir}`);
   console.log(`[server] 音频目录：${config.uploadDir}`);
 });

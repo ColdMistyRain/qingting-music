@@ -9,7 +9,10 @@ describe("parseRangeHeader", () => {
   });
 
   it("bytes=0-：从起点到末尾", () => {
-    expect(parseRangeHeader("bytes=0-", 1000)).toEqual({ kind: "partial", range: { start: 0, end: 999 } });
+    expect(parseRangeHeader("bytes=0-", 1000)).toEqual({
+      kind: "partial",
+      range: { start: 0, end: 999 },
+    });
   });
 
   it("bytes=100-199：闭区间原样返回", () => {

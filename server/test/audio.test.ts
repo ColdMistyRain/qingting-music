@@ -22,7 +22,10 @@ describe("GET /audio/:storedName", () => {
     const { app } = await setup();
     const song = await uploadOne(app);
 
-    const res = await request(app).get(`/audio/${song.storedName}`).buffer(true).parse(binaryParser);
+    const res = await request(app)
+      .get(`/audio/${song.storedName}`)
+      .buffer(true)
+      .parse(binaryParser);
 
     expect(res.status).toBe(200);
     expect(res.headers["accept-ranges"]).toBe("bytes");
@@ -57,14 +60,18 @@ describe("GET /audio/:storedName", () => {
       .parse(binaryParser);
 
     expect(res.status).toBe(206);
-    expect(res.headers["content-range"]).toBe(`bytes ${song.size - 10}-${song.size - 1}/${song.size}`);
+    expect(res.headers["content-range"]).toBe(
+      `bytes ${song.size - 10}-${song.size - 1}/${song.size}`,
+    );
   });
 
   it("区间越界：416 + Content-Range: bytes */size（浏览器据此重试整文件）", async () => {
     const { app } = await setup();
     const song = await uploadOne(app);
 
-    const res = await request(app).get(`/audio/${song.storedName}`).set("Range", `bytes=${song.size}-`);
+    const res = await request(app)
+      .get(`/audio/${song.storedName}`)
+      .set("Range", `bytes=${song.size}-`);
 
     expect(res.status).toBe(416);
     expect(res.headers["content-range"]).toBe(`bytes */${song.size}`);
@@ -124,8 +131,12 @@ describe("云端曲库的权限分级（AC-03）", () => {
 
     expect((await request(app).get("/api/songs").set("Cookie", cookie)).status).toBe(200);
     expect(
-      (await request(app).post("/api/songs/upload").set("Cookie", cookie).attach("file", wavBuffer(1), "a.wav"))
-        .status,
+      (
+        await request(app)
+          .post("/api/songs/upload")
+          .set("Cookie", cookie)
+          .attach("file", wavBuffer(1), "a.wav")
+      ).status,
     ).toBe(403);
     expect((await request(app).get("/api/stats").set("Cookie", cookie)).status).toBe(403);
   });
@@ -140,14 +151,19 @@ describe("云端曲库的权限分级（AC-03）", () => {
       .attach("file", wavBuffer(1), "a.wav");
 
     expect(res.status).toBe(201);
-    expect((await request(app).get("/api/stats").set("Cookie", cookie)).body.data.songCount).toBe(1);
+    expect((await request(app).get("/api/stats").set("Cookie", cookie)).body.data.songCount).toBe(
+      1,
+    );
   });
 });
 
 /** supertest 默认把响应当文本处理，音频是二进制：手工收成 Buffer。
     superagent 的 Parser 类型把第一个参数标成它自己的 Response，运行时给的其实是
     IncomingMessage，只能断言一下类型（库里已知的类型不对）。 */
-const binaryParser = ((res: IncomingMessage, callback: (error: Error | null, body: Buffer) => void) => {
+const binaryParser = ((
+  res: IncomingMessage,
+  callback: (error: Error | null, body: Buffer) => void,
+) => {
   const chunks: Buffer[] = [];
   res.on("data", (chunk: Buffer) => chunks.push(chunk));
   res.on("end", () => callback(null, Buffer.concat(chunks)));

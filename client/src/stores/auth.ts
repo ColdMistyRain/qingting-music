@@ -47,5 +47,16 @@ export const useAuthStore = defineStore("auth", () => {
     apply(await logoutRequest());
   }
 
-  return { role, authEnabled, loaded, isAdmin, isVisitor, canUseServer, refresh, ensureLoaded, login, logout };
+  return {
+    role,
+    authEnabled,
+    loaded,
+    isAdmin,
+    isVisitor,
+    canUseServer,
+    refresh,
+    ensureLoaded,
+    login,
+    logout,
+  };
 });

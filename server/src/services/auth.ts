@@ -29,7 +29,10 @@ export interface PasswordCandidate {
  * 依次比对明文密码，命中即返回角色（AC-02）。
  * 遍历完整候选列表且不做提前返回，避免用耗时差异泄露命中的是哪一把密码。
  */
-export function matchPassword(input: string, candidates: readonly PasswordCandidate[]): Role | null {
+export function matchPassword(
+  input: string,
+  candidates: readonly PasswordCandidate[],
+): Role | null {
   if (!input) return null;
   const inputDigest = digest(input);
   let matched: Role | null = null;

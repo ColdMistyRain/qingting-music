@@ -34,9 +34,7 @@
   --panel-blur: blur(40px) saturate(2);
   /* 顶部内高光：让玻璃在平坦底色上也有"湿润"的质感（不是只靠一圈描边） */
   --panel-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --panel-shadow:
-    0 12px 32px -12px rgba(20, 28, 60, 0.28),
-    0 2px 6px rgba(20, 28, 60, 0.08);
+  --panel-shadow: 0 12px 32px -12px rgba(20, 28, 60, 0.28), 0 2px 6px rgba(20, 28, 60, 0.08);
   /* 实心面板色：flat 模式下岛用它 */
   --plane: #ffffff;
   /* 岛内卡片的面色。浅色下与岛同色（靠 --card-shadow 分出层次）；

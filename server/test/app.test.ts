@@ -48,7 +48,9 @@ describe("GET /api/config", () => {
   });
 
   it("配置音源后 onlineEnabled = true", async () => {
-    const app = createApp(testConfig({ neteaseApiBase: "http://localhost:4000", onlineEnabled: true }));
+    const app = createApp(
+      testConfig({ neteaseApiBase: "http://localhost:4000", onlineEnabled: true }),
+    );
     const res = await request(app).get("/api/config");
     expect(res.body.data).toEqual({ onlineEnabled: true, maxUploadSize: 1024 });
   });

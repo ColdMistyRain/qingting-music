@@ -71,7 +71,7 @@ function fakeHost(width: number): MeasureHost & { appended: number; removed: num
         style: {} as CSSStyleDeclaration,
         textContent: "",
         setAttribute: () => undefined,
-        getBoundingClientRect: () => ({ width } as DOMRect),
+        getBoundingClientRect: () => ({ width }) as DOMRect,
         offsetWidth: 0,
       }) as unknown as HTMLElement,
     append: () => {

@@ -66,7 +66,8 @@ function listenLocal(): void {
       </button>
 
       <p class="login-note">
-        访问密码由部署者在环境变量中设置（USER_PASSWORD / ADMIN_PASSWORD）；两把都未配置时门禁关闭，不会出现本页（AC-05）
+        访问密码由部署者在环境变量中设置（USER_PASSWORD /
+        ADMIN_PASSWORD）；两把都未配置时门禁关闭，不会出现本页（AC-05）
       </p>
     </div>
   </section>

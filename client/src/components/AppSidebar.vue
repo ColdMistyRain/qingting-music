@@ -36,9 +36,7 @@ const navItems = computed<NavItem[]>(() => {
 
 <template>
   <aside class="sidebar glass">
-    <div class="sb-logo">
-      <span class="note">♫</span><span class="lbl">轻听音乐</span>
-    </div>
+    <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听音乐</span></div>
 
     <RouterLink
       v-for="item in navItems"

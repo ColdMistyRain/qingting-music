@@ -40,8 +40,14 @@ describe("parseTrackFileName（LB-03 / LC-03 共用同一套回退规则）", ()
   });
 
   it("剥掉曲序前缀再取歌手与歌名", () => {
-    expect(parseTrackFileName("01. 周杰伦 - 晴天.mp3")).toEqual({ title: "晴天", artist: "周杰伦" });
-    expect(parseTrackFileName("12_ 蓝溪 - 深海信笺.wav")).toEqual({ title: "深海信笺", artist: "蓝溪" });
+    expect(parseTrackFileName("01. 周杰伦 - 晴天.mp3")).toEqual({
+      title: "晴天",
+      artist: "周杰伦",
+    });
+    expect(parseTrackFileName("12_ 蓝溪 - 深海信笺.wav")).toEqual({
+      title: "深海信笺",
+      artist: "蓝溪",
+    });
   });
 
   it("识别不出歌手时整段作歌名、歌手记为未知", () => {
@@ -54,7 +60,10 @@ describe("parseTrackFileName（LB-03 / LC-03 共用同一套回退规则）", ()
   });
 
   it("支持无空格连字符命名（真实曲库习惯：歌手-歌名.mp3）", () => {
-    expect(parseTrackFileName("BEYOND-海阔天空.mp3")).toEqual({ title: "海阔天空", artist: "BEYOND" });
+    expect(parseTrackFileName("BEYOND-海阔天空.mp3")).toEqual({
+      title: "海阔天空",
+      artist: "BEYOND",
+    });
     expect(parseTrackFileName("A-Lin-给我一个理由忘记.mp3")).toEqual({
       title: "给我一个理由忘记",
       artist: "A-Lin",

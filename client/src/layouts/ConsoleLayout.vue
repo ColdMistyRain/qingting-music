@@ -23,9 +23,7 @@ const navItems: ConsoleNavItem[] = [
 <template>
   <div class="console">
     <aside class="cs-side glass">
-      <div class="sb-logo">
-        <span class="note">♫</span><span class="lbl">轻听 · 控制台</span>
-      </div>
+      <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听 · 控制台</span></div>
       <RouterLink
         v-for="item in navItems"
         :key="item.name"

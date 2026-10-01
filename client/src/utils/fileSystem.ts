@@ -4,10 +4,7 @@
  */
 
 export interface DirectoryReaderLike {
-  readEntries(
-    onSuccess: (entries: EntryLike[]) => void,
-    onError?: (error: unknown) => void,
-  ): void;
+  readEntries(onSuccess: (entries: EntryLike[]) => void, onError?: (error: unknown) => void): void;
 }
 
 export interface EntryLike {

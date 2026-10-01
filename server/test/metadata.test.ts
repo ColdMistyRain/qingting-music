@@ -53,7 +53,10 @@ describe("parseAudioFile", () => {
   });
 
   it("文件根本不是音频：不抛错，整体退到文件名", async () => {
-    const file = await tempFile("A-Lin-给我一个理由忘记.mp3", Buffer.from("这不是音频，是一段文本"));
+    const file = await tempFile(
+      "A-Lin-给我一个理由忘记.mp3",
+      Buffer.from("这不是音频，是一段文本"),
+    );
     const parsed = await parseAudioFile(file, "A-Lin-给我一个理由忘记.mp3");
 
     expect(parsed).toEqual({

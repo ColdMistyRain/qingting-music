@@ -7,7 +7,12 @@ describe("pickTags", () => {
       common: { title: "夜行", artist: "林晚", album: "城市霓虹" },
       format: { duration: 225.4 },
     });
-    expect(tags).toMatchObject({ title: "夜行", artist: "林晚", album: "城市霓虹", duration: 225.4 });
+    expect(tags).toMatchObject({
+      title: "夜行",
+      artist: "林晚",
+      album: "城市霓虹",
+      duration: 225.4,
+    });
   });
 
   it("空白字符串与缺失字段一律为 null（不猜值）", () => {
@@ -34,7 +39,9 @@ describe("pickTags", () => {
   });
 
   it("封面数据是数字数组时也转成 Uint8Array", () => {
-    const tags = pickTags({ common: { picture: [{ data: [255, 216, 255], format: "image/png" }] } });
+    const tags = pickTags({
+      common: { picture: [{ data: [255, 216, 255], format: "image/png" }] },
+    });
     expect(tags.picture?.data).toBeInstanceOf(Uint8Array);
     expect(tags.picture?.format).toBe("image/png");
   });

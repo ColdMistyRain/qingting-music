@@ -32,9 +32,9 @@ describe("parseUploadResponse", () => {
   });
 
   it("HTTP 200 但 code 不为 0 也算失败", () => {
-    expect(() => parseUploadResponse(200, JSON.stringify({ code: 500, message: "内部错误" }))).toThrowError(
-      "内部错误",
-    );
+    expect(() =>
+      parseUploadResponse(200, JSON.stringify({ code: 500, message: "内部错误" })),
+    ).toThrowError("内部错误");
   });
 });
 

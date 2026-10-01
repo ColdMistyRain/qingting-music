@@ -11,7 +11,12 @@ export function sendOk<T>(res: Response, data: T, status = 200): void {
  * 失败响应：HTTP 状态码承载语义，body 为 `{ code, message }`。
  * businessCode 仅在前端需要分支处理时传入（如 SONG_DUPLICATE）。
  */
-export function sendFail(res: Response, status: number, message: string, businessCode?: number): void {
+export function sendFail(
+  res: Response,
+  status: number,
+  message: string,
+  businessCode?: number,
+): void {
   res.status(status).json({ code: businessCode ?? status, message });
 }
 

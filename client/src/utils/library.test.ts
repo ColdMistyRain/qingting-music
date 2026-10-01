@@ -18,9 +18,30 @@ function song(patch: Partial<Song> & { id: string }): Song {
 }
 
 const LIBRARY: Song[] = [
-  song({ id: "a", title: "晴天", artist: "周杰伦", album: "叶惠美", size: 300, uploadedAt: "2026-09-30T10:00:00.000Z" }),
-  song({ id: "b", title: "海阔天空", artist: "BEYOND", album: "乐与怒", size: 100, uploadedAt: "2026-09-30T12:00:00.000Z" }),
-  song({ id: "c", title: "Rolling in the Deep", artist: "Adele", album: "21", size: 200, uploadedAt: "2026-09-30T11:00:00.000Z" }),
+  song({
+    id: "a",
+    title: "晴天",
+    artist: "周杰伦",
+    album: "叶惠美",
+    size: 300,
+    uploadedAt: "2026-09-30T10:00:00.000Z",
+  }),
+  song({
+    id: "b",
+    title: "海阔天空",
+    artist: "BEYOND",
+    album: "乐与怒",
+    size: 100,
+    uploadedAt: "2026-09-30T12:00:00.000Z",
+  }),
+  song({
+    id: "c",
+    title: "Rolling in the Deep",
+    artist: "Adele",
+    album: "21",
+    size: 200,
+    uploadedAt: "2026-09-30T11:00:00.000Z",
+  }),
 ];
 
 describe("filterSongs", () => {

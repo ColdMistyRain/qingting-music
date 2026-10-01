@@ -193,7 +193,10 @@ describe("POST /api/songs/reindex（LB-11 / AD-05）", () => {
 describe("GET /api/stats（LB-10 / AD-03）", () => {
   it("曲目数与总占用跟着曲库走", async () => {
     const { app } = await setup();
-    expect((await request(app).get("/api/stats")).body.data).toEqual({ songCount: 0, totalSize: 0 });
+    expect((await request(app).get("/api/stats")).body.data).toEqual({
+      songCount: 0,
+      totalSize: 0,
+    });
 
     await upload(app, "a.wav", wavBuffer(1));
     const res = await request(app).get("/api/stats");

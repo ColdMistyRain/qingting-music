@@ -37,7 +37,12 @@ beforeEach(() => {
 
 describe("曲库 store", () => {
   it("加载成功：写入列表与占用空间，状态转为 ready", async () => {
-    stubFetch(() => jsonResponse(200, { code: 0, data: { songs: [song("a", 300), song("b", 100)], totalSize: 400 } }));
+    stubFetch(() =>
+      jsonResponse(200, {
+        code: 0,
+        data: { songs: [song("a", 300), song("b", 100)], totalSize: 400 },
+      }),
+    );
     const library = useLibraryStore();
 
     await library.load();
@@ -49,7 +54,9 @@ describe("曲库 store", () => {
   });
 
   it("已加载过不再重复请求，force 时才重新拉", async () => {
-    const fetchMock = vi.fn(() => jsonResponse(200, { code: 0, data: { songs: [], totalSize: 0 } }));
+    const fetchMock = vi.fn(() =>
+      jsonResponse(200, { code: 0, data: { songs: [], totalSize: 0 } }),
+    );
     stubFetch(fetchMock as never);
     const library = useLibraryStore();
 
@@ -84,7 +91,9 @@ describe("曲库 store", () => {
   });
 
   it("上传成功后就地插入，不重新拉全量，并重算占用空间", async () => {
-    stubFetch(() => jsonResponse(200, { code: 0, data: { songs: [song("a", 100)], totalSize: 100 } }));
+    stubFetch(() =>
+      jsonResponse(200, { code: 0, data: { songs: [song("a", 100)], totalSize: 100 } }),
+    );
     const library = useLibraryStore();
     await library.load();
 
@@ -95,7 +104,12 @@ describe("曲库 store", () => {
   });
 
   it("删除成功：本地同步剔除；接口失败：保留该曲并抛出给页面提示", async () => {
-    stubFetch(() => jsonResponse(200, { code: 0, data: { songs: [song("a", 100), song("b", 200)], totalSize: 300 } }));
+    stubFetch(() =>
+      jsonResponse(200, {
+        code: 0,
+        data: { songs: [song("a", 100), song("b", 200)], totalSize: 300 },
+      }),
+    );
     const library = useLibraryStore();
     await library.load();
 

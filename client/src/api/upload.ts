@@ -52,7 +52,8 @@ export function uploadSong(file: File, options: UploadOptions = {}): Promise<Son
     xhr.responseType = "text";
 
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && event.total > 0) options.onProgress?.(event.loaded / event.total);
+      if (event.lengthComputable && event.total > 0)
+        options.onProgress?.(event.loaded / event.total);
     };
     xhr.onload = () => {
       try {

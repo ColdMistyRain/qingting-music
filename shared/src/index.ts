@@ -49,7 +49,7 @@ export interface Song {
   uploadedAt: string;
 }
 
-/** 歌单内的一条曲目引用（跨来源） */export interface PlaylistItem {
+/** 歌单内的一条曲目引用（跨来源） */ export interface PlaylistItem {
   source: TrackSource;
   /** source = server 时为 Song.id；online 为 "provider:id"；local 仅记文件名 */
   refId?: string;
@@ -110,15 +110,7 @@ export type ApiResponse<T> = ApiOk<T> | ApiErr;
 export const ANONYMOUS_ROLE: Role = "anonymous";
 
 /** 上传白名单：音频扩展名（PRD LB-02 / LC-02） */
-export const AUDIO_EXTENSIONS = [
-  "mp3",
-  "flac",
-  "wav",
-  "ogg",
-  "m4a",
-  "aac",
-  "opus",
-] as const;
+export const AUDIO_EXTENSIONS = ["mp3", "flac", "wav", "ogg", "m4a", "aac", "opus"] as const;
 
 export type AudioExtension = (typeof AUDIO_EXTENSIONS)[number];
 
@@ -152,7 +144,9 @@ const ANY_DASH = /[-–—]/g;
  */
 export function parseTrackFileName(fileName: string): { title: string; artist: string } {
   const extension = fileExtension(fileName);
-  const withoutExtension = extension ? fileName.slice(0, fileName.length - extension.length - 1) : fileName;
+  const withoutExtension = extension
+    ? fileName.slice(0, fileName.length - extension.length - 1)
+    : fileName;
   const cleaned = withoutExtension.replace(TRACK_NUMBER_PREFIX, "").trim();
 
   const spaced = SPACED_SEPARATOR.exec(cleaned);

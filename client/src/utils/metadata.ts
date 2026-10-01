@@ -42,8 +42,11 @@ export function pickTags(metadata: RawMetadataLike): AudioTags {
     title: readText(metadata.common?.title),
     artist: readText(metadata.common?.artist),
     album: readText(metadata.common?.album),
-    duration: typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? duration : null,
-    picture: picture ? { data: Uint8Array.from(picture.data), format: picture.format || "image/jpeg" } : null,
+    duration:
+      typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? duration : null,
+    picture: picture
+      ? { data: Uint8Array.from(picture.data), format: picture.format || "image/jpeg" }
+      : null,
     lyrics,
   };
 }

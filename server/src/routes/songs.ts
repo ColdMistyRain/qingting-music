@@ -164,7 +164,7 @@ export function createSongsRouter(config: AppConfig): Router {
           artist: parsed.artist,
           album: parsed.album,
           duration: parsed.duration,
-          coverUrl: coverName ? `/covers/${coverName}` : previous?.coverUrl ?? null,
+          coverUrl: coverName ? `/covers/${coverName}` : (previous?.coverUrl ?? null),
           originalName,
           storedName: name,
           size: info.size,

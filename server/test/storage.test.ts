@@ -1,7 +1,14 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import type { Song } from "@qingting/shared";
-import { createSongId, createStoredName, loadSongs, saveSongs, songsFilePath, toSongListResult } from "../src/services/storage.js";
+import {
+  createSongId,
+  createStoredName,
+  loadSongs,
+  saveSongs,
+  songsFilePath,
+  toSongListResult,
+} from "../src/services/storage.js";
 import { tempDirs } from "./helpers.js";
 
 function song(overrides: Partial<Song> = {}): Song {
@@ -74,8 +81,8 @@ describe("saveSongs", () => {
     await saveSongs(dataDir, [song()]);
 
     const raw = await readFile(songsFilePath(dataDir), "utf8");
-    expect(raw).toContain("\"storedName\"");
-    expect(raw).toContain("\"uploadedAt\"");
+    expect(raw).toContain('"storedName"');
+    expect(raw).toContain('"uploadedAt"');
     expect(JSON.parse(raw)).toHaveLength(1);
   });
 });

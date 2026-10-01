@@ -34,8 +34,12 @@ const selected = ref<Set<string>>(new Set());
 const busy = ref(false);
 const actionError = ref("");
 
-const rows = computed(() => sortSongs(filterSongs(library.songs, keyword.value), sortKey.value, direction.value));
-const allSelected = computed(() => rows.value.length > 0 && rows.value.every((s) => selected.value.has(s.id)));
+const rows = computed(() =>
+  sortSongs(filterSongs(library.songs, keyword.value), sortKey.value, direction.value),
+);
+const allSelected = computed(
+  () => rows.value.length > 0 && rows.value.every((s) => selected.value.has(s.id)),
+);
 const selectedCount = computed(() => selected.value.size);
 const showEmptyState = computed(() => library.status === "ready" && library.songs.length === 0);
 const showErrorPanel = computed(() => library.status === "error" && library.songs.length === 0);
@@ -141,40 +145,45 @@ async function removeSelected(): Promise<void> {
     </div>
 
     <div v-if="library.songs.length > 0" class="toolbar">
-        <label class="search">
-          <IconMagnifyingGlass class="icon" />
-          <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />
-        </label>
+      <label class="search">
+        <IconMagnifyingGlass class="icon" />
+        <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />
+      </label>
 
-        <label class="sort">
-          <select v-model="sortKey">
-            <option v-for="option in SORT_OPTIONS" :key="option.value" :value="option.value">
-              按{{ option.label }}
-            </option>
-          </select>
-        </label>
-        <button
-          class="ctl"
-          :title="direction === 'asc' ? '升序（点击改为降序）' : '降序（点击改为升序）'"
-          @click="toggleDirection"
-        >
-          <IconSortAscending v-if="direction === 'asc'" class="icon" />
-          <IconSortDescending v-else class="icon" />
-        </button>
+      <label class="sort">
+        <select v-model="sortKey">
+          <option v-for="option in SORT_OPTIONS" :key="option.value" :value="option.value">
+            按{{ option.label }}
+          </option>
+        </select>
+      </label>
+      <button
+        class="ctl"
+        :title="direction === 'asc' ? '升序（点击改为降序）' : '降序（点击改为升序）'"
+        @click="toggleDirection"
+      >
+        <IconSortAscending v-if="direction === 'asc'" class="icon" />
+        <IconSortDescending v-else class="icon" />
+      </button>
 
-        <span class="toolbar__spacer count">
-          {{ rows.length === library.songs.length ? `共 ${rows.length} 首` : `找到 ${rows.length} 首` }}
-        </span>
+      <span class="toolbar__spacer count">
+        {{
+          rows.length === library.songs.length ? `共 ${rows.length} 首` : `找到 ${rows.length} 首`
+        }}
+      </span>
 
-        <button class="btn btn-danger" :disabled="selectedCount === 0" @click="askRemoveSelected">
-          <IconTrash class="icon" />
-          批量删除{{ selectedCount > 0 ? `（${selectedCount}）` : "" }}
-        </button>
+      <button class="btn btn-danger" :disabled="selectedCount === 0" @click="askRemoveSelected">
+        <IconTrash class="icon" />
+        批量删除{{ selectedCount > 0 ? `（${selectedCount}）` : "" }}
+      </button>
     </div>
 
     <!-- 只有表格滚动（方案 A）：页头与工具条固定在上部 -->
     <div class="page-frame__scroll">
-      <div v-if="library.status === 'loading' && library.songs.length === 0" class="page-frame__fill">
+      <div
+        v-if="library.status === 'loading' && library.songs.length === 0"
+        class="page-frame__fill"
+      >
         <p class="note">正在读取曲库…</p>
       </div>
 
@@ -194,7 +203,9 @@ async function removeSelected(): Promise<void> {
           desc="上传的音乐会出现在这里，可以搜索、排序与批量管理。"
           fill
         >
-          <RouterLink class="btn btn-primary" :to="{ name: 'console-upload' }">去上传音乐</RouterLink>
+          <RouterLink class="btn btn-primary" :to="{ name: 'console-upload' }"
+            >去上传音乐</RouterLink
+          >
         </EmptyState>
       </div>
 

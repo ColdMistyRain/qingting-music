@@ -97,12 +97,12 @@ const navItems = computed<NavItem[]>(() => {
   overflow: hidden;
 }
 
-/* 内容固定“展开时的宽度”，折叠态再改成窄栏宽度。
-   两档都是**瞬时**切换，动画只发生在网格列上 —— 这就是“不回流”的关键：
-   展开那一刻内容已经是 224px 的布局，由外层窗口慢慢把它露出来。
-   ⚠️ 这里的宽度必须等于**列宽本身**（224 / 68），不能减掉内边距：
-   全局是 border-box，内边距已包含在宽度里；再减一次就会在右侧多出 24px 空条
-   （实测：侧栏 224 而内层只有 200，右边缘一条空面板）。 */
+/* 内容固定“展开时的宽度”，折叠态再改成窄栏宽度。两档都**跟着网格列一起动画**：
+   这样选中高亮（项自己的底色）是**跟着面板一起缩**，而不是在点击那一帧从 200px 瞬变 44px
+   （需求方：“高亮的背景会前后动”）。
+   文字不会因为宽度动画回流：标签 `nowrap` + 外层 `overflow: hidden`，多出来的部分被裁。
+   ⚠️ 宽度必须等于**列宽本身**（224 / 68），不能减掉内边距：全局是 border-box，
+   内边距已包含在宽度里；再减一次就会在右侧多出 24px 空条。 */
 .sb-inner {
   display: flex;
   flex-direction: column;
@@ -110,6 +110,18 @@ const navItems = computed<NavItem[]>(() => {
   height: 100%;
   padding: 18px 12px 12px;
   overflow-y: auto;
+  transition:
+    width 0.25s ease,
+    padding 0.25s ease;
+}
+
+/* 折叠态：**只改宽度**（+ 藏标签、折叠箭头转 180°）。
+   原来还改了 nav-item 的 padding/justify-center、分隔线外边距、分组标题的 justify ——
+   那些都是“点一下就地换布局”，每一项都会跳一下（图标、分隔线、加号按钮）。
+   现在折叠态几何与展开态一致：图标停在 12+12=24（恰好也是窄栏的居中位置，
+   因为 68/2 − 19/2 = 24.5），高亮与分隔线跟着面板宽度滑。 */
+.app.collapsed .sb-inner {
+  width: 68px;
 }
 
 /* 文字永不换行：容器还窄的时候只能被裁，不能挤成竖排 */
@@ -121,6 +133,11 @@ const navItems = computed<NavItem[]>(() => {
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 1px;
+  /* ⚠️ 行高必须**写死**（v5.12）：折叠态把字号提到 20px 是为了 ♫ 在窄栏里更有存在感，
+     但字号一变行高就跟着变 → logo 盒子从 44 变 48，**下面所有图标瞬跳 4px**
+     （实测：收起/展开的瞬间 86.4 → 90.4，就是需求方看到的“图标在跳动”）。
+     固定 22px 行高后，两态盒子都是 44，图标一动不动。 */
+  line-height: 22px;
   padding: 4px 12px 18px;
   white-space: nowrap;
 }
@@ -244,8 +261,8 @@ const navItems = computed<NavItem[]>(() => {
 
 /* 折叠态：纯图标窄栏，状态由 PlayerLayout 记忆（原型 v2.7） */
 .app.collapsed .sb-logo {
-  text-align: center;
-  padding: 4px 0 18px;
+  /* 字号可以变大（行高已写死，不会推布局），但**不能改 text-align/padding** ——
+     那会让 ♫ 在点击那一帧横移。 */
   font-size: 20px;
 }
 
@@ -253,24 +270,11 @@ const navItems = computed<NavItem[]>(() => {
   display: none;
 }
 
-.app.collapsed .sb-inner {
-  width: 68px;
-  padding: 18px 8px 12px;
-}
-
-.app.collapsed .nav-item {
-  justify-content: center;
-  padding-left: 0;
-  padding-right: 0;
-  gap: 0;
-}
-
-.app.collapsed .sb-section-head {
-  justify-content: center;
-  padding: 10px 0 6px;
-}
-
-.app.collapsed .sb-sep {
-  margin: 10px 6px;
+/* 折叠态藏掉「歌单」分组右上角的新建按钮（v5.13）：
+   它的位置由 `.sb-section-head` 的 space-between 决定 —— 标签一藏，它就只剩一个孩子、
+   被推到最左边，于是在点击那一帧横跳 161px（实测 199 → 38）。
+   shadcn 的 SidebarGroupAction 在 icon 态也是直接 hidden；何况它现在还是 disabled 的。 */
+.app.collapsed .sb-add {
+  display: none;
 }
 </style>

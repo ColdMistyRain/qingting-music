@@ -891,6 +891,10 @@ select {
     transform: scale(1);
     will-change: auto;
   }
+  /* 切 Tab 时内容也不做淡入，直接出现 */
+  .tabs ~ [role="tabpanel"] > * {
+    animation: none;
+  }
 }
 
 .pb-right {
@@ -927,6 +931,24 @@ select {
 .tab[data-state="active"] {
   color: var(--text-1);
   border-bottom-color: var(--accent);
+}
+
+/* 切 Tab 时面板内容淡入一点点（v5.5 需求方：“那为什么没有动画过渡”）。
+   为什么之前没有：Reka 的面板是**懒挂载**的——非活动面板只剩一个 hidden 的空壳
+   （aria-controls 要指得到，所以壳必须在），内容每次切换都是重新创建，
+   于是它“无中生有”地出现，而标签本身本来就有 0.15s 的颜色/下划线过渡。
+   所以动画要挂在**内容**上：挂在面板壳上不会播（壳一直存在、不重新挂载）。
+   只做 opacity + 2px 位移、0.18s：目的是让眼睛知道“内容换了”，不是让它跳舞。
+   选择器用 `.tabs ~` 限定在这一组 Tab 上（全站目前只有设置页有 Tab）。 */
+.tabs ~ [role="tabpanel"] > * {
+  animation: tab-panel-in 0.18s ease-out;
+}
+
+@keyframes tab-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
 }
 
 /* ---------- 设置卡片 ---------- */

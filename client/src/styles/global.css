@@ -479,11 +479,12 @@ html[data-vt-dir="out"] ::view-transition-new(qt-cover) {
   opacity: 0;
 }
 
-/* 过渡期间，新页面自己的入场动画要让位（快照是在动画第一帧拍的，会拍到一张空页）。
-   `data-vt` 由 utils/viewTransition.ts 在过渡期间挂在 <html> 上。 */
-html[data-vt="on"] .im {
-  animation: none;
-}
+/* 过渡期间新页面自己的入场动画要让位：快照是在动画第一帧拍的，不让位就会拍到一张空页。
+   ⚠️ **不能用"过渡期间把 animation 覆盖成 none、结束后再撤掉"这种写法**（v5.21）：
+   撤掉覆盖会让被取消的动画**重新从头播** —— 快照刚拆、页面刚露出来，一眼就是“闪一下”
+   （实测：过渡末尾 data-vt="on" 时 .im 无动画，结束后 im-in 又 running）。
+   正确做法是**持久标记**：`<html data-vt>` 仍作为“这次进了过渡”的信号，但决定权在页面自己
+   （见 ImmersiveView 的 `no-enter` 类，setup 里读一次，整个页面实例都不再放入场动画）。 */
 
 /* ---------- 应用外壳 ---------- */
 .app {

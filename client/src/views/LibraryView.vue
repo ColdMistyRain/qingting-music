@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NavToggle from "@/components/NavToggle.vue";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
@@ -50,6 +51,7 @@ function playAt(index: number): void {
 <template>
   <section class="page-frame">
     <div class="page-head">
+      <NavToggle />
       <h1>
         音乐库
         <div class="sub">{{ summary }}</div>

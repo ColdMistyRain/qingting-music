@@ -524,10 +524,15 @@ select {
   align-items: center;
   gap: 16px;
   margin-bottom: 20px;
+  /* 标题首行的尺寸：字号 + 行高。抽屉按钮（NavToggle）靠这两个值把自己居中到
+     **标题那一行**，而不是“标题 + 下面描述”整块 —— 两者必须同源，否则改了字号按钮就偏。 */
+  --page-h1-size: 22px;
+  --page-h1-leading: 1.3;
 }
 
 .page-head h1 {
-  font-size: 22px;
+  font-size: var(--page-h1-size);
+  line-height: var(--page-h1-leading);
   font-weight: 700;
   margin-right: auto;
 }
@@ -1199,10 +1204,11 @@ kbd {
     padding: 16px;
   }
 
-  /* 页头给左上角的汉堡键（NavDrawer 的 .nav-toggle，fixed 在 18px 处）让位，
-     否则标题会被压住。16px 内边距 + 42px = 58px，刚好落在按钮右缘（52px）之后。 */
-  .page-head {
-    padding-left: 42px;
+  /* 手机上标题与抽屉按钮都按“页头顶端”对齐（按钮那边在 NavToggle.vue 里同样写了 align-self）。
+     页头里那组操作按钮在窄屏会换行、比标题块还高，`align-items: center` 会把标题块挤下去
+     （实测 /local 差 11px，而按钮贴着页头顶端）—— 两端都按顶端排，标题首行的位置才是确定的。 */
+  .page-head h1 {
+    align-self: flex-start;
   }
 
   /* 播放条 → 迷你条（RT-02：“播放条简化为迷你条，点击展开沉浸式播放页”）。

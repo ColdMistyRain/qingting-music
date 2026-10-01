@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NavToggle from "@/components/NavToggle.vue";
 import IconGlobe from "~icons/ph/globe";
 import IconPlugsConnected from "~icons/ph/plugs-connected";
 import EmptyState from "@/components/EmptyState.vue";
@@ -11,6 +12,7 @@ const config = useConfigStore();
 <template>
   <section>
     <div class="page-head">
+      <NavToggle />
       <h1>
         在线搜索
         <div class="sub">音源：网易云（ON-02/03）</div>

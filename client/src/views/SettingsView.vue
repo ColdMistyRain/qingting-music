@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NavToggle from "@/components/NavToggle.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
@@ -127,6 +128,7 @@ async function signOut(): Promise<void> {
 <template>
   <section>
     <div class="page-head">
+      <NavToggle />
       <h1>设置</h1>
     </div>
 

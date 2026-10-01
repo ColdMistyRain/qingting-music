@@ -81,9 +81,11 @@ client/src/utils/         player（模式状态机与选曲，纯函数）、loc
 client/src/views/         login/local/library/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
 client/src/composables/   useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
                           useMediaQuery（响应式断点：只在“同一处要显示不同内容”时用 - v5.33）、
+                          useNavDrawer（手机抽屉开合状态：按钮在页头、面板在外壳，两处共享 - v5.35）
                           useNavItems（一级导航项：侧栏与手机底栏共用一份 - RT-02）、
                           useMediaSession（把播放器状态接到锁屏/通知栏，挂 App.vue - RT-04）
-client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavDrawer（手机左侧导航抽屉 - RT-02）、
+client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavToggle（手机抽屉入口，渲染在页头里 - v5.35）、
+                          NavDrawer（手机左侧导航抽屉的面板 - RT-02）、
                           QueuePopover（PL-06，Reka Popover）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
                           TrackRow（通用曲目行）、EmptyState、
@@ -96,7 +98,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.86：按公式自行实现 `utils/spring.ts`，只参考思路不搬代码）** + **歌词来源打开与滚动键盘化（v4.87：支持增强型 LRC、可手动导入 `.lrc`/`.yrc`（按曲目记忆、GBK 回退）、歌词区键盘滚动；顺带修好开发环境封面一直没加载出来的代理缺陷）**；前后端类型检查、生产构建、**378 个单测**（server 103 + client 275）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
 
-**手机端（v5.32/5.33/5.34，RT-01/02/03/05/06）**：`<768px` 导航收进**左侧抽屉**（`NavDrawer`：左上角按钮 / 屏幕左缘右滑拉出，遮罩或左滑或选完自动收起）—— 桌面侧栏不变（收起 = 68px 图标条）；播放条变迷你条（**只剩 播放/暂停 + 下一首**，顶沿 3px 进度线，第二行显示**当前歌词**）；列表收起「专辑/来源」两列、删除键隐藏；管理台只给「请使用电脑访问」提示。手势：行单击即播（`utils/pointer.ts`）、迷你条与沉浸页左右滑切歌、沉浸页下滑收起 / 上滑歌词铺满、**长按播放键进沉浸**；均只认真实触摸。**移动端参考对象＝Salt Player（椒盐音乐）**：无推荐流的简易首页、左侧抽屉、迷你条歌词、长按进沉浸、封面取色、横竖屏与平板、通知栏控制。**锁屏/通知栏（RT-04）**：锁屏显示封面+歌名+歌手+专辑，六个动作全接上（`utils/mediaSession.ts` + `useMediaSession`，挂在 `App.vue`）。
+**手机端（v5.32/5.33/5.34/5.35，RT-01/02/03/05/06）**：`<768px` 导航收进**左侧抽屉**（`NavDrawer` 面板 + 页头里的 `NavToggle` 按钮：与标题同一行、可从屏幕左缘右滑拉出，遮罩/左滑/选完自动收起）—— 桌面侧栏不变（收起 = 68px 图标条）；播放条变迷你条（**只剩 播放/暂停 + 下一首**，顶沿 3px 进度线，第二行显示**当前歌词**）；列表收起「专辑/来源」两列、删除键隐藏；管理台只给「请使用电脑访问」提示。手势：行单击即播（`utils/pointer.ts`）、迷你条与沉浸页左右滑切歌、沉浸页下滑收起 / 上滑歌词铺满、**长按播放键进沉浸**；均只认真实触摸。**移动端参考对象＝Salt Player（椒盐音乐）**：无推荐流的简易首页、左侧抽屉、迷你条歌词、长按进沉浸、封面取色、横竖屏与平板、通知栏控制。**锁屏/通知栏（RT-04）**：锁屏显示封面+歌名+歌手+专辑，六个动作全接上（`utils/mediaSession.ts` + `useMediaSession`，挂在 `App.vue`）。
 
 **下一步**（建议顺序）：歌单（3.6，需服务端）→ 在线音源（3.5，需服务端）→ PWA 与离线（RT-07）→ 生产静态托管（服务端）。
 

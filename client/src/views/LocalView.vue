@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NavToggle from "@/components/NavToggle.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import IconCloudArrowUp from "~icons/ph/cloud-arrow-up";
@@ -188,6 +189,7 @@ async function clearAll(): Promise<void> {
 <template>
   <section class="page-frame">
     <div class="page-head">
+      <NavToggle />
       <h1>
         本地播放
         <div class="sub">

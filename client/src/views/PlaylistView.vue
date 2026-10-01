@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NavToggle from "@/components/NavToggle.vue";
 import IconPlaylist from "~icons/ph/playlist";
 import EmptyState from "@/components/EmptyState.vue";
 
@@ -9,6 +10,7 @@ defineProps<{ id: string }>();
 <template>
   <section>
     <div class="page-head">
+      <NavToggle />
       <h1>歌单</h1>
     </div>
     <EmptyState

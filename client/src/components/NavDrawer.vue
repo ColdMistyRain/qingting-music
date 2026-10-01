@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
-import IconList from "~icons/ph/list";
 import AppSidebar from "@/components/AppSidebar.vue";
+import { useNavDrawer } from "@/composables/useNavDrawer";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { isTouchTap } from "@/utils/pointer";
 
@@ -12,28 +12,18 @@ import { isTouchTap } from "@/utils/pointer";
  * **只在手机（<768px）出现**：桌面沿用原来的侧栏（收起 = 缩成图标条），一分不变 ——
  * 曾经把桌面也改成“收起即完全隐藏 + 左缘临时滑出”，需求方澄清后回退（只动手机）。
  *
+ * 这里只有**面板**；入口按钮在页头里（`components/NavToggle.vue`）——
+ * 因为需求方要求按钮与标题同一行，而面板必须盖住整页，两者无法写在一起（状态在 useNavDrawer 里）。
+ *
  * 打开：左上角按钮 / 屏幕左缘右滑；关闭：遮罩、抽屉内左滑、Esc、选完页面自动收起。
  */
 const route = useRoute();
 const isMobile = useMediaQuery(MOBILE_QUERY);
 
-const open = ref(false);
+const { open, show, hide, toggle } = useNavDrawer();
 
 /** 抽屉里的侧栏永远是“展开态”（抽屉里再缩成图标条没有意义） */
 const drawerCollapsed = false;
-
-function show(): void {
-  open.value = true;
-}
-
-function hide(): void {
-  open.value = false;
-}
-
-function toggle(): void {
-  if (open.value) hide();
-  else show();
-}
 
 /** 抽屉里的“收起侧栏”按钮就是收起抽屉 */
 function onSidebarToggle(): void {
@@ -95,17 +85,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 </script>
 
 <template>
-  <!-- 整个组件只在手机存在：桌面（≥768px）侧栏仍是常驻 + 图标条折叠 -->
-  <button
-    v-if="isMobile"
-    class="nav-toggle"
-    :title="open ? '收起侧栏' : '展开侧栏'"
-    aria-controls="nav-drawer"
-    :aria-expanded="open"
-    @click="toggle"
-  >
-    <IconList class="icon" />
-  </button>
+  <!-- 整个组件只在手机存在：桌面（≥768px）侧栏仍是常驻 + 图标条折叠。
+       入口按钮不在这里 —— 它在各页页头里（NavToggle），与标题同一行。 -->
 
   <!-- 屏幕左缘热区：从这里右滑拉出抽屉 -->
   <div
@@ -138,34 +119,6 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 </template>
 
 <style scoped>
-/* ---------- 入口按钮 ---------- */
-.nav-toggle {
-  position: fixed;
-  /* 与页面内边距（16px）对齐，视觉上落在内容岛左上角；比标题略高一点，看着像页头的一部分 */
-  top: 18px;
-  left: 18px;
-  z-index: 70;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-control);
-  color: var(--text-2);
-  transition:
-    color 0.15s,
-    background 0.15s;
-}
-
-.nav-toggle:hover {
-  color: var(--text-1);
-  background: var(--hover);
-}
-
-.nav-toggle .icon {
-  width: 20px;
-  height: 20px;
-}
-
 /* ---------- 左缘热区 ---------- */
 .nav-edge {
   position: fixed;

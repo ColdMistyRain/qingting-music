@@ -537,6 +537,36 @@ select {
   margin-right: auto;
 }
 
+/* 标题块：两行结构 —— 第一行是「☰ + 标题」，第二行是描述（`.sub`）。
+   放在同一行会把描述挤到标题右侧，塞进 h1 里又会跟着标题一起缩进；
+   而描述属于**页面级说明**，左边界应该与搜索框、列表那一列对齐（需求方：“这个要左对齐”）。
+   列间距用按钮自己的 margin-right，不用 column-gap：桌面没有按钮，column-gap 会凭空推出 12px。 */
+.page-head__title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  margin-right: auto;
+}
+
+/* 标题块里的 h1 不再自己占满整行（那是 .page-head__title 的活） */
+.page-head__title h1 {
+  margin-right: 0;
+}
+
+/* 描述横跨两列 → 从最左边（即 ☰ 的左缘、也是页面内容左边界）开始 */
+.page-head__title .sub {
+  grid-column: 1 / -1;
+}
+
+/* ☰ 在“标题块”里只需要补一个与标题的间距。
+   定位仍用 NavToggle 自己那套“顶端 + 派生偏移”—— 那是按**标题首行**算的，
+   标题万一换成两行（窄屏 + 两个操作按钮）也不会偏；
+   反过来若在栅格里用 align-self: center，参照会变成整行（两行 = 57px）→ 实测偏低 14px。
+   间距写在这里而不是按钮上：不带标题块的页头（如设置页）用 .page-head 的 gap，不要多一份。 */
+.page-head .page-head__title .nav-toggle {
+  margin-right: 12px;
+}
+
 .page-head .sub {
   color: var(--text-3);
   font-size: 12px;
@@ -1204,11 +1234,16 @@ kbd {
     padding: 16px;
   }
 
-  /* 手机上标题与抽屉按钮都按“页头顶端”对齐（按钮那边在 NavToggle.vue 里同样写了 align-self）。
-     页头里那组操作按钮在窄屏会换行、比标题块还高，`align-items: center` 会把标题块挤下去
-     （实测 /local 差 11px，而按钮贴着页头顶端）—— 两端都按顶端排，标题首行的位置才是确定的。 */
-  .page-head h1 {
-    align-self: flex-start;
+  /* 手机上标题与抽屉按钮的对齐由 `.page-head__title` 的栅格负责（两者在同一行里居中），
+     这里不需要额外补位 —— 曾经写过的 `align-self: flex-start` 已删（它会让标题在栅格行里偏上）。 */
+
+  /* 页头允许换行：窄屏下标题 + "选择文件 / 清空列表"两个按钮挤在一行时，
+     被挤扁的是**标题**（实测“本地播放”被压成两行，列宽 67px < 文字 88px），
+     而标题换行又会让抽屉按钮跟着偏。宁可让操作按钮另起一行（本地播放页实测会走到这一步），
+     也不要让标题断字。 */
+  .page-head {
+    flex-wrap: wrap;
+    row-gap: 10px;
   }
 
   /* 播放条 → 迷你条（RT-02：“播放条简化为迷你条，点击展开沉浸式播放页”）。

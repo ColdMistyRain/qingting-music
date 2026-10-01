@@ -51,11 +51,11 @@ function playAt(index: number): void {
 <template>
   <section class="page-frame">
     <div class="page-head">
-      <NavToggle />
-      <h1>
-        音乐库
+      <div class="page-head__title">
+        <NavToggle />
+        <h1>音乐库</h1>
         <div class="sub">{{ summary }}</div>
-      </h1>
+      </div>
       <button
         v-if="library.songs.length > 0 || library.status === 'error'"
         class="btn"

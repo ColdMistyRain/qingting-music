@@ -189,9 +189,9 @@ async function clearAll(): Promise<void> {
 <template>
   <section class="page-frame">
     <div class="page-head">
-      <NavToggle />
-      <h1>
-        本地播放
+      <div class="page-head__title">
+        <NavToggle />
+        <h1>本地播放</h1>
         <div class="sub">
           {{
             hasTracks
@@ -199,7 +199,7 @@ async function clearAll(): Promise<void> {
               : "直接在浏览器里播放，文件不经过服务器"
           }}
         </div>
-      </h1>
+      </div>
       <!-- 有曲目时"添加"并入页头：投放区不再单独占一行（v4.37） -->
       <div v-if="hasTracks" class="page-head__actions">
         <button class="btn" title="支持 MP3 · FLAC · WAV · OGG · M4A · OPUS" @click="pickFiles">

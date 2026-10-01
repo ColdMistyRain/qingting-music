@@ -12,11 +12,11 @@ const config = useConfigStore();
 <template>
   <section>
     <div class="page-head">
-      <NavToggle />
-      <h1>
-        在线搜索
+      <div class="page-head__title">
+        <NavToggle />
+        <h1>在线搜索</h1>
         <div class="sub">音源：网易云（ON-02/03）</div>
-      </h1>
+      </div>
     </div>
 
     <EmptyState

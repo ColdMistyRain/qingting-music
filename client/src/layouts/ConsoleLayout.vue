@@ -23,7 +23,7 @@ const navItems: ConsoleNavItem[] = [
 <template>
   <div class="console">
     <aside class="cs-side glass">
-      <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听 · 控制台</span></div>
+      <div class="sb-logo"><span class="brand-mark" /><span class="lbl">轻听 · 控制台</span></div>
       <!-- 与播放器侧栏同一套配方（v5.15）：品牌与页脚固定、中段（导航）是唯一滚动区，
            否则窗口一矮就把「返回播放器」推出去滚不见了。 -->
       <nav class="cs-nav">
@@ -100,16 +100,18 @@ const navItems: ConsoleNavItem[] = [
 
 .sb-logo {
   flex: none;
+  /* 标记给 24px（默认 22px，这个图形细节多，太小会糊）；理由同播放器侧栏 */
+  --brand-mark-size: 24px;
+  /* flex 对齐的理由同播放器侧栏：标记是定高图片元素，行盒对齐会把它的高度算进去 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 1px;
+  line-height: 24px;
   padding: 4px 12px 18px;
   white-space: nowrap;
-}
-
-.sb-logo .note {
-  color: var(--accent);
-  margin-right: 6px;
 }
 
 .nav-item {

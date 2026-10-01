@@ -416,6 +416,24 @@ select {
      表头与滚动区里的行自然等宽（以前在这里各写一份，现在只写一处）。 */
 }
 
+/* ---------- 品牌标记（v5.16） ----------
+   需求方提供的品牌 logo（AI 生成的「音符 + 耳机」标记，右下角的 AI 水印已在制作资源时
+   连同空白一起裁掉）。资源是**单色透明标记**（`src/assets/logo-mark.png`：按“白底合成”的
+   逆运算取覆盖率做 alpha），所以这里用**遮罩上色**而不是直接 <img>：
+   ① 深浅主题与封面取色都跟着走（同 `--accent`），也不会拖着一个白底方块进玻璃岛；
+   ② 只有一份文件，HiDPI 下永远清晰，不需要描边/投影补救；
+   ③ 尺寸只改 `--brand-mark-size`（登录页会放大）。
+   侧栏 .sb-logo / 控制台 .sb-logo / 登录页 .login-logo 三处共用这一条（原来各写一份 ♫ 字形）。 */
+.brand-mark {
+  display: block;
+  flex: none;
+  width: var(--brand-mark-size, 22px);
+  height: var(--brand-mark-size, 22px);
+  background: var(--accent);
+  -webkit-mask: url("../assets/logo-mark.png") center / contain no-repeat;
+  mask: url("../assets/logo-mark.png") center / contain no-repeat;
+}
+
 /* ---------- 应用外壳 ---------- */
 .app {
   position: relative;

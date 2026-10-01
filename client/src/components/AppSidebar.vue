@@ -40,7 +40,7 @@ const navItems = computed<NavItem[]>(() => {
          参考 shadcn-vue 的 sidebar（v5.10）：面板宽度动画，内容不跟着回流，
          否则展开的那 0.25s 里文字会被挤成竖排（实测标签高度一度 67px = 四行）。 -->
     <div class="sb-inner">
-      <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听音乐</span></div>
+      <div class="sb-logo"><span class="brand-mark" /><span class="lbl">轻听音乐</span></div>
 
       <!-- 中段（导航 + 歌单）是**唯一**的滚动区，品牌与页脚固定（v5.15）：
            原来整个 .sb-inner 都在滚，窗口一矮就把「设置 / 折叠侧边栏」推出去滚不见了；
@@ -156,14 +156,20 @@ const navItems = computed<NavItem[]>(() => {
 
 .sb-logo {
   flex: none;
+  /* 标记给 26px（默认 22px）：这个图形内部有四条渐细笔画 + 耳机弧，22px 下会糊成一团。
+     行高/盒子高度两态一致（标记是定高图片，两边都是 26 + 4 + 18 = 48），所以不会跳。 */
+  --brand-mark-size: 26px;
+  /* 用 flex 而不是“字形 + margin”：标记是定高图片元素，行盒基线对齐会把它自己的高度
+     算进行盒（盒子就比 26px 高），而这里的盒子高度一变就会带动下面所有图标跳（v5.12 的坑）。
+     flex 对齐后行高恒为 26px（+ 4/18 内边距 = 48，两态一致）。 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 1px;
-  /* ⚠️ 行高必须**写死**（v5.12）：折叠态把字号提到 20px 是为了 ♫ 在窄栏里更有存在感，
-     但字号一变行高就跟着变 → logo 盒子从 44 变 48，**下面所有图标瞬跳 4px**
-     （实测：收起/展开的瞬间 86.4 → 90.4，就是需求方看到的“图标在跳动”）。
-     固定 22px 行高后，两态盒子都是 44，图标一动不动。 */
-  line-height: 22px;
+  /* ⚠️ 行高必须**写死**（v5.12）：字号或行高一变，logo 盒子就变，下面所有图标瞬跳。 */
+  line-height: 26px;
   padding: 4px 12px 18px;
   white-space: nowrap;
 }
@@ -176,11 +182,6 @@ const navItems = computed<NavItem[]>(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.sb-logo .note {
-  color: var(--accent);
-  margin-right: 6px;
 }
 
 .nav-item {
@@ -287,13 +288,9 @@ const navItems = computed<NavItem[]>(() => {
   transform: rotate(180deg);
 }
 
-/* 折叠态：纯图标窄栏，状态由 PlayerLayout 记忆（原型 v2.7） */
-.app.collapsed .sb-logo {
-  /* 字号可以变大（行高已写死，不会推布局），但**不能改 text-align/padding** ——
-     那会让 ♫ 在点击那一帧横移。 */
-  font-size: 20px;
-}
-
+/* 折叠态：纯图标窄栏，状态由 PlayerLayout 记忆（原型 v2.7）。
+   改品牌标记后这里**不再改字号**了：标记是定高图片，字号只影响已被藏起来的标签
+   （原来把字号提到 20px 是为了让 ♫ 在窄栏里更有存在感）。 */
 .app.collapsed .lbl {
   display: none;
 }

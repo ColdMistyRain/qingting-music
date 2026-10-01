@@ -63,6 +63,7 @@ server/src/services/       storage（data/songs.json 原子读写）、metadata�
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
 server/src/routes/        auth、config、songs（列表/上传/删除/重建索引）、audio（/audio + /covers）、stats
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen
+client/src/assets/        logo-mark.png（品牌标记：透明底单色，供 `.brand-mark` 遮罩上色；水印已裁掉）
 client/src/styles/        tokens.css（令牌 + OKLCH 取色核心）、global.css（外壳与共用类）、
                           material.css（材质双模式：islands 玻璃浮岛 / flat 实心面板，含 Apple 实测配方）
 client/src/layouts/       PlayerLayout（侧栏+内容+播放条，含空格键快捷键）、ConsoleLayout（控制台独立布局）

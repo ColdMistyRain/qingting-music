@@ -38,7 +38,7 @@ function listenLocal(): void {
 <template>
   <section class="login">
     <div class="login-card glass">
-      <div class="login-logo"><span class="note">♫</span>轻听音乐</div>
+      <div class="login-logo"><span class="brand-mark" /><span>轻听音乐</span></div>
       <div class="login-sub">QING TING · 私有云音乐中心</div>
 
       <form @submit.prevent="submit">
@@ -91,14 +91,15 @@ function listenLocal(): void {
 }
 
 .login-logo {
+  /* 登录页是唯一能把品牌放大到能看清的地方：标记放到 30px，与标题同一行居中（v5.16） */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  --brand-mark-size: 30px;
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 1px;
-}
-
-.login-logo .note {
-  color: var(--accent);
-  margin-right: 6px;
 }
 
 .login-sub {

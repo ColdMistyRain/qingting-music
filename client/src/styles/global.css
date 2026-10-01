@@ -628,9 +628,20 @@ select {
   color: var(--text-2);
   display: grid;
   place-items: center;
+  /* 悬浮反馈从“放大”换成“光”（v4.67）：过渡的也换成 filter。
+     这里写的是**熄灭那一程**：0.12s，移开马上收、不黏手（v5.0）。
+     亮起来那一程写在下面的 :hover 里（0.22s ease-out）—— transition 取的是**目标状态**
+     那份声明，所以两程可以不一样。 */
   transition:
     color 0.15s,
-    /* 悬浮反馈从“放大”换成“光”（v4.67）：过渡的也换成 filter */ filter 0.15s;
+    filter 0.12s ease;
+}
+
+/* 亮起来那一程：0.22s ease-out（快起慢收，像灯丝升温） */
+.ctl:hover:not(:disabled) {
+  transition:
+    color 0.15s,
+    filter 0.22s ease-out;
 }
 
 /* 悬浮反馈**只给旁边那几枚图标按钮**：文字色由 --text-2 提到 --text-1。

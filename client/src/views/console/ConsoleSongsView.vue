@@ -338,12 +338,14 @@ async function removeSelected(): Promise<void> {
 
 .songs {
   padding: 6px 10px 10px;
+  /* 行间不再画线（v4.90，与曲目列表同一套语言）：分隔交给整条列表的 gap */
+  display: flex;
+  flex-direction: column;
+  gap: var(--row-list-gap);
 }
 
 /* 列：勾选 / 封面 / 曲目 / 大小 / 上传时间 / 操作 */
 .sg {
-  /* 分隔线用伪元素画，需要定位上下文 */
-  position: relative;
   display: grid;
   grid-template-columns: 24px 40px minmax(0, 1fr) 90px 148px auto;
   align-items: center;
@@ -358,18 +360,8 @@ async function removeSelected(): Promise<void> {
   background: var(--hover);
 }
 
-/* 数据行之间用极淡直线分隔（同上：不用 border-top，避开圆角末端的弧；
-   两端按行的水平内边距内缩，不顶到圆角）。
-   集合型列表用线、任务型列表（上传队列，行带状态底色）用间距 + 行块，两者不混用。 */
-.sg:not(.sg--head) + .sg:not(.sg--head)::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 8px;
-  right: 8px;
-  height: 1px;
-  background: var(--glass-border);
-}
+/* 数据行之间不再画线（v4.90）：集合型列表与任务型列表（上传队列，行带状态底色）
+   现在都不画线，两者只差“行块本身的底色”，语言统一。 */
 
 .sg--head {
   /* 与曲目列表表头同一规则：不吸顶、不加底色（吸顶要不透明底，

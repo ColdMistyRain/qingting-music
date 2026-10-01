@@ -97,9 +97,10 @@ function onVolume(event: Event): void {
    开合、延迟、"鼠标从按钮移到面板上"的判定全部交给 Reka HoverCard（v4.60）：
    ::after 透明桥接与 ::before 手写小三角都已退役；小三角在 v4.61 按要求拿掉
    （面板底边离按钮只有 4px，箭头反而多一层噪音）。
-   材质用**实底**而不是 chrome 玻璃：它浮在播放条上，背后是平坦底色，没有内容可模糊，
-   玻璃在这只会变成"看不见的一圈描边"（实拍发现的回归）；
-   队列弹层因为背后有滚动列表，仍然用 chrome 玻璃。
+   材质：用浮层面板材质（--panel-*，仍是玻璃，只是比底下的播放条更实一档）。
+   v4.60 一度改成实底，理由是"背后是平坦底色、没有内容可模糊"——真因其实是
+   面板与它下面的播放条用了**同一个填充值**，同色叠同色等于没画（v4.63 修正）。
+   按材质阶梯来：页面底 → 岛/播放条（--chrome-*） → 弹出的临时面板（--panel-*）。
    ⚠️ 必须是非 scoped 块：面板被 Reka Teleport 到 body，Vue 的 scoped 属性不会跟过去，
    带 [data-v-x] 的规则永远匹配不上（v4.60 实测：class 在、样式不生效）。
    隔离靠 .vol-pop* 前缀，不进全局命名空间。 */
@@ -113,9 +114,13 @@ function onVolume(event: Event): void {
   padding: 14px 8px 10px;
   min-width: 46px;
   border-radius: var(--radius-control);
-  background: var(--plane-2);
+  background: var(--panel-bg);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--panel-sheen),
+    var(--panel-shadow);
   transform-origin: bottom center;
   animation: vol-in 0.18s var(--ease-ios);
 }

@@ -99,11 +99,14 @@ function askClear(): void {
   max-height: min(60vh, 470px);
   padding: 10px 10px 8px;
   border-radius: var(--radius-panel);
-  background: var(--chrome-bg);
-  backdrop-filter: var(--chrome-blur);
-  -webkit-backdrop-filter: var(--chrome-blur);
+  /* 与音量面板同一套浮层材质（--panel-*）：弹出的临时面板比底下的常驻层更实一档 */
+  background: var(--panel-bg);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--panel-sheen),
+    var(--panel-shadow);
   color: var(--text-1);
   transform-origin: bottom right;
   animation: q-in 0.18s var(--ease-ios);

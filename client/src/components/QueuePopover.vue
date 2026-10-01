@@ -92,8 +92,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
     </DialogTrigger>
 
     <DialogPortal>
-      <DialogOverlay class="q-scrim" />
-      <DialogContent class="q-sheet">
+      <!-- force-mount 两个（v5.50）：Reka 的 Dialog 默认“一关就卸载”，于是只有进场动画、
+           收起时会直接消失（需求方：“歌曲列表收回是没有过渡动画”）。
+           留着不卸载、用 data-state 驱动过渡，两个方向就都有动画了。
+           关闭态的可见性与点击由下面 CSS 的 visibility/pointer-events 拿走。 -->
+      <DialogOverlay class="q-scrim" force-mount />
+      <DialogContent class="q-sheet" force-mount>
         <!-- 无障碍名字与描述：视觉上由面板里的“当前播放”承担。
              ⚠️ 两个都要给：Reka 的 DialogContent 缺 DialogTitle **或** DialogDescription
              都会在控制台告警（Popover 没有这条要求）—— 只在浏览器里看 error 会漏掉它。 -->
@@ -163,13 +167,22 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   z-index: 95;
   /* 与左抽屉（NavDrawer）同一档遮罩：全站只有一种“后面还有东西”的压暗 */
   background: rgba(12, 16, 28, 0.34);
-  animation: q-scrim-in 0.24s ease;
+  /* 与抽屉同时长（下面 .q-sheet 的 0.34s），一升一降看着是一层。
+     ⚠️ `visibility: hidden` 不能省：遮罩现在 force-mount 常驻 DOM（为了收起动画），
+        而 `opacity: 0` **不等于不可点** —— 少了这一句，关闭态的透明遮罩会拦住整页的点击
+        （实测：列表里的行都点不动了）。visibility 是离散属性，会在过渡结束时才隐藏。 */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.34s var(--ease-ios),
+    visibility 0.34s;
 }
 
-@keyframes q-scrim-in {
-  from {
-    opacity: 0;
-  }
+.q-scrim[data-state="open"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .q-sheet {
@@ -193,27 +206,37 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   border: 1px solid var(--glass-border);
   border-bottom: 0;
   border-radius: var(--radius-panel) var(--radius-panel) 0 0;
-  /* 半屏抽屉读成一块“**面**”，不是一块玻璃 —— 与浮层（.q-pop）故意不同：
-     ① 背后正好是沉浸页那排走带键（实测就在抽屉范围内，y 762~818）。0.94 的遮盖度
-        仍能认出那排键的轮廓（深色描边在平坦浅色面上太显眼）；
-     ② `backdrop-filter` 在部分环境里根本不参与合成（无头浏览器实测不糊），
-        不能把“看不清”赌在模糊上；
-     ③ 半屏的实时 64px 模糊在手机上是一笔真开销，而它换来的信息本来就不该看见。
-     “透”交给遮罩（.q-scrim）：抽屉外的页面仍然透出来并被压暗一层。
-     材质与左侧抽屉（NavDrawer）**同一套令牌**（--tray-*）：浮岛 = 玻璃、flat = 实心，
-     组件不判断模式（v5.48）。
-     它背后本来是同屏的第二套控件（走带键）—— 所以配套一条：抽屉打开时把那些控件与
-     进度行淡出（见下面 body:has(.q-sheet) 那条），玻璃才背后干净。 */
-  background: var(--tray-bg);
-  backdrop-filter: var(--tray-blur);
-  -webkit-backdrop-filter: var(--tray-blur);
+  /* 材质：**面板玻璃那一档**（--panel-bg / --panel-blur，与队列浮层同一套）——
+     它背后是沉浸页本身（明亮 + 封面光晕），所以透得出去、也不显脏。
+     与左侧抽屉的 --tray-* **故意不同档**：那套是为“背后是被遮罩压暗的页面 + 成片正文”
+     定的，要实一档才不显脏、不会比页面上的岛暗（v5.45/5.46 的两次反馈都出在那里）。
+     这里曾明确写成实心面，理由是背后那排走带键会透出轮廓（实测 0.94 遮盖度下仍能认出来，
+     且模糊在某些环境不参与合成）；那条问题现在用“打开时把控件与进度行淡出”解决了
+     （见下面 `body:has(.q-sheet)` 那条），于是 0.88/0.80 那种保守透度反而看不出玻璃
+     （v5.49 需求方：“并没有过分的透，甚至看不出来透”）。“透”的底气来自两件事：
+     遮罩压暗 + 背后控件已淡出。 */
+  background: var(--panel-bg);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
   box-shadow:
     var(--panel-sheen),
     0 -18px 44px -16px rgba(20, 28, 60, 0.34);
   color: var(--text-1);
   /* 圆角里的内容是列表，裁一下，免得行色/滚动条从圆角处漏出去 */
   overflow: hidden;
-  animation: q-sheet-in 0.34s var(--ease-ios);
+  /* 开合都走过渡（v5.50）：base 态是“收在屏幕外”，[data-state="open"] 才是升起后的位置。
+     visibility 一起过渡 —— 它是离散属性，浏览器会在过渡**结束时**才真的隐藏（反向在开头就可见），
+     所以收起动画能完整放完，而不是“一帧就没了”。 */
+  transform: translateY(100%);
+  visibility: hidden;
+  transition:
+    transform 0.34s var(--ease-ios),
+    visibility 0.34s;
+}
+
+.q-sheet[data-state="open"] {
+  transform: translateY(0);
+  visibility: visible;
 }
 
 :root[data-theme="dark"] .q-sheet {
@@ -224,12 +247,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 }
 
 /* 从底部升起：位移与沉浸页那张 sheet（.im-sheet-enter-from）完全一致 ——
-   全站“从下面上来”只有这一种动法；时长0.34s 比整页的 0.42s 短一档（这是个面板，不是整页） */
-@keyframes q-sheet-in {
-  from {
-    transform: translateY(100%);
-  }
-}
+   全站“从下面上来”只有这一种动法；时长 0.34s 比整页的 0.42s 短一档（这是个面板，不是整页） */
 
 /* 把手：既是“从底部上来的”信号，也是下滑收起的抓手（手势挂在这块 22px 高的区域上） */
 .q-grip-area {
@@ -250,10 +268,13 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .q-pop,
+  .q-pop {
+    animation: none;
+  }
+
   .q-sheet,
   .q-scrim {
-    animation: none;
+    transition: none;
   }
 }
 
@@ -261,10 +282,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
    它们正好落在玻璃背后，不挪开就会透出轮廓（模糊不参与合成时尤其明显，
    实测 0.94 遮盖度下仍能认出那几个键）。被抽屉盖住的东西本来也看不见，
    所以这一步在视觉上零代价，只是把玻璃背后变干净。
+   ⚠️ 选择器要带 [data-state="open"]：抽屉现在 force-mount 常驻 DOM（为了收起动画），
+      不带状态的话关闭后控件会被永久淡出。
    用 `:has()` 而不是共享状态：`.q-sheet` 只在手机端存在（浮层是另一套壳），
    所以桌面浮层不会误触；真不支持 :has() 的环境只是少一层润色，玻璃仍能用。 */
-body:has(.q-sheet) .im-ctrls,
-body:has(.q-sheet) .im-progress {
+body:has(.q-sheet[data-state="open"]) .im-ctrls,
+body:has(.q-sheet[data-state="open"]) .im-progress {
   opacity: 0;
 }
 </style>

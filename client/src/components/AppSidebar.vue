@@ -36,41 +36,46 @@ const navItems = computed<NavItem[]>(() => {
 
 <template>
   <aside class="sidebar glass">
-    <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听音乐</span></div>
+    <!-- 内层内容固定“展开时的宽度”（.sb-inner），折叠/展开时由外层 .sidebar 裁切 ——
+         参考 shadcn-vue 的 sidebar（v5.10）：面板宽度动画，内容不跟着回流，
+         否则展开的那 0.25s 里文字会被挤成竖排（实测标签高度一度 67px = 四行）。 -->
+    <div class="sb-inner">
+      <div class="sb-logo"><span class="note">♫</span><span class="lbl">轻听音乐</span></div>
 
-    <RouterLink
-      v-for="item in navItems"
-      :key="item.name"
-      class="nav-item"
-      active-class="active"
-      :title="item.label"
-      :to="{ name: item.name }"
-    >
-      <component :is="item.icon" class="icon" />
-      <span class="lbl">{{ item.label }}</span>
-    </RouterLink>
+      <RouterLink
+        v-for="item in navItems"
+        :key="item.name"
+        class="nav-item"
+        active-class="active"
+        :title="item.label"
+        :to="{ name: item.name }"
+      >
+        <component :is="item.icon" class="icon" />
+        <span class="lbl">{{ item.label }}</span>
+      </RouterLink>
 
-    <!-- 歌单分区（PRD 3.6 / 原型 v2.6）：数据接入在 M2（PS-01） -->
-    <div class="sb-sep" />
-    <div class="sb-section">
-      <div class="sb-section-head">
-        <span class="lbl">歌 单</span>
-        <button class="sb-add" disabled title="新建歌单（开发中）">
-          <IconListPlus class="icon" />
+      <!-- 歌单分区（PRD 3.6 / 原型 v2.6）：数据接入在 M2（PS-01） -->
+      <div class="sb-sep" />
+      <div class="sb-section">
+        <div class="sb-section-head">
+          <span class="lbl">歌 单</span>
+          <button class="sb-add" disabled title="新建歌单（开发中）">
+            <IconListPlus class="icon" />
+          </button>
+        </div>
+        <p class="sb-hint lbl">暂无歌单</p>
+      </div>
+
+      <div class="sb-foot">
+        <RouterLink class="nav-item" active-class="active" title="设置" :to="{ name: 'settings' }">
+          <IconGearSix class="icon" />
+          <span class="lbl">设置</span>
+        </RouterLink>
+        <button class="nav-item" title="折叠侧边栏" @click="$emit('toggle')">
+          <IconCaretDoubleLeft class="icon icon--collapse" />
+          <span class="lbl">折叠侧边栏</span>
         </button>
       </div>
-      <p class="sb-hint lbl">暂无歌单</p>
-    </div>
-
-    <div class="sb-foot">
-      <RouterLink class="nav-item" active-class="active" title="设置" :to="{ name: 'settings' }">
-        <IconGearSix class="icon" />
-        <span class="lbl">设置</span>
-      </RouterLink>
-      <button class="nav-item" title="折叠侧边栏" @click="$emit('toggle')">
-        <IconCaretDoubleLeft class="icon icon--collapse" />
-        <span class="lbl">折叠侧边栏</span>
-      </button>
     </div>
   </aside>
 </template>
@@ -79,10 +84,29 @@ const navItems = computed<NavItem[]>(() => {
 .sidebar {
   grid-row: 1;
   grid-column: 1;
+  /* 内层管滚动与内边距，外层只负责**裁切**：列宽动画期间多出来的内容被裁掉，
+     而不是撑出横向滚动条（原来 overflow-y: auto 会把 overflow-x 也算成 auto，
+     于是展开动画里 logo 一超宽就出现横向滚动）。
+     ⚠️ 这里**不要写 display**：移动端靠 global.css 的 `.sidebar { display: none }`
+     把它收掉，而 scoped 规则的特异性更高（.sidebar[data-v-x]），写上去会让窄屏又冒出来。 */
+  overflow: hidden;
+}
+
+/* 内容固定“展开时的宽度”（224 − 左右 12 内边距）；折叠态再改成 68 − 8。
+   两档都是**瞬时**切换，动画只发生在网格列上 —— 这就是“不回流”的关键：
+   展开那一刻内容已经是 200px 的布局，由外层窗口慢慢把它露出来。 */
+.sb-inner {
   display: flex;
   flex-direction: column;
+  width: 200px;
+  height: 100%;
   padding: 18px 12px 12px;
   overflow-y: auto;
+}
+
+/* 文字永不换行：容器还窄的时候只能被裁，不能挤成竖排 */
+.lbl {
+  white-space: nowrap;
 }
 
 .sb-logo {
@@ -213,7 +237,8 @@ const navItems = computed<NavItem[]>(() => {
   display: none;
 }
 
-.app.collapsed .sidebar {
+.app.collapsed .sb-inner {
+  width: 52px;
   padding: 18px 8px 12px;
 }
 

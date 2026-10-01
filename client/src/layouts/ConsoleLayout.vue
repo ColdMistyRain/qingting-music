@@ -110,7 +110,8 @@ const navItems: ConsoleNavItem[] = [
   font-weight: 700;
   letter-spacing: 1px;
   line-height: 24px;
-  padding: 4px 12px 18px;
+  /* 左内边距的理由同播放器侧栏：标记比 19px 的图标列宽，按中轴对齐才不歪（v5.17） */
+  padding: 4px 12px 18px calc(12px - (var(--brand-mark-size) - 19px) / 2);
   white-space: nowrap;
 }
 

@@ -170,7 +170,12 @@ const navItems = computed<NavItem[]>(() => {
   letter-spacing: 1px;
   /* ⚠️ 行高必须**写死**（v5.12）：字号或行高一变，logo 盒子就变，下面所有图标瞬跳。 */
   line-height: 26px;
-  padding: 4px 12px 18px;
+  /* ⚠️ 左内边距要把标记按**中轴**对齐导航图标（v5.17）。
+     图标列宽 19px，标记盒 26px —— 两者都从同一个左内边距开始的话，标记的中轴会比图标的
+     中轴偏右 (26−19)/2 = 3.5px，窄栏（只有图标）里一眼就看出“logo 没居中”。
+     所以左内边距改成 12 − (标记宽 − 19)/2：标记中轴正好落在图标列的中轴上，
+     而且顺带让品牌文字与导航文字对齐（都从 69 开始）。右内边距不变。 */
+  padding: 4px 12px 18px calc(12px - (var(--brand-mark-size) - 19px) / 2);
   white-space: nowrap;
 }
 

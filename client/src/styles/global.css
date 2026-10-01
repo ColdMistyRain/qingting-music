@@ -595,12 +595,15 @@ select {
   place-items: center;
   transition:
     color 0.15s,
-    transform 0.1s;
+    /* 悬浮反馈从“放大”换成“光”（v4.67）：过渡的也换成 filter */ filter 0.15s;
 }
 
 .ctl:hover:not(:disabled) {
   color: var(--text-1);
-  transform: scale(1.08);
+  /* 悬浮反馈用**光**而不是放大（v4.67 需求方：“这些按钮都不要放大效果”）：
+     drop-shadow 才能给 SVG 图标上光（text-shadow 对图标无效），
+     且它不改变盒子尺寸，鼠标悬停时目标不会动。 */
+  filter: drop-shadow(0 0 6px var(--glow-halo));
 }
 
 .ctl:disabled {
@@ -623,15 +626,16 @@ select {
   background: var(--accent-soft);
   color: var(--accent);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 0 0 1px var(--glow-ring),
     /* 光晕收敛过一轮（用户：“阴影收敛点”）：半径 22 → 14、不透明度 65% → 45%，
        让它只是“坐得稳一点”的一层，不抢旁边的进度条与图标 */
     0 3px 14px -7px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .ctl.play:hover:not(:disabled) {
-  /* 悬浮只提亮一丁点：软底本身就是主题色，再叠底色会发闷（与 .btn-primary 同一手法） */
-  filter: brightness(1.12);
+  /* 悬浮只提亮一丁点：软底本身就是主题色，再叠底色会发闷（与 .btn-primary 同一手法）；
+     光效与其他控件一致地叠在 filter 里（两条 filter 会互相覆盖，必须写在一起）。 */
+  filter: brightness(1.12) drop-shadow(0 0 6px var(--glow-halo));
 }
 
 .ctl.play .icon {

@@ -128,12 +128,13 @@ function onPointerUp(event: PointerEvent): void {
   place-items: center;
   transition:
     color 0.15s,
-    transform 0.1s;
+    filter 0.15s;
 }
 
 .ctl:hover:not(:disabled) {
   color: var(--text-1);
-  transform: scale(1.08);
+  /* 与播放条一致：悬浮反馈用光，不用放大（v4.67） */
+  filter: drop-shadow(0 0 6px var(--glow-halo));
 }
 
 .ctl:disabled {
@@ -154,12 +155,12 @@ function onPointerUp(event: PointerEvent): void {
   background: var(--accent-soft);
   color: var(--accent);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 0 0 1px var(--glow-ring),
     0 3px 14px -7px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .ctl.play:hover:not(:disabled) {
-  filter: brightness(1.12);
+  filter: brightness(1.12) drop-shadow(0 0 6px var(--glow-halo));
 }
 
 .ctl.play .icon {

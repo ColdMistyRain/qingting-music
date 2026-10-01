@@ -153,6 +153,13 @@ function onPointerUp(event: PointerEvent): void {
   width: min(560px, 74vw);
 }
 
+/* 队列抽屉打开时会被淡出（规则在 QueuePopover 的非 scoped 样式里，靠 body:has(.q-sheet)）。
+   这里有过渡，关抽屉那一刻才会淡回来而不是硬切。 */
+.im-ctrls,
+.im-progress {
+  transition: opacity 0.2s;
+}
+
 .im-ctrls {
   display: flex;
   align-items: center;

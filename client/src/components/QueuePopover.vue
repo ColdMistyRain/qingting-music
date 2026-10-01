@@ -200,10 +200,13 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
         不能把“看不清”赌在模糊上；
      ③ 半屏的实时 64px 模糊在手机上是一笔真开销，而它换来的信息本来就不该看见。
      “透”交给遮罩（.q-scrim）：抽屉外的页面仍然透出来并被压暗一层。
-     ⚠️ 与手机左侧抽屉（NavDrawer）故意不同：那边用 `--tray-bg` 跟着材质模式走
-     （浮岛 = 玻璃），这里**始终不透明**（`--plane`）—— 因为背后是同屏的第二套控件
-     （走带键），而模糊在某些环境里不参与合成（AGENTS #15），透出来就是两层控件叠着。 */
-  background: var(--plane);
+     材质与左侧抽屉（NavDrawer）**同一套令牌**（--tray-*）：浮岛 = 玻璃、flat = 实心，
+     组件不判断模式（v5.48）。
+     它背后本来是同屏的第二套控件（走带键）—— 所以配套一条：抽屉打开时把那些控件与
+     进度行淡出（见下面 body:has(.q-sheet) 那条），玻璃才背后干净。 */
+  background: var(--tray-bg);
+  backdrop-filter: var(--tray-blur);
+  -webkit-backdrop-filter: var(--tray-blur);
   box-shadow:
     var(--panel-sheen),
     0 -18px 44px -16px rgba(20, 28, 60, 0.34);
@@ -252,5 +255,16 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   .q-scrim {
     animation: none;
   }
+}
+
+/* 队列抽屉打开时，把沉浸页那排走带键与进度行**淡出**（v5.48）：
+   它们正好落在玻璃背后，不挪开就会透出轮廓（模糊不参与合成时尤其明显，
+   实测 0.94 遮盖度下仍能认出那几个键）。被抽屉盖住的东西本来也看不见，
+   所以这一步在视觉上零代价，只是把玻璃背后变干净。
+   用 `:has()` 而不是共享状态：`.q-sheet` 只在手机端存在（浮层是另一套壳），
+   所以桌面浮层不会误触；真不支持 :has() 的环境只是少一层润色，玻璃仍能用。 */
+body:has(.q-sheet) .im-ctrls,
+body:has(.q-sheet) .im-progress {
+  opacity: 0;
 }
 </style>

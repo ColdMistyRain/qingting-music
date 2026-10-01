@@ -8,9 +8,8 @@ import IconRepeatOnce from "~icons/ph/repeat-once";
 import IconShuffle from "~icons/ph/shuffle";
 import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
-import IconSpeakerHigh from "~icons/ph/speaker-high";
-import IconSpeakerSlash from "~icons/ph/speaker-slash";
 import { usePlayerStore } from "@/stores/player";
+import VolumeControl from "@/components/VolumeControl.vue";
 import { formatTime } from "@/utils/format";
 import type { PlayMode } from "@/utils/player";
 
@@ -32,9 +31,6 @@ const MODE_ICONS: Record<PlayMode, Component> = {
 
 const modeIcon = computed(() => MODE_ICONS[player.mode]);
 const playIcon = computed(() => (player.playing ? IconPause : IconPlay));
-const silent = computed(() => player.muted || player.volume === 0);
-const volumeIcon = computed(() => (silent.value ? IconSpeakerSlash : IconSpeakerHigh));
-const sliderValue = computed(() => (silent.value ? 0 : player.volume));
 const totalSeconds = computed(() => player.duration || player.currentTrack?.duration || 0);
 
 /* 进度条：与播放条同一套交互（点/拖都走 store 的 begin/update/end，数值夹取在 store 里已单测） */
@@ -63,11 +59,6 @@ function onPointerUp(event: PointerEvent): void {
   // endSeek 不带参数：拖拽过程中 updateSeek 已经把目标写进 store（PL-03）
   player.endSeek();
 }
-
-function onVolume(event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value);
-  player.setVolume(value / 100);
-}
 </script>
 
 <template>
@@ -79,28 +70,20 @@ function onVolume(event: Event): void {
       <button class="ctl" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
         <IconSkipBack class="icon" />
       </button>
-      <button class="ctl play" :title="player.playing ? '暂停（空格）' : '播放（空格）'" :disabled="!player.hasTrack" @click="player.toggle()">
+      <button
+        class="ctl play"
+        :title="player.playing ? '暂停（空格）' : '播放（空格）'"
+        :disabled="!player.hasTrack"
+        @click="player.toggle()"
+      >
         <component :is="playIcon" class="icon" />
       </button>
       <button class="ctl" title="下一首" :disabled="!player.hasTrack" @click="player.next()">
         <IconSkipForward class="icon" />
       </button>
-      <div class="vol">
-        <button class="ctl" :title="silent ? '恢复音量' : '静音'" @click="player.toggleMute()">
-          <component :is="volumeIcon" class="icon" />
-        </button>
-        <input
-          class="vol-range"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          :value="Math.round(sliderValue * 100)"
-          :style="{ '--p': `${Math.round(sliderValue * 100)}%` }"
-          aria-label="音量"
-          @input="onVolume"
-        />
-      </div>
+      <!-- 音量：与播放条共用同一个控件（components/VolumeControl.vue，v4.62）——
+           两边不再各写一套，否则一定会走偏（这里原来是一条横条）。 -->
+      <VolumeControl />
     </div>
 
     <div class="im-progress">
@@ -135,6 +118,8 @@ function onVolume(event: Event): void {
   display: flex;
   align-items: center;
   gap: 20px;
+  /* 沉浸页的控件图标略大（22px），共享的音量控件跟着这里走 */
+  --ctl-icon-size: 22px;
 }
 
 .ctl {
@@ -180,17 +165,6 @@ function onVolume(event: Event): void {
 .ctl.play .icon {
   width: 30px;
   height: 30px;
-}
-
-.vol {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vol-range {
-  width: 96px;
-  cursor: pointer;
 }
 
 .im-progress {

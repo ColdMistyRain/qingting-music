@@ -472,11 +472,46 @@ select {
   overflow: hidden;
 }
 
-/* 只留大位图：飞入（`in`）时旧状态是播放条那张 52px 小图，藏掉它；
-   飞出（`out`）时新状态才是小图，藏掉那一侧。方向由 utils/viewTransition.ts 写上。 */
-html[data-vt-dir="in"] ::view-transition-old(qt-cover),
-html[data-vt-dir="out"] ::view-transition-new(qt-cover) {
-  opacity: 0;
+/* 只留大位图那一侧快照：飞入（`in`）时旧状态是播放条那张 52px 小图，藏掉它；
+   飞出（`out`）时新状态才是小图，藏掉那一侧。方向由 utils/viewTransition.ts 写在 `<html>` 上。
+   （海报布局正是靠这一条才能参与：两侧都画的话，播放条小图会直接叠在彩胶上。）
+   ⚠️ 这里**必须走继承的自定义属性**，不能写后代选择器（v5.22 实测纠正两次）：
+   `::view-transition-*(名字)` 这些伪元素虽然跟 `<html>` 挂在同一棵伪元素树上，
+   但 `html[data-vt-dir="out"] ::view-transition-new(qt-cover)` 这种“从元素派生的后代”
+   匹配不上（实测：探针把两侧同时 `opacity: 0 !important` 时飞行的图会彻底消失，
+   说明写法本身有效；一旦加上方向前缀就再也不生效）。自定义属性是沿树继承的，
+   在 `html` 上设、在伪元素里读，两边都稳。 */
+html[data-vt-dir="in"] {
+  --vt-old-opacity: 0;
+}
+
+html[data-vt-dir="out"] {
+  --vt-new-opacity: 0;
+}
+
+::view-transition-old(qt-cover) {
+  opacity: var(--vt-old-opacity, 1);
+}
+
+::view-transition-new(qt-cover) {
+  opacity: var(--vt-new-opacity, 1);
+}
+
+/* 海报布局（彩胶）在过渡期间把**旋转与呼吸停住**（v5.22）：
+   快照是一张冻结的图，而盘还在转 —— 8s/圈 下过渡的 420ms 就是 19°，落地那一下
+   标签会明显跳一下；停住后快照与实况是同一个角度，落地即无缝接上。
+   两个要点：
+   ① 用 `animation-play-state` 而**不是**撤掉动画（`:hover` 式的 `animation: none` 会让它
+      回到 0 相位）。实测：过渡期间 `currentTime` 冻在 1512ms 不动，撤掉 `data-vt` 后
+      从 1512 继续（而不是回 0）——「停住→接着转」才是转盘该有的语义。
+      呼吸（`::before` 的暗帧）同理：它平时**故意**不用 play-state 暂停（组件里那条注释：
+      暂停会停在呼吸到一半的暗帧），但过渡只是一瞬的冻结、随后从同一相位接着呼吸，不会留暗帧。
+   ② 这条规则要压过组件自己的 `.poster.is-playing .v-disc { animation-play-state: running }`
+      （scoped 后是 (0,4,0)）。写成 `html[data-vt="on"] .poster.is-playing .v-disc` 是 (0,4,1)，
+      刚好压得住——实测过渡中读到 `paused`、过渡结束读出 `running`；**别再往选择器里减层级**。 */
+html[data-vt="on"] .poster.is-playing .v-disc,
+html[data-vt="on"] .poster.is-playing .vinyl-assembly::before {
+  animation-play-state: paused;
 }
 
 /* 过渡期间新页面自己的入场动画要让位：快照是在动画第一帧拍的，不让位就会拍到一张空页。

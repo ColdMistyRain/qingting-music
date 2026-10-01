@@ -27,16 +27,14 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 <template>
   <div class="poster" :class="{ 'is-playing': playing }">
-    <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内 -->
-    <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内
-         ⚠️ 本布局**不参与封面飞入**（不加 `.vt-cover`）：彩胶不是"同一张画"——
-         ① 它在盘中心、还跟着盘一起旋转，按设计又要伸出屏幕右上角（v4.75），飞行目标本身半出画；
-         ② 共享元素过渡靠"旧/新凑成同一元素"，而我们为了让同一张封面不变形又免掉交叉淡化
-         （见 global.css 的 `::view-transition-old/new(qt-cover) { animation: none }`）——
-         换成彩胶就会把播放条小图直接叠在大盘上（实测：绿色方形压住黄盘）。
-         所以海报布局只走整页交叉淡化，飞入留给双栏布局（那里两端确实是同一张封面）。 -->
+    <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内。
+         飞入/飞出的**共享元素取外壳 .vinyl-assembly**（v5.22），不要取中心标签或旋转盘：
+         外壳不转，捕获到的四角永远是正的；旋转盘与标签跟着盘一起转，点击那一刻的角度是
+         任意的，拿它们当共享元素会看到封面“边飞边转”，落地还差出 8s/圈 → 420ms 的 19°。
+         盘本身在过渡期间要停住（不然快照是冻的、实况在转，落地会跳一下）——
+         见 global.css 里 `html[data-vt="on"] .poster.is-playing .v-disc` 那条（暂停而非撤掉动画）。 -->
     <div class="poster__art" aria-hidden="true">
-      <div class="vinyl-assembly">
+      <div class="vinyl-assembly vt-cover">
         <div class="v-disc">
           <div class="v-vinyl"></div>
           <div class="v-texture"></div>

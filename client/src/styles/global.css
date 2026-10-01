@@ -571,9 +571,11 @@ select {
    定位仍用 NavToggle 自己那套“顶端 + 派生偏移”—— 那是按**标题首行**算的，
    标题万一换成两行（窄屏 + 两个操作按钮）也不会偏；
    反过来若在栅格里用 align-self: center，参照会变成整行（两行 = 57px）→ 实测偏低 14px。
-   间距写在这里而不是按钮上：不带标题块的页头（如设置页）用 .page-head 的 gap，不要多一份。 */
+   间距写在这里而不是按钮上：不带标题块的页头（如设置页）用 .page-head 的 gap，不要多一份。
+   数值取 4px：按钮的透明热区本身还有 7px 内缩，图标墨迹到标题最终是 11px —— 12px 时那 19px
+   在需求方截图里看着“两者没关系”（圈的就是这段空白）。 */
 .page-head .page-head__title .nav-toggle {
-  margin-right: 12px;
+  margin-right: 4px;
 }
 
 .page-head .sub {

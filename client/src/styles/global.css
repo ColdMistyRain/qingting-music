@@ -525,9 +525,15 @@ select {
   gap: 16px;
   margin-bottom: 20px;
   /* 标题首行的尺寸：字号 + 行高。抽屉按钮（NavToggle）靠这两个值把自己居中到
-     **标题那一行**，而不是“标题 + 下面描述”整块 —— 两者必须同源，否则改了字号按钮就偏。 */
+     **标题那一行**，而不是“标题 + 下面描述”整块 —— 三者必须同源，否则改了字号按钮就偏。 */
   --page-h1-size: 22px;
   --page-h1-leading: 1.3;
+  /* 抽屉按钮的触摸目标与图标尺寸：图标要比字号大一档才“看着一样高”
+     （汉字字形几乎占满 em，而 Phosphor 图标只占画布的 ~80%，
+      所以 20px 图标配 20px 汉字会显小；26px 图标的“墨高”约 21px，与 20px 汉字相当）。
+     描述的左缩进也从这两个值算：它要对齐的是**图标**，不是按钮的透明热区。 */
+  --nav-toggle-size: 40px;
+  --nav-toggle-icon: 26px;
 }
 
 .page-head h1 {
@@ -544,7 +550,10 @@ select {
 .page-head__title {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  /* 行内按顶端排：☰ 自己带着“按标题行盒算出来”的负 margin-top，
+     若这里用 center，栅格会先把它在行里居中、再叠上负边距 → 实测偏高 3.5px。
+     顶端排 + 自己的负边距，才是“按钮中心 = 标题首行中心”。 */
+  align-items: start;
   margin-right: auto;
 }
 
@@ -1244,6 +1253,14 @@ kbd {
   .page-head {
     flex-wrap: wrap;
     row-gap: 10px;
+    /* 手机标题降一档：22px 在 390px 宽下与 40px 的按钮放在一起显得头重 */
+    --page-h1-size: 20px;
+  }
+
+  /* 描述与**图标**左对齐（不是与按钮的热区左对齐）：缩进 = 按钮里图标的内缩量。
+     只在手机断点写 —— 桌面没有这枚按钮，加了会在所有页面上凭空多出 7px 缩进。 */
+  .page-head .page-head__title .sub {
+    padding-left: calc((var(--nav-toggle-size) - var(--nav-toggle-icon)) / 2);
   }
 
   /* 播放条 → 迷你条（RT-02：“播放条简化为迷你条，点击展开沉浸式播放页”）。

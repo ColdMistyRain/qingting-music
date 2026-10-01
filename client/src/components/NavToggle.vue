@@ -29,20 +29,20 @@ const { open, toggle } = useNavDrawer();
 
 <style scoped>
 .nav-toggle {
-  /* 与标题首行对齐：标题块里还有一行描述（`.sub`），按 flex 默认的居中会把这枚按钮
-     居到“标题 + 描述”整块的中线上去（实测偏 6px）。改成按标题的**行盒**居中 ——
-     行盒高由页头的 --page-h1-* 两个变量给（与标题自己的 font-size / line-height 同源）。 */
-  --nav-toggle-size: 34px;
+  /* 与标题首行对齐：按标题的**行盒**居中（行盒高由页头给的两个变量算出），
+     不用 flex 默认居中 —— 那会把按钮居到“标题 + 描述”整块的中线上。
+     尺寸也全部来自页头变量（global.css 的 .page-head）：按钮、图标、描述缩进
+     三者从同一组值派生，改一处三处一起变。 */
   align-self: flex-start;
   margin-top: calc(
-    (var(--page-h1-size, 22px) * var(--page-h1-leading, 1.3) - var(--nav-toggle-size)) / 2
+    (var(--page-h1-size, 22px) * var(--page-h1-leading, 1.3) - var(--nav-toggle-size, 40px)) / 2
   );
   /* 不参与压缩：标题会被长文本挤，按钮得保持形状 */
   flex: none;
   display: grid;
   place-items: center;
-  width: var(--nav-toggle-size);
-  height: var(--nav-toggle-size);
+  width: var(--nav-toggle-size, 40px);
+  height: var(--nav-toggle-size, 40px);
   border-radius: var(--radius-control);
   color: var(--text-2);
   transition:
@@ -56,7 +56,7 @@ const { open, toggle } = useNavDrawer();
 }
 
 .nav-toggle .icon {
-  width: 20px;
-  height: 20px;
+  width: var(--nav-toggle-icon, 26px);
+  height: var(--nav-toggle-icon, 26px);
 }
 </style>

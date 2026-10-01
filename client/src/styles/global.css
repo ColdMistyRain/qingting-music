@@ -438,9 +438,24 @@ select {
    v5.18 起给播放条与沉浸页的封面挂过 `.vt-cover`（同名 `qt-cover`）做共享元素形变，
    彩胶也在 v5.22~v5.24 试过三轮。两个理由让它整体下线：
    ① 彩胶那一对两端既不同形也不同画，怎么调都留痕（见 PRD 修订 v5.23~v5.25）；
-   ② 撤掉后页面只靠各自的 CSS 入场动画（沉浸页 `im-in` 0.36s），少掉一层浏览器级的快照
+   ② 撤掉后页面只靠各自的 CSS 入场动画（沉浸页 v5.27 起改为一整张从底部升起的 sheet，
+      见 App.vue 的层过渡与 ImmersiveView 的 `.im-sheet`），少掉一层浏览器级的快照
       与清理逻辑，也就不再有“过渡不结束 / 停在某一帧 / 落地那一帧硬切”这类环境差异。
    想再做回来：约定文档里有归档小结，代码见 git 历史 v5.18~v5.25。 */
+
+/* 沉浸页从底部升起时，主壳要**原地留住**：它压在下层（`.app` z-index 1 < `.im` 60），
+   被 sheet 盖住就行。Vue 的 `<Transition>` 靠“元素上声明出来的 transform 时长”决定何时拆除
+   离场元素，所以这条只声明时长、不改任何属性：这 0.42s 里它一动不动，等 sheet 盖住了再被拆。
+   少了它，主壳会在过渡一开始就消失（sheet 就会升到一片空白上）。 */
+.app.im-sheet-leave-active {
+  transition: transform 0.42s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app.im-sheet-leave-active {
+    transition: none;
+  }
+}
 
 /* ---------- 应用外壳 ---------- */
 .app {

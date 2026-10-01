@@ -202,7 +202,20 @@ onBeforeUnmount(() => {
   /* 海报布局的大彩胶要从右上角**伸出屏幕**：本页是固定的全屏页，
      裁在视口上就好，不能让它变成页面滚动区域 */
   overflow: hidden;
-  animation: im-in 0.36s var(--ease-ios);
+}
+
+/* 沉浸页开合：从底部升起 / 反向沉下（v5.27，需求方指定）。
+   过渡类由 App.vue 的 `<Transition name="im-sheet">` 挂在路由根元素上 —— 写在**本组件的
+   scoped 样式**里，就只可能命中本页（主壳的 `.app` 拿不到这枚 scope id），所以两个方向
+   都只有这张 sheet 在动；开与关用同一时长与曲线，看上去就是同一段动画反过来播。 */
+.im-sheet-enter-active,
+.im-sheet-leave-active {
+  transition: transform 0.42s var(--ease-ios);
+}
+
+.im-sheet-enter-from,
+.im-sheet-leave-to {
+  transform: translateY(100%);
 }
 
 /* 薄雾：封面颜色不可控，文字必须始终可读。用主题底色而不是写死黑/白，
@@ -217,13 +230,6 @@ onBeforeUnmount(() => {
 
 .im > * {
   position: relative;
-}
-
-@keyframes im-in {
-  from {
-    opacity: 0;
-    transform: scale(0.985);
-  }
 }
 
 .im-top {
@@ -296,8 +302,11 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .im {
+  .im,
+  .im-sheet-enter-active,
+  .im-sheet-leave-active {
     animation: none;
+    transition: none;
   }
 }
 </style>

@@ -26,7 +26,8 @@ const player = usePlayerStore();
 const router = useRouter();
 
 /** VS-03：点击播放条左侧（封面 / 歌曲信息）展开沉浸式播放页。
- *  就是一次普通跳页 —— 跳页的动效由沉浸页自己的入场动画（`im-in`）负责。 */
+ *  就是一次普通跳页 —— 动效由沉浸页自己负责：它作为一张从底部升起的 sheet 上场，
+ *  从沉浸页退回时同一段位移反向播（见 App.vue 的层过渡与 ImmersiveView 的 `.im-sheet`）。 */
 function openImmersive(): void {
   if (!player.hasTrack) return;
   void router.push({ name: "now" });

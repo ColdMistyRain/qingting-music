@@ -13,8 +13,6 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@applemusic-like-lyrics/core": "^0.6.0",
-    "@applemusic-like-lyrics/vue": "^0.6.0",
     "@qingting/shared": "*",
     "music-metadata": "^11.16.1",
     "pinia": "^4.0.3",

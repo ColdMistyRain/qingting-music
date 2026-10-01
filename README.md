@@ -89,6 +89,8 @@ $env:USER_PASSWORD='guest123'; $env:ADMIN_PASSWORD='admin123'; npm run dev
 
 本项目以 **AGPL-3.0-only** 分发（见 [`LICENSE`](./LICENSE)）。
 
-原因：沉浸页歌词的渲染与动效直接使用 **AMLL**（[amll-dev/applemusic-like-lyrics](https://github.com/amll-dev/applemusic-like-lyrics)，`@applemusic-like-lyrics/core` / `vue`，**AGPL-3.0-only**，v4.84 接入）。AGPL 具传染性，且本软件是网络服务（AGPL §13 要求向使用者提供完整源码）——这与本项目的定位一致（可私有部署、开源）。
+原因：沉浸页歌词中的**弹簧动画**（`client/src/utils/spring.ts`）改编自 **AMLL**（[amll-dev/applemusic-like-lyrics](https://github.com/amll-dev/applemusic-like-lyrics)，AGPL-3.0；其求解器本源是 [pushkine](https://github.com/pushkine) 的 MIT 实现）。AGPL 具传染性，且本软件是网络服务（AGPL §13 要求向使用者提供完整源码）——这与本项目的定位一致（可私有部署、开源）。
 
-只有这一个第三方强拷贝依赖；其余依赖（Vue / Vite / Express / Reka UI / Phosphor 图标等）均为宽松许可。**新加依赖前先看 `npm view <pkg> license`**。
+**没有安装 AMLL 的 npm 包**（v4.84 曾装、v4.85 已回退）：只把其中值得拄的机制移植进我们自己的代码并保留署名，界面风格、主题色与锦线策略都是本项目的。
+
+其它依赖（Vue / Vite / Express / Reka UI / Phosphor 图标等）均为宽松许可。**新加依赖前先看 `npm view <pkg> license`**。

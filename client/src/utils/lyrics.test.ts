@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { currentLineIndex, parseLyrics } from "./lyrics";
+import {
+  centerShift,
+  clampManualShift,
+  currentLineIndex,
+  lineProgress,
+  parseLyrics,
+  wordFillProgress,
+} from "./lyrics";
 
 /** LR-01 / PRD 11.2：LRC + yrc 解析，非法行容错 */
 describe("parseLyrics（LRC 行级）", () => {
@@ -105,5 +112,93 @@ describe("currentLineIndex（LR-06 自动居中 / LR-04 景深都靠它）", () 
 
   it("空歌词返回 -1", () => {
     expect(currentLineIndex([], 10)).toBe(-1);
+  });
+});
+
+describe("wordFillProgress（LR-05 逐字填充）", () => {
+  const { lines } = parseLyrics("[1000,2000](0,500,0)你(500,500,0)好(1000,1000,0)世界");
+  const line = lines[0]!;
+
+  it("按字自己的时间算进度，唱完为 1", () => {
+    expect(wordFillProgress(line, 0.25)).toEqual([0.5, 0, 0]);
+    expect(wordFillProgress(line, 0.5)).toEqual([1, 0, 0]);
+    expect(wordFillProgress(line, 1.5)).toEqual([1, 1, 0.5]);
+    expect(wordFillProgress(line, 99)).toEqual([1, 1, 1]);
+  });
+
+  it("行首之前全是 0（还没轮到这句）", () => {
+    expect(wordFillProgress(line, -1)).toEqual([0, 0, 0]);
+  });
+
+  it("没有逐字数据返回空数组（交给行级降级路径）", () => {
+    const plain = parseLyrics("[00:01.00]只有行级").lines[0]!;
+    expect(wordFillProgress(plain, 5)).toEqual([]);
+  });
+
+  it("字时长为 0 时不除零：到点即满", () => {
+    const zero = parseLyrics("[0,1000](0,0,0)甲(0,500,0)乙").lines[0]!;
+    expect(wordFillProgress(zero, 0.3)).toEqual([1, 0.6]);
+  });
+});
+
+describe("lineProgress（LR-05 降级：整句渐亮）", () => {
+  const { lines } = parseLyrics("[00:10.00]一\n[00:20.00]二");
+
+  it("按到下一句开始的时长线性推进", () => {
+    expect(lineProgress(lines, 0, 10)).toBe(0);
+    expect(lineProgress(lines, 0, 15)).toBe(0.5);
+    expect(lineProgress(lines, 0, 20)).toBe(1);
+    expect(lineProgress(lines, 0, 40)).toBe(1); // 夹在 0~1
+  });
+
+  it("末句没有下一句时用兜底时长，不会瞬间满格", () => {
+    expect(lineProgress(lines, 1, 20)).toBe(0);
+    expect(lineProgress(lines, 1, 23)).toBeCloseTo(0.5, 5);
+  });
+
+  it("越界索引返回 0（不抛错）", () => {
+    expect(lineProgress(lines, 9, 100)).toBe(0);
+    expect(lineProgress([], 0, 1)).toBe(0);
+  });
+});
+
+/** LR-06 自动居中的夹取 + LR-07 手动滚动的位移夹取 */
+describe("centerShift（自动居中不许推出两端）", () => {
+  it("开头几句：想要负位移就贴在顶部（不把第一行推到中线）", () => {
+    expect(centerShift(-120, 2000, 400)).toBe(0);
+  });
+
+  it("中间：原样返回", () => {
+    expect(centerShift(500, 2000, 400)).toBe(500);
+  });
+
+  it("末尾：不超过列表高度减窗口高度（否则下面留白）", () => {
+    expect(centerShift(5000, 2000, 400)).toBe(1600);
+  });
+
+  it("歌词比窗口还短：位移恒为 0", () => {
+    expect(centerShift(300, 200, 400)).toBe(0);
+  });
+
+  it("非法输入不抛错", () => {
+    expect(centerShift(Number.NaN, 2000, 400)).toBe(0);
+    expect(centerShift(100, Number.NaN, 400)).toBe(0);
+  });
+});
+
+describe("clampManualShift（手动滚动夹取）", () => {
+  it("上下两端都夹住", () => {
+    expect(clampManualShift(-50, 800)).toBe(0);
+    expect(clampManualShift(9999, 800)).toBe(800);
+    expect(clampManualShift(300, 800)).toBe(300);
+  });
+
+  it("没什么可滚的时候只能停在 0", () => {
+    expect(clampManualShift(120, 0)).toBe(0);
+  });
+
+  it("非法输入不抛错", () => {
+    expect(clampManualShift(Number.NaN, 800)).toBe(0);
+    expect(clampManualShift(100, Number.NaN)).toBe(0);
   });
 });

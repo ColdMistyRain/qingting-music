@@ -31,7 +31,7 @@ const router = useRouter();
  *  不支持 API / 用户要求减少动效时就是普通跳页（withViewTransition 内部降级）。 */
 function openImmersive(): void {
   if (!player.hasTrack) return;
-  void withViewTransition(() => router.push({ name: "now" }));
+  void withViewTransition(() => router.push({ name: "now" }), "in");
 }
 
 const MODE_ICONS: Record<PlayMode, Component> = {

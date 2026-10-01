@@ -122,7 +122,7 @@ function close(): void {
     const back = window.history.state?.back as string | undefined;
     if (back) router.replace(back);
     else router.push({ name: "home" });
-  });
+  }, "out");
 }
 
 function onKeydown(event: KeyboardEvent): void {

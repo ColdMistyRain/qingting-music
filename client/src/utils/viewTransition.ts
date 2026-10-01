@@ -14,6 +14,13 @@
  *     参考实现：`music-player1` 的 `stores/ui.ts`（同一思路，阈值是我们自己的）。
  *  3. **过渡期间给新页面自己的入场动画让位**：快照是在动画第一帧（opacity 0）拍的，
  *     不停掉的话交叉淡化过去就是“一片空”，所以过渡期间在 `<html>` 上挂 `data-vt="on"`。
+ *  4. **方向**：飞行中显示的快照是**被拉伸的位图**，而两端位图分辨率差 5 倍
+ *     （播放条 52px / 沉浸页封面 ~254px），所以只保留“大”的那一侧：
+ *     飞入时藏 `old`、飞出时藏 `new`（CSS 按 `data-vt-dir` 取值）。方向由调用方给，
+ *     因为只有它知道这次是“从小变大”还是“从大变小”。
+ *     （原型 mockup 走的是**默认交叉淡化**，实测中途两张半透明的图叠在一起、几乎看不见封面；
+ *     参考仓库 music-player1 则直接 `animation: none` 但两侧都画 —— 会有一侧是拉伸的糊图。
+ *     我们取两者之上：只画大位图那一侧。）
  */
 import { nextTick } from "vue";
 
@@ -22,6 +29,12 @@ export const VT_WATCHDOG_MS = 1500;
 
 /** 过渡期间挂在 `<html>` 上的标记（CSS 用它让新页面自己的入场动画让位） */
 export const VT_ATTR = "data-vt";
+
+/** 过渡期间挂在 `<html>` 上的方向标记（CSS 用它决定藏哪一侧快照） */
+export const VT_DIR_ATTR = "data-vt-dir";
+
+/** 这次过渡是“展开沉浸页”（in，封面从 52px 变大）还是“收起”（out，变小） */
+export type ViewTransitionDirection = "in" | "out";
 
 export interface ViewTransitionEnv {
   /** 浏览器是否支持 View Transition API */
@@ -57,6 +70,7 @@ interface StartedTransition {
  */
 export async function withViewTransition(
   update: () => unknown | Promise<unknown>,
+  direction: ViewTransitionDirection,
 ): Promise<boolean> {
   if (!shouldUseViewTransition(currentEnv())) {
     await update();
@@ -65,6 +79,7 @@ export async function withViewTransition(
 
   const root = document.documentElement;
   root.setAttribute(VT_ATTR, "on");
+  root.setAttribute(VT_DIR_ATTR, direction);
 
   let transition: StartedTransition;
   try {
@@ -79,6 +94,7 @@ export async function withViewTransition(
   } catch {
     // 起不来就当没这回事：属性清掉、更新照旧
     root.removeAttribute(VT_ATTR);
+    root.removeAttribute(VT_DIR_ATTR);
     await update();
     return false;
   }
@@ -96,6 +112,7 @@ export async function withViewTransition(
     .finally(() => {
       clearTimeout(watchdog);
       root.removeAttribute(VT_ATTR);
+      root.removeAttribute(VT_DIR_ATTR);
     });
 
   return true;

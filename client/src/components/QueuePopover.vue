@@ -91,22 +91,22 @@ function askClear(): void {
    不会跟过去，带 [data-v-x] 的规则永远匹配不上（v4.60 实测：class 在、样式不生效）。
    隔离靠类名前缀：本组件所有类都用 q- 开头，不污染全局。 */
 .q-pop {
+  /* 面板的水平内边距单独提成变量：列表要用它做负边距，把滚动条推到面板边缘 */
+  --q-pad: 10px;
   z-index: 70;
   display: flex;
   flex-direction: column;
   gap: 8px;
   width: min(390px, 92vw);
   max-height: min(60vh, 470px);
-  padding: 10px 10px 8px;
+  padding: 10px var(--q-pad) 8px;
   border-radius: var(--radius-panel);
   /* 与音量面板同一套浮层材质（--panel-*）：弹出的临时面板比底下的常驻层更实一档 */
   background: var(--panel-bg);
   backdrop-filter: var(--panel-blur);
   -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid var(--glass-border);
-  box-shadow:
-    var(--panel-sheen),
-    var(--panel-shadow);
+  box-shadow: var(--panel-sheen), var(--panel-shadow);
   color: var(--text-1);
   transform-origin: bottom right;
   animation: q-in 0.18s var(--ease-ios);
@@ -154,12 +154,18 @@ function askClear(): void {
 }
 
 /* 列表自己滚（不用 Reka 的 ScrollArea）：滚动条要走全站那套自绘样式，
-   两套滚动条会打架。Reka 在这里提供的是行为（关闭/焦点），不是滚动条。 */
+   两套滚动条会打架。Reka 在这里提供的是行为（关闭/焦点），不是滚动条。
+   滚动条贴面板边缘：负外边距吃掉面板的右内边距，让滚动条落进面板的留白区，
+   再用等量内边距把行缩回来（行右边缘到边框的距离不变）——
+   与列表页 .page-frame__scroll 同一套做法。
+   不这么做时滚动条会“悬”在右留白中间，看起来行宽与面板内宽不一致
+   （需求方实拍：“有点抽象，两个宽度最好一致”）。 */
 .q-list {
   list-style: none;
   overflow-y: auto;
   min-height: 0;
-  padding-right: 2px;
+  margin-right: calc(var(--q-pad) * -1);
+  padding-right: var(--q-pad);
 }
 
 .q-item {

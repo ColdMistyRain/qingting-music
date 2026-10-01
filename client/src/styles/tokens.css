@@ -70,8 +70,11 @@
   /* 内容岛水平内边距：滚动区要用它做负边距补偿，让滚动条贴在岛边 */
   --island-pad-x: 26px;
 
-  /* 滚动条宽度：固定层用它把“滚动区内外的宽度”对齐，所以必须是个确定的数
-     （下面 *::-webkit-scrollbar 的宽高读的就是它） */
+  /* 滚动条宽度：固定层用它把“滚动区内外的宽度”对齐，所以必须是个确定的数。
+     ⚠️ 这里的 10px 只是**首帧兑底值**：Chromium 的 `::-webkit-scrollbar` 确实是 10px，
+     但 Firefox 只认 `scrollbar-width: thin`（宽度由引擎/平台给，Windows 上不是 10px）——
+     启动时 `main.ts` 会实测真实宽度并覆盖这个变量（见 `utils/scrollbar.ts`）。
+     写死不改的话，Firefox 下折叠侧栏的导航项与高亮会被挤歪几个像素（v5.30 修）。 */
   --scrollbar-size: 10px;
 }
 

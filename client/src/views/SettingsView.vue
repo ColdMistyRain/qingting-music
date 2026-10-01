@@ -61,9 +61,12 @@ async function signOut(): Promise<void> {
 
     <!-- 顶栏 Tab：行为层用 Reka（v4.60）——role=tablist/tab、aria-selected、
          左右方向键在选项间移动、Home/End 跳到首尾，都是它自带的；
-         面板必须一起包进 TabsContent，否则 aria-controls 会指向不存在的面板。 -->
+         面板必须一起包进 TabsContent，否则 aria-controls 会指向不存在的面板。
+         样式仍然全是我们自己的（global.css 的 .tabs/.tab，选中态挂 data-state="active"）。
+         aria-label 得自己给：Reka 会给 tablist 角色，但不会替你起名字（v5.4 实测补上）——
+         没有名字时屏幕阅读器只会念“标签列表”，不知道这组标签是干什么的。 -->
     <TabsRoot v-model="active">
-      <TabsList class="tabs">
+      <TabsList class="tabs" aria-label="设置分组">
         <TabsTrigger v-for="tab in tabs" :key="tab.key" :value="tab.key" class="tab">
           {{ tab.label }}
         </TabsTrigger>

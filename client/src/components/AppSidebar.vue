@@ -92,13 +92,16 @@ const navItems = computed<NavItem[]>(() => {
   overflow: hidden;
 }
 
-/* 内容固定“展开时的宽度”（224 − 左右 12 内边距）；折叠态再改成 68 − 8。
+/* 内容固定“展开时的宽度”，折叠态再改成窄栏宽度。
    两档都是**瞬时**切换，动画只发生在网格列上 —— 这就是“不回流”的关键：
-   展开那一刻内容已经是 200px 的布局，由外层窗口慢慢把它露出来。 */
+   展开那一刻内容已经是 224px 的布局，由外层窗口慢慢把它露出来。
+   ⚠️ 这里的宽度必须等于**列宽本身**（224 / 68），不能减掉内边距：
+   全局是 border-box，内边距已包含在宽度里；再减一次就会在右侧多出 24px 空条
+   （实测：侧栏 224 而内层只有 200，右边缘一条空面板）。 */
 .sb-inner {
   display: flex;
   flex-direction: column;
-  width: 200px;
+  width: 224px;
   height: 100%;
   padding: 18px 12px 12px;
   overflow-y: auto;
@@ -238,7 +241,7 @@ const navItems = computed<NavItem[]>(() => {
 }
 
 .app.collapsed .sb-inner {
-  width: 52px;
+  width: 68px;
   padding: 18px 8px 12px;
 }
 

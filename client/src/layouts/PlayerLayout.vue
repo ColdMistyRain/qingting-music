@@ -22,9 +22,8 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  // 功能开关（在线音源是否配置）与用户偏好（音量/播放模式）各拉一次
+  // 功能开关（在线音源是否配置）拉一次；播放存档已由 main.ts 在首屏前恢复
   void useConfigStore().load();
-  player.restore();
   window.addEventListener("keydown", onKeydown);
 });
 

@@ -10,8 +10,11 @@ import {
   type PlayMode,
 } from "@/utils/player";
 import { applyCoverColors } from "@/utils/coverColor";
+import { parseSnapshot, sanitizeSnapshot } from "@/utils/playerState";
 
 const STORAGE_KEY = "qt-player";
+/** PL-07：进度存盘节流（timeupdate 约 4Hz，每 5 秒写一次就够；写得再勤只是浪费） */
+const PROGRESS_PERSIST_INTERVAL_MS = 5000;
 /** PL-02：播放超过该秒数后按"上一首"回到本曲开头 */
 const RESTART_THRESHOLD_SECONDS = 3;
 /** 播放条提示的存活时间：瞬时信息（自动播放被拦、加载失败）不该长期占用位置 */
@@ -23,11 +26,7 @@ export const NOTICE_TTL_MS = 8000;
  */
 const DEFAULT_AUDIBLE_VOLUME = 0.8;
 
-interface PersistedPlayer {
-  mode: PlayMode;
-  volume: number;
-  muted: boolean;
-}
+/** 存档格式见 `utils/playerState.ts`（PL-04 偏好 + PL-07 队列与进度） */
 
 /**
  * 播放器单例 store（PRD 3.2）。
@@ -60,6 +59,8 @@ export const usePlayerStore = defineStore("player", () => {
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   /** 粘性提示（如"加载失败已跳到下一首"）不会被"播放成功"清掉，但仍受超时限制 */
   let noticeSticky = false;
+  /** 从存档恢复出来的进度：等元数据加载完才能 seek（设太早会被忽略） */
+  let pendingSeconds = 0;
 
   /**
    * 设置播放条提示；传空串即清除，非空则在 NOTICE_TTL_MS 后自动消失。
@@ -148,13 +149,22 @@ export const usePlayerStore = defineStore("player", () => {
     });
     audio.addEventListener("pause", () => {
       playing.value = false;
+      // 暂停即存：下次打开就停在离开的地方（PL-07）
+      persist();
     });
 
     audio.addEventListener("timeupdate", () => {
       if (!seeking.value) progress.value = audio?.currentTime ?? 0;
+      scheduleProgressPersist();
     });
     audio.addEventListener("loadedmetadata", () => {
       duration.value = audio?.duration ?? 0;
+      // 存档里的进度到这里才能落地（元数据没加载时设 currentTime 会被忽略）
+      if (pendingSeconds > 0 && audio) {
+        audio.currentTime = Math.min(pendingSeconds, duration.value || pendingSeconds);
+        progress.value = audio.currentTime;
+        pendingSeconds = 0;
+      }
     });
     audio.addEventListener("ended", () => {
       handleEnded();
@@ -214,7 +224,9 @@ export const usePlayerStore = defineStore("player", () => {
     currentIndex.value = index;
     progress.value = 0;
     duration.value = track.duration ?? 0;
+    pendingSeconds = 0;
     notify("");
+    persist();
 
     const element = ensureAudio();
     if (!element) return;
@@ -248,6 +260,8 @@ export const usePlayerStore = defineStore("player", () => {
     const target = Math.max(0, duration.value > 0 ? Math.min(seconds, duration.value) : seconds);
     progress.value = target;
     if (audio) audio.currentTime = target;
+    // 跳过之后就存：用户很可能就是停在跳过去的那段听的（PL-07）
+    persist();
   }
 
   function beginSeek(ratio: number): void {
@@ -321,6 +335,7 @@ export const usePlayerStore = defineStore("player", () => {
     }
     if (fresh.length === 0) return 0;
     queue.value = [...queue.value, ...fresh];
+    persist();
     return fresh.length;
   }
 
@@ -351,7 +366,9 @@ export const usePlayerStore = defineStore("player", () => {
       currentIndex.value -= 1;
     } else if (index === currentIndex.value) {
       playAt(Math.min(index, queue.value.length - 1));
+      return;
     }
+    persist();
   }
 
   /** 清空队列并释放本地 Blob URL（LC-06：不留存，同时避免内存泄漏） */
@@ -361,9 +378,11 @@ export const usePlayerStore = defineStore("player", () => {
     currentIndex.value = -1;
     progress.value = 0;
     duration.value = 0;
+    pendingSeconds = 0;
     notify("");
     pause();
     if (audio) audio.removeAttribute("src");
+    persist();
   }
 
   /** 释放 Blob URL（本地音频、内嵌封面），避免反复拖入后内存堆积 */
@@ -377,27 +396,68 @@ export const usePlayerStore = defineStore("player", () => {
     if (canRevoke && url.startsWith("blob:")) URL.revokeObjectURL(url);
   }
 
-  /** 持久化用户偏好（PL-04 音量记忆；曲目与进度见 PL-07，等云端曲目可用后再补） */
+  /** 存盘（PL-04 偏好 + PL-07 队列与进度）：只存**刷新后能续上**的曲目，见 utils/playerState */
   function persist(): void {
     if (typeof localStorage === "undefined") return;
-    const payload: PersistedPlayer = { mode: mode.value, volume: volume.value, muted: muted.value };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    const snapshot = sanitizeSnapshot({
+      mode: mode.value,
+      volume: volume.value,
+      muted: muted.value,
+      queue: queue.value,
+      currentIndex: currentIndex.value,
+      seconds: progress.value,
+    });
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // 隐私模式 / 配额满：存不上就不存，不影响播放
+    }
   }
 
+  /** 进度存盘的节流（timeupdate 触发得太密） */
+  let lastPersistAt = 0;
+  function scheduleProgressPersist(): void {
+    const now = Date.now();
+    if (now - lastPersistAt < PROGRESS_PERSIST_INTERVAL_MS) return;
+    lastPersistAt = now;
+    persist();
+  }
+
+  /**
+   * 读盘（PL-07）：偏好 + 队列 + 进度。
+   * **恢复后不自动播放**：浏览器本来也会拦自动播放，而且用户没点播放，
+   * 摆好曲目与进度、等用户按一下即可。
+   */
   function restore(): void {
     if (typeof localStorage === "undefined") return;
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    try {
-      const data = JSON.parse(raw) as Partial<PersistedPlayer>;
-      if (data.mode && PLAY_MODE_LABELS[data.mode]) mode.value = data.mode;
-      if (typeof data.volume === "number") volume.value = Math.min(1, Math.max(0, data.volume));
-      if (typeof data.muted === "boolean") muted.value = data.muted;
-      // 存档里音量 > 0 就把它当作可恢复音量，静音后取消静音不会突然跳到默认值
-      if (volume.value > 0) lastAudibleVolume.value = volume.value;
-      syncVolumeToAudio();
-    } catch {
-      // 存档损坏（手改 / 旧版本）时忽略，用默认值继续
+    const snapshot = parseSnapshot(raw);
+    if (!snapshot) return;
+
+    mode.value = snapshot.mode;
+    volume.value = Math.min(1, Math.max(0, snapshot.volume));
+    muted.value = snapshot.muted;
+    // 存档里音量 > 0 就把它当作可恢复音量，静音后取消静音不会突然跳到默认值
+    if (volume.value > 0) lastAudibleVolume.value = volume.value;
+    syncVolumeToAudio();
+
+    // 本地曲目是 Blob 地址，刷新后文件已经不在了——丢掉它们是诚实的，但要告诉用户
+    const dropped = snapshot.droppedLocalTracks;
+
+    queue.value = snapshot.queue;
+    currentIndex.value = snapshot.currentIndex;
+    const track = currentTrack.value;
+    if (track) {
+      duration.value = track.duration ?? 0;
+      progress.value = snapshot.seconds;
+      pendingSeconds = snapshot.seconds;
+      const element = ensureAudio();
+      // 只预载元数据把时长与进度摆好，不 play()
+      if (element) element.src = track.url;
+    }
+
+    if (dropped > 0) {
+      notify(`本地曲目刷新后无法自动恢复，已去掉 ${dropped} 首，需要时重新选文件`, true);
     }
   }
 

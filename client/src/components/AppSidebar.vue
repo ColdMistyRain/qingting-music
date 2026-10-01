@@ -109,6 +109,11 @@ const navItems = computed<NavItem[]>(() => {
   width: 224px;
   height: 100%;
   padding: 18px 12px 12px;
+  /* ⚠️ 横向必须显式 `hidden`（v5.14）：只写 `overflow-y: auto` 时，按规范 `overflow-x`
+     会被算成 `auto` —— 展开动画里有那么两三帧，内层还只有 81px 宽，而标签/品牌文字已经
+     瞬时显形（nowrap，宽 117px），于是**底部冒出一条横向滚动条**（实测 10px 高，两帧后消失）。
+     需求方看到的就是“侧边栏底部在收起/展开时跳一下”。这里要的是裁切而不是滚动。 */
+  overflow-x: hidden;
   overflow-y: auto;
   transition:
     width 0.25s ease,

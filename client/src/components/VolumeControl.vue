@@ -189,15 +189,16 @@ function onKeydown(event: KeyboardEvent): void {
 
 /* 底轨：自绘时最容易漏的一块——它原来是原生 range 的轨道（tokens.css 里画的），
    换成自绘后不画就没有了（v4.65 补回）。
-   ::before 在绘制顺序上等价于第一个子元素，所以不用 z-index，填充与滑块自然压在它上面。 */
+   ::before 在绘制顺序上等价于第一个子元素，所以不用 z-index，填充与滑块自然压在它上面。
+   宽度 5px 与进度条轨道一致（v4.95）；面板只有 18px 宽，轨道再粗就显得笨。 */
 .vol-pop__track::before {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 6px;
-  margin-left: -3px;
+  width: 5px;
+  margin-left: -2.5px;
   border-radius: 99px;
   background: var(--fill-track);
 }
@@ -206,21 +207,19 @@ function onKeydown(event: KeyboardEvent): void {
   position: absolute;
   bottom: 0;
   left: 50%;
-  width: 6px;
-  margin-left: -3px;
+  width: 5px;
+  margin-left: -2.5px;
   border-radius: 99px;
   background: var(--accent);
 }
 
+/* 滑块：**视觉配方在 global.css 的共用规则里**（`.progress .knob, .vol-pop__thumb`，
+   v4.95：尺寸/颜色/柔光与进度条手柄同一份）；这里只管竖向定位——
+   bottom 是“值的位置”，所以要把滑块自身往上提半格才对齐。 */
 .vol-pop__thumb {
   position: absolute;
   left: 50%;
-  width: 13px;
-  height: 13px;
-  margin-left: -6.5px;
-  border-radius: 50%;
-  background: var(--accent);
-  /* bottom 是“值的位置”，所以要把滑块自身往上提半格才对齐 */
+  margin-left: -4.5px;
   transform: translateY(50%);
 }
 

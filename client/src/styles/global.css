@@ -633,6 +633,9 @@ select {
   gap: 12px;
   min-width: 0;
   cursor: pointer;
+  /* 手机上这块是滑动切歌（左右滑）的手势区：把纵向留给滚动，横向交给我们自己处理 ——
+     不写的话浏览器可能把横向拖拽当成滚动/手势而吞掉 pointer 事件。 */
+  touch-action: pan-y;
 }
 
 /* 歌曲信息块：铺满固定列宽剩下的固定空间（封面 52 + 间隔 12 → 文字区 176） */
@@ -670,6 +673,14 @@ select {
   font-size: 11px;
   color: var(--text-2);
   margin-top: 3px;
+}
+
+/* 迷你条第二行显示歌词时（手机）：定宽省略，不做跑马灯 ——
+   歌词每隔几秒换一句，每换一句重启一次滚动会很恰（见 PlayerBar.vue 的注释）。 */
+.pb-lyric {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 播放异常提示（PL-09）：加载失败、自动播放被拦截等 */
@@ -1216,13 +1227,15 @@ kbd {
     gap: 2px;
   }
 
-  /* 迷你条只留三枚走带键（RT-02：迷你条 + 点开沉浸页看全部控件）。
+  /* 迷你条只留两枚键（Salt Player 的迷你条语言）：播放/暂停 + 下一首。
+     上一首改走“在信息区左右滑”（手势见 PlayerBar.vue），沉浸页里仍是完整三键。
      音量点开的是 HoverCard（悬浮卡片），手机上既没有悬浮、也有系统音量键 —— 一并收起，
      沉浸页里那枚保留（那里才是完整控制区）。
      ⚠️ 音量键的 display 写在 VolumeControl.vue 的 scoped 样式里（`.vctl[data-v-x]`），
      特异性同为 (0,2,0) 而组件样式在运行时注入 → 源码顺序上它更靠后。
      所以这里必须写到 (0,3,0)：用 .playerbar 前缀，别省。 */
   .playerbar .pb-ctrls .ctl.mode,
+  .playerbar .pb-ctrls .ctl.prev,
   .playerbar .pb-ctrls .vctl,
   .pb-right {
     display: none;

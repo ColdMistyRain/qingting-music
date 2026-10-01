@@ -3,13 +3,16 @@ import { computed, ref, type Component } from "vue";
 import IconArrowRight from "~icons/ph/arrow-right";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
+import IconQueue from "~icons/ph/queue";
 import IconRepeat from "~icons/ph/repeat";
 import IconRepeatOnce from "~icons/ph/repeat-once";
 import IconShuffle from "~icons/ph/shuffle";
 import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import { usePlayerStore } from "@/stores/player";
+import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
+import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { formatTime } from "@/utils/format";
 import type { PlayMode } from "@/utils/player";
 
@@ -32,6 +35,11 @@ const MODE_ICONS: Record<PlayMode, Component> = {
 const modeIcon = computed(() => MODE_ICONS[player.mode]);
 const playIcon = computed(() => (player.playing ? IconPause : IconPlay));
 const totalSeconds = computed(() => player.duration || player.currentTrack?.duration || 0);
+
+/** 手机断点：走带键独占一排、其余控件收进次排（Salt Player 的控件分布），
+ *  并且手机上多一枚**队列**入口 —— 迷你条为了留白把队列键收起了，
+ *  这里是手机端唯一能打开播放队列的地方（Salt 的全屏播放页也有这一枚）。 */
+const isMobile = useMediaQuery(MOBILE_QUERY);
 
 /* 进度条：与播放条同一套交互（点/拖都走 store 的 begin/update/end，数值夹取在 store 里已单测） */
 const barRef = ref<HTMLDivElement | null>(null);
@@ -64,26 +72,50 @@ function onPointerUp(event: PointerEvent): void {
 <template>
   <div class="im-ctl">
     <div class="im-ctrls">
-      <button class="ctl mode" :title="`播放模式：${player.modeLabel}`" @click="player.cycleMode()">
-        <component :is="modeIcon" class="icon" />
-      </button>
-      <button class="ctl" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
-        <IconSkipBack class="icon" />
-      </button>
-      <button
-        class="ctl play"
-        :title="player.playing ? '暂停（空格）' : '播放（空格）'"
-        :disabled="!player.hasTrack"
-        @click="player.toggle()"
-      >
-        <component :is="playIcon" class="icon" />
-      </button>
-      <button class="ctl" title="下一首" :disabled="!player.hasTrack" @click="player.next()">
-        <IconSkipForward class="icon" />
-      </button>
-      <!-- 音量：与播放条共用同一个控件（components/VolumeControl.vue，v4.62）——
-           两边不再各写一套，否则一定会走偏（这里原来是一条横条）。 -->
-      <VolumeControl />
+      <!-- 三组结构在桌面与手机共用，只是**排布**不同：
+           桌面挤成一行（模式 上一首 播放 下一首 音量，组间间距与键间距同为 20px，看不出分组），
+           手机换行后走带键在前、其余两枚小组走到第二排小键。
+           队列入口只在手机上出现：迷你条把队列键收起了，这里是手机唯一入口。 -->
+      <div class="im-ctrls__row im-ctrls__row--secondary">
+        <button
+          class="ctl mode"
+          :title="`播放模式：${player.modeLabel}`"
+          @click="player.cycleMode()"
+        >
+          <component :is="modeIcon" class="icon" />
+        </button>
+
+        <QueuePopover v-if="isMobile">
+          <template #trigger>
+            <button class="ctl" :title="`播放队列（${player.queue.length} 首）`">
+              <IconQueue class="icon" />
+            </button>
+          </template>
+        </QueuePopover>
+      </div>
+
+      <div class="im-ctrls__row im-ctrls__row--primary">
+        <button class="ctl prev" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
+          <IconSkipBack class="icon" />
+        </button>
+        <button
+          class="ctl play"
+          :title="player.playing ? '暂停（空格）' : '播放（空格）'"
+          :disabled="!player.hasTrack"
+          @click="player.toggle()"
+        >
+          <component :is="playIcon" class="icon" />
+        </button>
+        <button class="ctl next" title="下一首" :disabled="!player.hasTrack" @click="player.next()">
+          <IconSkipForward class="icon" />
+        </button>
+      </div>
+
+      <div class="im-ctrls__row im-ctrls__row--secondary">
+        <!-- 音量：与播放条共用同一个控件（components/VolumeControl.vue，v4.62）——
+             两边不再各写一套，否则一定会走偏（这里原来是一条横条）。 -->
+        <VolumeControl />
+      </div>
     </div>
 
     <div class="im-progress">
@@ -121,7 +153,10 @@ function onPointerUp(event: PointerEvent): void {
 .im-ctrls {
   display: flex;
   align-items: center;
+  justify-content: center;
+  /* 手机换行后两组次级键落到下一排；桌面 `nowrap` 时与下面各组的间距叠出视觉上的 20px */
   gap: 20px;
+  flex-wrap: nowrap;
   /* 沉浸页的控件只是**尺寸**比播放条大一档；配方其余部分（图标/主按钮的软底、
      主题色、极淡描边、光晕、悬停光、禁用态、过渡）全在 global.css 的 .ctl 系列里，
      这里只写差异（v4.98 收口）。v4.95 的漂移就是因为两处各留一份实现：主按钮在这里
@@ -130,6 +165,35 @@ function onPointerUp(event: PointerEvent): void {
   --ctl-icon-size: 22px;
   --ctl-play-size: 48px;
   --ctl-play-icon: 30px;
+}
+
+.im-ctrls__row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+@media (max-width: 767px) {
+  /* 手机：走带键独占一排（排在最上、间距拉开、主键再大一点，拇指好按），
+     模式/队列/静音降为下一排小键（图标 19px、间距松一点、颜色已由 .ctl 的 --text-2 管）。
+     这就是 Salt Player 的控件分布：常用动作一条排，其余收进次排。 */
+  .im-ctrls {
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+
+  .im-ctrls__row--primary {
+    order: 1;
+    gap: 26px;
+    --ctl-play-size: 56px;
+    --ctl-play-icon: 32px;
+  }
+
+  .im-ctrls__row--secondary {
+    order: 2;
+    gap: 22px;
+    --ctl-icon-size: 19px;
+  }
 }
 
 .im-progress {

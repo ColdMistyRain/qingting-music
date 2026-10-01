@@ -15,7 +15,10 @@ import { usePlayerStore } from "@/stores/player";
 import ScrollingText from "@/components/ScrollingText.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
+import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { formatTime } from "@/utils/format";
+import { currentLineIndex, parseLyrics } from "@/utils/lyrics";
+import { isTouchTap } from "@/utils/pointer";
 import type { PlayMode } from "@/utils/player";
 
 /**
@@ -32,6 +35,71 @@ function openImmersive(): void {
   if (!player.hasTrack) return;
   void router.push({ name: "now" });
 }
+
+/* ---------- 手机手势（RT-05，按 Salt Player 的交互语言） ----------
+   ① 左侧信息区**左右滑** → 上一首 / 下一首（拇指最常停在这一带；也是迷你条只剩两枚按钮后
+      “上一首”的去处）；② **长按播放键** → 展开沉浸页（Salt 官方：“独家长按播放键沉浸模式”）。
+   两条都只认真实触摸（`pointerType === "touch"`）：桌面上按住播放键不该算“长按”，
+   鼠标拖拽也不该被当成滑动切歌 —— 桌面既有行为一分不变。 */
+const SWIPE_MIN_PX = 40;
+const LONG_PRESS_MS = 500;
+
+const swipeStart = { x: 0, y: 0, active: false };
+/** 刚滑过一下：抑制紧随其后的 click（否则还会展开沉浸页） */
+const justSwiped = ref(false);
+let pressTimer = 0;
+let openedByPress = false;
+
+function onLeftPointerDown(event: PointerEvent): void {
+  if (!isTouchTap(event.pointerType)) return;
+  swipeStart.active = true;
+  swipeStart.x = event.clientX;
+  swipeStart.y = event.clientY;
+}
+
+function onLeftPointerUp(event: PointerEvent): void {
+  if (!swipeStart.active) return;
+  swipeStart.active = false;
+  const dx = event.clientX - swipeStart.x;
+  const dy = event.clientY - swipeStart.y;
+  // 竖向意图（滚动/下拉）不当切歌：横向位移要明显压过纵向
+  if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+  justSwiped.value = true;
+  window.setTimeout(() => (justSwiped.value = false), 400);
+  if (dx < 0) player.next();
+  else player.prev();
+}
+
+function onLeftClick(): void {
+  if (justSwiped.value) return;
+  openImmersive();
+}
+
+function clearPressTimer(): void {
+  if (!pressTimer) return;
+  window.clearTimeout(pressTimer);
+  pressTimer = 0;
+}
+
+function onPlayPointerDown(event: PointerEvent): void {
+  if (!isTouchTap(event.pointerType) || !player.hasTrack) return;
+  pressTimer = window.setTimeout(() => {
+    pressTimer = 0;
+    openedByPress = true;
+    openImmersive();
+  }, LONG_PRESS_MS);
+}
+
+function onPlayClick(): void {
+  // 长按已经进了沉浸页，这一下不要再当成“播放/暂停”
+  if (openedByPress) {
+    openedByPress = false;
+    return;
+  }
+  player.toggle();
+}
+
+const isMobile = useMediaQuery(MOBILE_QUERY);
 
 const MODE_ICONS: Record<PlayMode, Component> = {
   seq: IconArrowRight,
@@ -75,6 +143,16 @@ const subtitleText = computed(() =>
     : "从本地播放或音乐库选择歌曲",
 );
 
+/* 迷你条第二行：**当前歌词行**（Salt Player 的“迷你播放条歌词”），没歌词时退回 歌手 · 专辑。
+  桌面播放条不变（那里有位置放完整信息）。这一行不做跑马灯 —— 歌词每隔几秒就换一句，
+  每换一句重启一次滚动会很恰，长句直接省略，要看全的歌词去沉浸页。 */
+const lyricLine = computed(() => {
+  const lines = parseLyrics(player.lyricsSource).lines;
+  if (lines.length === 0) return "";
+  return lines[currentLineIndex(lines, player.displaySeconds)]?.text ?? "";
+});
+const miniSubtitle = computed(() => lyricLine.value || subtitleText.value);
+
 /* 播放中或鼠标停在左侧信息区时，两条长文本才滚动；其余时间保持静态单行 */
 const hovering = ref(false);
 const marqueeActive = computed(() => player.playing || hovering.value);
@@ -87,8 +165,11 @@ const marqueeActive = computed(() => player.playing || hovering.value);
       role="button"
       :tabindex="player.hasTrack ? 0 : -1"
       :title="player.hasTrack ? '展开沉浸式播放页' : undefined"
-      @click="openImmersive"
+      @click="onLeftClick"
       @keydown.enter="openImmersive"
+      @pointerdown="onLeftPointerDown"
+      @pointerup="onLeftPointerUp"
+      @pointercancel="onLeftPointerUp"
       @mouseenter="hovering = true"
       @mouseleave="hovering = false"
     >
@@ -98,7 +179,15 @@ const marqueeActive = computed(() => player.playing || hovering.value);
       </div>
       <div class="pb-info">
         <ScrollingText class="pb-title" :text="titleText" :active="marqueeActive" />
-        <ScrollingText class="pb-artist" :text="subtitleText" :active="marqueeActive" />
+        <!-- 第二行按断点换内容：桌面是 歌手 · 专辑，手机是当前歌词（内容不同，只能换文本，
+             不能用 CSS 显隐 —— 两个 ScrollingText 都在树上会各跑一份测量） -->
+        <ScrollingText
+          v-if="!isMobile"
+          class="pb-artist"
+          :text="subtitleText"
+          :active="marqueeActive"
+        />
+        <div v-else class="pb-artist pb-lyric" :title="miniSubtitle">{{ miniSubtitle }}</div>
         <div v-if="player.notice" class="pb-notice">{{ player.notice }}</div>
       </div>
     </div>
@@ -112,14 +201,18 @@ const marqueeActive = computed(() => player.playing || hovering.value);
         >
           <component :is="modeIcon" class="icon" />
         </button>
-        <button class="ctl" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
+        <button class="ctl prev" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
           <IconSkipBack class="icon" />
         </button>
         <button
           class="ctl play"
           :title="player.playing ? '暂停（空格）' : '播放（空格）'"
           :disabled="!player.hasTrack"
-          @click="player.toggle()"
+          @pointerdown="onPlayPointerDown"
+          @pointerup="clearPressTimer"
+          @pointerleave="clearPressTimer"
+          @pointercancel="clearPressTimer"
+          @click="onPlayClick"
         >
           <component :is="playIcon" class="icon" />
         </button>

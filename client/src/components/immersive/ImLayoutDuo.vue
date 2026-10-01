@@ -140,4 +140,22 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
     height: min(38vh, 300px);
   }
 }
+
+/* 横屏手机（RT-06）：宽够、高不够 —— 上下叠会把封面顶出屏幕。
+   这里回到两栏（封面在左、歌词在右），但封面尺寸改由**高度**派生：
+   `34vh` 在 375px 高的屏上只有 127px，比竖屏的 220px 小得多，正好塞进上下两条控件之间。 */
+@media (max-width: 767px) and (orientation: landscape) {
+  .duo {
+    grid-template-columns: min(38vh, 220px) minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .cover {
+    width: 100%;
+  }
+
+  .ly {
+    height: min(46vh, 260px);
+  }
+}
 </style>

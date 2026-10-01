@@ -12,6 +12,7 @@ import LyricsSourceMenu from "@/components/immersive/LyricsSourceMenu.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
 import { parseLyrics } from "@/utils/lyrics";
+import { isTouchTap } from "@/utils/pointer";
 import { handleShortcut } from "@/utils/shortcuts";
 
 /**
@@ -117,6 +118,55 @@ function close(): void {
   else router.push({ name: "home" });
 }
 
+/* ---------- 手机手势（RT-05，按 Salt Player 的交互语言） ----------
+   在“封面 / 背景区”上：左右滑 → 上一首 / 下一首；下滑 → 收起（与顶部收起同一个动作）；
+   上滑 → 歌词铺满（封面让位，再来一次下滑回到常规）。
+   三条规矩：
+   ① 只认真实触摸（`pointerType === "touch"`）—— 桌面上拖一下不该切歌（桌面行为不变）；
+   ② 起手位置必须在手势区：歌词区与控件区自己有滚动/点击语义，不能被抢（`inGestureZone`）；
+   ③ 没到阈值或方向不明确（横竖相差不到 1.5 倍）就什么都不做，不要猜。 */
+const SWIPE_MIN_PX = 40;
+const lyricsFocus = ref(false);
+const gesture = { x: 0, y: 0, active: false };
+
+function inGestureZone(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || typeof el.closest !== "function") return false;
+  return !el.closest("header, .im-ctl, .ly, .ly-view");
+}
+
+function onGestureStart(event: PointerEvent): void {
+  if (!isTouchTap(event.pointerType) || !inGestureZone(event.target)) return;
+  gesture.active = true;
+  gesture.x = event.clientX;
+  gesture.y = event.clientY;
+}
+
+function onGestureEnd(event: PointerEvent): void {
+  if (!gesture.active) return;
+  gesture.active = false;
+  const dx = event.clientX - gesture.x;
+  const dy = event.clientY - gesture.y;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+
+  if (absX >= SWIPE_MIN_PX && absX > absY * 1.5) {
+    if (dx < 0) player.next();
+    else player.prev();
+    return;
+  }
+
+  if (absY >= SWIPE_MIN_PX && absY > absX * 1.5) {
+    if (dy > 0) {
+      // 下滑：先在“歌词铺满”里退回常规，常规下才是收起整页
+      if (lyricsFocus.value) lyricsFocus.value = false;
+      else close();
+    } else {
+      lyricsFocus.value = true;
+    }
+  }
+}
+
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     close();
@@ -138,7 +188,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="im" :style="ambientStyle">
+  <div
+    class="im"
+    :class="{ 'is-lyrics-focus': lyricsFocus }"
+    :style="ambientStyle"
+    @pointerdown="onGestureStart"
+    @pointerup="onGestureEnd"
+    @pointercancel="onGestureEnd"
+  >
     <header class="im-top">
       <button class="ctl" title="收起（Esc）" @click="close">
         <IconCaretDown class="icon" />
@@ -223,6 +280,29 @@ onBeforeUnmount(() => {
 .im-sheet-leave-to {
   transform: translateY(100%);
   border-radius: 18px 18px 0 0;
+}
+
+/* 上滑展开歌词（RT-05）：封面让位、歌词区占满。
+   状态属于“页面”（一场手势同时改三套布局的版式），但**每套布局让位的方式不同**，
+   所以响应写在本页、用 :deep 落到布局里 —— 布局组件不用为了一个共享状态各自加 prop。
+   只有触摸设备可能置上这个类（手势只认 pointerType），桌面看不到这套版式。 */
+.im.is-lyrics-focus :deep(.cover-wrap),
+.im.is-lyrics-focus :deep(.poster__art) {
+  display: none;
+}
+
+/* 封面藏掉后栅格只剩一列，否则会留一条空列（手机横屏时双栏布局会真的走两栏） */
+.im.is-lyrics-focus :deep(.duo),
+.im.is-lyrics-focus :deep(.poster) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.im.is-lyrics-focus :deep(.ly) {
+  height: min(56vh, 520px);
+}
+
+.im.is-lyrics-focus :deep(.center) {
+  gap: 10px;
 }
 
 /* 深色主题用面板那套深投影（黑 + 更大一点），与 --panel-shadow 的口径一致 */

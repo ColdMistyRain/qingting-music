@@ -160,8 +160,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
   /* 抽屉自己是一块**面**（v5.43）：背后是列表正文，而岛是玻璃 —— 不垫底时正文会直接从
      抽屉里透出来（截图里能看到“搜索歌名…”“时长”两层字叠在一起）。
-     底色用 --bg-base 之后，抽屉里的岛与桌面外壳里的岛落在**同一种底**上，观感一致。 */
-  background: var(--bg-base);
+     底色用 --tray-bg（= --plane，比页面底亮一档）：一开始用的 --bg-base 在深色下近黑
+     （#0a0c12），抽屉看着就是一块黑斑（需求方：“深色模式下，这个侧边栏也太黑了吧”，v5.45）。 */
+  background: var(--tray-bg);
   border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
   box-shadow: 14px 0 40px -18px rgba(20, 28, 60, 0.34);
   transform: translateX(-104%);

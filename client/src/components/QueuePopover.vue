@@ -200,9 +200,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
         不能把“看不清”赌在模糊上；
      ③ 半屏的实时 64px 模糊在手机上是一笔真开销，而它换来的信息本来就不该看见。
      “透”交给遮罩（.q-scrim）：抽屉外的页面仍然透出来并被压暗一层。
-     底色用 --bg-base：行内的 --hover / --accent-soft 都是按页面底色标定的对比度，
-     换成纯白面板会让“播放中”那行看着更重（参考对象 Salt / 网易云的底部抽屉也是实心）。 */
-  background: var(--bg-base);
+     底色用 --tray-bg（比页面底亮一档）：沉浸页自己的底就是 --bg-base（+ 封面环境光），
+     抽屉再拿同一个值垫底的话，深色下会变成一块比页面更黑的斑（v5.45 与左侧抽屉同一条）。 */
+  background: var(--tray-bg);
   box-shadow:
     var(--panel-sheen),
     0 -18px 44px -16px rgba(20, 28, 60, 0.34);

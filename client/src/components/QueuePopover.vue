@@ -1,89 +1,116 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
-import IconBroom from "~icons/ph/broom";
-import IconPause from "~icons/ph/pause";
-import IconPlay from "~icons/ph/play";
-import IconX from "~icons/ph/x";
-import { usePlayerStore } from "@/stores/player";
-import { confirmAction } from "@/utils/confirm";
-import { formatTime } from "@/utils/format";
+import { onBeforeUnmount, onMounted, ref } from "vue";
+import {
+  DialogContent,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
+  PopoverContent,
+  PopoverPortal,
+  PopoverRoot,
+  PopoverTrigger,
+} from "reka-ui";
+import QueuePanel from "@/components/QueuePanel.vue";
+import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
+import { isTouchTap } from "@/utils/pointer";
 
 /**
- * 播放队列弹层（PL-06）。
+ * 播放队列的**壳层**（PL-06）：同一个触发按钮，两种壳层。
  *
- * 行为层交给 Reka UI 的 Popover（v4.59 定稿）：打开/关闭、点外部关闭、Esc、焦点归还、
- * 与触发器的位置计算（含碰撞避让）全都不用自己写——这正是"复杂交互件用 Reka UI"（铁律 1）的意义。
- * 样式仍然全部自己写（Reka 是无样式行为层，不引带样式的组件库）。
+ * - **桌面**：贴着触发器弹出的浮层（Reka Popover，v4.59 定稿）——
+ *   打开/关闭、点外部关闭、Esc、焦点归还、与触发器的位置计算（含碰撞避让）都不用自己写。
+ * - **手机**：从底部升起的**半屏抽屉**（Reka Dialog）—— 需求方：“点击列表按钮后让它从底部弹出来
+ *   占满下半屏幕”。半屏是因为手机上的“当前播放”本来就是一份要翻看的列表，
+ *   塞在小浮层里又矮又贴边（旧版在 390px 宽下的实拍就是这样）。
+ *   Dialog 顺带把 Esc、点遮罩关闭、焦点锁在面板里、aria-modal、关闭后焦点归还触发器都给了；
+ *   手势（把手下滑 ≥ 40px 收起）与左抽屉的左滑同一档阈值，且只认真实触摸。
  *
- * 触发按钮由**调用方**通过 #trigger 插槽传入：它属于播放条那套控件（`.ctl`），
- * 样式留在 PlayerBar，别在这里复制一份。
+ * 行为层用 Reka（铁律 1）、样式全部自己写（Reka 是无样式行为层）；
+ * **内容**（标题行 + 列表）在 QueuePanel.vue，两套壳层共用一份。
+ *
+ * 触发按钮由**调用方**通过 #trigger 插槽传入：它属于播放条/沉浸页那套控件（`.ctl`），
+ * 样式留在各自的调用点，别在这里复制一份。
  */
-const player = usePlayerStore();
 const open = ref(false);
+const isMobile = useMediaQuery(MOBILE_QUERY);
 
-/** 清空是破坏性操作（队列没了要一首首重新加）→ 走统一确认入口（开发约定） */
-function askClear(): void {
-  if (!confirmAction("清空播放队列？")) return;
-  player.clear();
+/* 手机关闭手势：把手往下滑（与左抽屉的左滑同一档 40px） */
+const gripSwipe = { y: 0, active: false };
+
+function onGripDown(event: PointerEvent): void {
+  if (!isTouchTap(event.pointerType)) return;
+  gripSwipe.active = true;
+  gripSwipe.y = event.clientY;
+}
+
+function onGripUp(event: PointerEvent): void {
+  if (!gripSwipe.active) return;
+  gripSwipe.active = false;
+  if (event.clientY - gripSwipe.y >= 40) open.value = false;
+}
+
+/**
+ * Esc：抽屉只关自己这一层。
+ *
+ * 沉浸页在 `window` 上听 Esc（收起整页），Reka 也在 `window` 上听（关抽屉）。
+ * 两个都在同一层时“谁先注册谁先跑”，靠 `@escape-key-down` 里 stopPropagation 拦不住
+ * （实测：按一下抽屉与整页一起关）。所以这里挂**捕获阶段**的 window 监听 ——
+ * 它一定先于任何冒泡监听执行，拦住并自己关抽屉，保证“Esc 只关最上面那层”。
+ */
+function onKeydown(event: KeyboardEvent): void {
+  if (!isMobile.value || !open.value || event.key !== "Escape") return;
+  event.stopPropagation();
   open.value = false;
 }
+
+onMounted(() => window.addEventListener("keydown", onKeydown, true));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 </script>
 
 <template>
-  <PopoverRoot v-model:open="open">
+  <!-- 桌面：贴着触发器弹出的浮层 -->
+  <PopoverRoot v-if="!isMobile" v-model:open="open">
     <PopoverTrigger as-child>
       <slot name="trigger" />
     </PopoverTrigger>
 
     <PopoverPortal>
       <PopoverContent class="q-pop" side="top" align="end" :side-offset="10">
-        <header class="q-head">
-          <b>当前播放</b>
-          <span class="q-count">{{ player.queue.length }} 首</span>
-          <button class="btn q-clear" :disabled="player.queue.length === 0" @click="askClear">
-            <IconBroom class="icon" />
-            清空
-          </button>
-        </header>
-
-        <p v-if="player.queue.length === 0" class="q-empty">
-          队列是空的，从本地播放或音乐库选一首歌就会出现在这里。
-        </p>
-
-        <ul v-else class="q-list">
-          <li
-            v-for="(track, index) in player.queue"
-            :key="track.id"
-            class="q-item"
-            :class="{ current: index === player.currentIndex }"
-          >
-            <button class="q-main" :title="`播放 ${track.title}`" @click="player.playAt(index)">
-              <!-- 正在播放标识（PL-06）：当前曲目显示播放/暂停图标，其余显示序号 -->
-              <span class="q-mark">
-                <template v-if="index === player.currentIndex">
-                  <component :is="player.playing ? IconPause : IconPlay" class="icon" />
-                </template>
-                <template v-else>{{ index + 1 }}</template>
-              </span>
-              <span class="q-tb">
-                <b>{{ track.title }}</b>
-                <span>{{ track.artist }}</span>
-              </span>
-              <span class="q-dur">{{ formatTime(track.duration ?? 0) }}</span>
-            </button>
-            <button
-              class="q-del"
-              :title="`从队列移除 ${track.title}`"
-              @click="player.removeAt(index)"
-            >
-              <IconX class="icon" />
-            </button>
-          </li>
-        </ul>
+        <QueuePanel @close="open = false" />
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>
+
+  <!-- 手机：半屏底部抽屉。用 v-else 而不是再加一个断点判断：两套壳层共用一个开关，
+       断点变化时只是换壳，不会出现“两个都开”。 -->
+  <DialogRoot v-else v-model:open="open">
+    <DialogTrigger as-child>
+      <slot name="trigger" />
+    </DialogTrigger>
+
+    <DialogPortal>
+      <DialogOverlay class="q-scrim" />
+      <DialogContent class="q-sheet">
+        <!-- 无障碍名字：视觉上由面板里的“当前播放”承担（Reka 缺 DialogTitle 会告警） -->
+        <DialogTitle class="sr-only">播放队列</DialogTitle>
+
+        <!-- 把手：既是“从底部上来的”的信号，也是下滑收起的抓手。
+             手势只挂在把手上（不挂整块面板）：列表要能正常滚动，两者不能抢。 -->
+        <div
+          class="q-grip-area"
+          @pointerdown="onGripDown"
+          @pointerup="onGripUp"
+          @pointercancel="onGripUp"
+        >
+          <span class="q-grip" aria-hidden="true" />
+        </div>
+
+        <QueuePanel @close="open = false" />
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
 
 <style>
@@ -119,168 +146,99 @@ function askClear(): void {
   }
 }
 
-.q-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 6px;
+/* ---------- 手机：半屏底部抽屉 ----------
+   需求方：“点击列表按钮后让它从底部弹出来占满下半屏幕”。
+   高度用 50vh 而不是 50dvh：外壳自己就是 100vh（global.css 的 .app），
+   两处同一个单位，抽屉的上沿才会正好落在屏幕正中。
+   底部内边距带上安全区（全面屏的 home 指示条）：无安全区的环境里 env() 就是 0。 */
+.q-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  /* 与左抽屉（NavDrawer）同一档遮罩：全站只有一种“后面还有东西”的压暗 */
+  background: rgba(12, 16, 28, 0.34);
+  animation: q-scrim-in 0.24s ease;
 }
 
-.q-head b {
-  font-size: 13px;
+@keyframes q-scrim-in {
+  from {
+    opacity: 0;
+  }
 }
 
-.q-count {
-  font-size: 11.5px;
-  color: var(--text-3);
-  margin-right: auto;
-}
-
-.q-clear {
-  padding: 5px 10px;
-  font-size: 12px;
-}
-
-.q-clear .icon {
-  width: 14px;
-  height: 14px;
-}
-
-.q-empty {
-  padding: 18px 10px 20px;
-  font-size: 12.5px;
-  color: var(--text-3);
-  line-height: 1.6;
-}
-
-/* 列表自己滚（不用 Reka 的 ScrollArea）：滚动条要走全站那套自绘样式，
-   两套滚动条会打架。Reka 在这里提供的是行为（关闭/焦点），不是滚动条。
-   滚动条贴面板边缘：负外边距吃掉面板的右内边距，让滚动条落进面板的留白区，
-   再用等量内边距把行缩回来（行右边缘到边框的距离不变）——
-   与列表页 .page-frame__scroll 同一套做法。
-   不这么做时滚动条会“悬”在右留白中间，看起来行宽与面板内宽不一致
-   （需求方实拍：“有点抽象，两个宽度最好一致”）。 */
-/* 行节奏：紧凑浮层用自己的间距（6px）——没有间距时，悬浮态与“播放中”的底色
-   会直接贴在一起（需求方：“这个挨的有点紧了”）。
-   主列表那边是“宽屏 6px + 细线 / 窄屏 13px”（v4.91），两者行距一致；
-   浮层算窄列表，不画线。
-   用 flex 列 + gap（**不要**给行加 margin：那样首尾会多出半格，滚动时也不好算）。 */
-.q-list {
-  list-style: none;
-  overflow-y: auto;
-  min-height: 0;
+.q-sheet {
+  /* 面板的水平内边距：列表拿它做负边距，把滚动条推到面板边缘（见 QueuePanel） */
+  --q-pad: 14px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 96;
+  /* 下半屏 */
+  height: 50vh;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-right: calc(var(--q-pad) * -1);
-  padding-right: var(--q-pad);
+  padding: 0 var(--q-pad) calc(10px + env(safe-area-inset-bottom));
+  /* 下沿在屏幕外，下边框画了也看不到 */
+  border: 1px solid var(--glass-border);
+  border-bottom: 0;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  /* 半屏抽屉读成一块“**面**”，不是一块玻璃 —— 与浮层（.q-pop）故意不同：
+     ① 背后正好是沉浸页那排走带键（实测就在抽屉范围内，y 762~818）。0.94 的遮盖度
+        仍能认出那排键的轮廓（深色描边在平坦浅色面上太显眼）；
+     ② `backdrop-filter` 在部分环境里根本不参与合成（无头浏览器实测不糊），
+        不能把“看不清”赌在模糊上；
+     ③ 半屏的实时 64px 模糊在手机上是一笔真开销，而它换来的信息本来就不该看见。
+     “透”交给遮罩（.q-scrim）：抽屉外的页面仍然透出来并被压暗一层。
+     底色用 --bg-base：行内的 --hover / --accent-soft 都是按页面底色标定的对比度，
+     换成纯白面板会让“播放中”那行看着更重（参考对象 Salt / 网易云的底部抽屉也是实心）。 */
+  background: var(--bg-base);
+  box-shadow:
+    var(--panel-sheen),
+    0 -18px 44px -16px rgba(20, 28, 60, 0.34);
+  color: var(--text-1);
+  /* 圆角里的内容是列表，裁一下，免得行色/滚动条从圆角处漏出去 */
+  overflow: hidden;
+  animation: q-sheet-in 0.34s var(--ease-ios);
 }
 
-.q-item {
-  display: flex;
-  align-items: center;
-  border-radius: var(--radius-row);
-  /* 列方向 flex 里要显式禁止收缩，否则行会被压矮 */
+:root[data-theme="dark"] .q-sheet {
+  /* 深色主题用面板那套深投影（黑 + 更大一点），与 --panel-shadow 口径一致 */
+  box-shadow:
+    var(--panel-sheen),
+    0 -20px 46px -16px rgba(0, 0, 0, 0.6);
+}
+
+/* 从底部升起：位移与沉浸页那张 sheet（.im-sheet-enter-from）完全一致 ——
+   全站“从下面上来”只有这一种动法；时长0.34s 比整页的 0.42s 短一档（这是个面板，不是整页） */
+@keyframes q-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* 把手：既是“从底部上来的”信号，也是下滑收起的抓手（手势挂在这块 22px 高的区域上） */
+.q-grip-area {
   flex: none;
-}
-
-.q-item:hover {
-  background: var(--hover);
-}
-
-.q-main {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 46px;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 4px 7px 8px;
-  text-align: left;
-}
-
-.q-mark {
-  font-size: 11px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
+  height: 22px;
   display: grid;
   place-items: center;
+  /* 这块只用来拖，别让浏览器把它当成滚动手势的起点 */
+  touch-action: none;
 }
 
-.q-mark .icon {
-  width: 15px;
-  height: 15px;
-}
-
-.q-tb {
-  min-width: 0;
-}
-
-.q-tb b {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 600;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.q-tb span {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--text-3);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.q-dur {
-  font-size: 11px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.q-del {
-  flex: none;
-  display: grid;
-  place-items: center;
-  padding: 7px 10px;
-  color: var(--text-3);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.q-del .icon {
-  width: 15px;
-  height: 15px;
-}
-
-.q-item:hover .q-del,
-.q-del:focus-visible {
-  opacity: 1;
-}
-
-.q-del:hover {
-  color: var(--danger);
-}
-
-/* 当前曲目：主题色 + 稍强底色，与"正在播放"图标一起把位置说清（PL-06） */
-.q-item.current .q-mark,
-.q-item.current .q-tb b {
-  color: var(--accent);
-}
-
-/* 当前曲目：底色铺在**整行**上，宽度与悬浮态一致（需求方：“正在播放的和悬浮选中的
-   长度要一样”）。原来铺在 .q-main 上 —— 那里不含右侧删除键那块，看着就比悬浮态短一截。
-   写在 .q-item 上、且排在 :hover 之后，保证“播放中的行”悬停时仍然是主题色。 */
-.q-item.current {
-  background: var(--accent-soft);
+.q-grip {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--text-3);
+  opacity: 0.5;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .q-pop {
+  .q-pop,
+  .q-sheet,
+  .q-scrim {
     animation: none;
   }
 }

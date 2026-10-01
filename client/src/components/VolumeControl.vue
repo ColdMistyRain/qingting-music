@@ -86,7 +86,7 @@ function onKeydown(event: KeyboardEvent): void {
       <HoverCardContent
         class="vol-pop"
         side="top"
-        :side-offset="4"
+        :side-offset="10"
         role="group"
         aria-label="音量调节"
       >
@@ -184,6 +184,21 @@ function onKeydown(event: KeyboardEvent): void {
   height: 84px;
   cursor: pointer;
   touch-action: none;
+}
+
+/* 底轨：自绘时最容易漏的一块——它原来是原生 range 的轨道（tokens.css 里画的），
+   换成自绘后不画就没有了（v4.65 补回）。
+   ::before 在绘制顺序上等价于第一个子元素，所以不用 z-index，填充与滑块自然压在它上面。 */
+.vol-pop__track::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 99px;
+  background: var(--fill-track);
 }
 
 .vol-pop__fill {

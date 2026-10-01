@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import AppSidebar from "@/components/AppSidebar.vue";
-import MobileTabBar from "@/components/MobileTabBar.vue";
+import NavDrawer from "@/components/NavDrawer.vue";
 import PlayerBar from "@/components/PlayerBar.vue";
 import { useConfigStore } from "@/stores/config";
 import { usePlayerStore } from "@/stores/player";
@@ -37,6 +37,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 
 <template>
   <div class="app" :class="{ collapsed }">
+    <!-- 桌面：侧栏常驻，“收起”= 缩成图标条（既有行为，不变） -->
     <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
     <main class="content glass">
       <RouterView v-slot="{ Component }">
@@ -46,7 +47,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
       </RouterView>
     </main>
     <PlayerBar />
-    <!-- 手机导航（RT-02）：≥768px 自身 display:none，桌面不受影响 -->
-    <MobileTabBar />
+    <!-- 手机：导航收进左侧抽屉（RT-02，参考 Salt Player）。组件自身在 ≥768px 不渲染任何东西。 -->
+    <NavDrawer />
   </div>
 </template>

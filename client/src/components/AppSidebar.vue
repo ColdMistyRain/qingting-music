@@ -5,7 +5,9 @@ import IconGearSix from "~icons/ph/gear-six";
 import IconListPlus from "~icons/ph/list-plus";
 import { useNavItems } from "@/composables/useNavItems";
 
-defineProps<{ collapsed: boolean }>();
+const props = withDefaults(defineProps<{ collapsed: boolean; toggleLabel?: string }>(), {
+  toggleLabel: "折叠侧边栏",
+});
 defineEmits<{ toggle: [] }>();
 
 /** 一级导航与手机底栏共用一份（RT-02）：按身份与音源配置裁剪的逻辑在 useNavItems 里 */
@@ -59,9 +61,9 @@ const navItems = useNavItems();
           <IconGearSix class="icon" />
           <span class="lbl">设置</span>
         </RouterLink>
-        <button class="nav-item" title="折叠侧边栏" @click="$emit('toggle')">
+        <button class="nav-item" :title="props.toggleLabel" @click="$emit('toggle')">
           <IconCaretDoubleLeft class="icon icon--collapse" />
-          <span class="lbl">折叠侧边栏</span>
+          <span class="lbl">{{ props.toggleLabel }}</span>
         </button>
       </div>
     </div>

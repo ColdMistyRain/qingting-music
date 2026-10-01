@@ -497,6 +497,9 @@ select {
   transition: grid-template-columns 0.25s ease;
 }
 
+/* 桌面侧栏“收起”= 缩成图标条（既有行为，一分不变）。
+   手机端的导航不走这里：那里的侧栏整个不渲染（`.sidebar { display: none }`），
+   导航由 NavDrawer 的左侧抽屉承担（参考 Salt Player）。 */
 .app.collapsed {
   grid-template-columns: 68px 1fr;
 }
@@ -1178,11 +1181,10 @@ kbd {
 
   .app,
   .app.collapsed {
-    /* 三行：内容 / 迷你播放条 / 底部标签栏（PC 端是 224px 侧栏 + 1fr 内容 + 84px 播放条）。
-       两行都用 auto 而不是固定高度：标签栏要留刘海屏安全区（env(safe-area-inset-bottom)），
-       写死 56px 会把最后一行字压到系统手势条底下。 */
+    /* 手机：两行（内容 / 迷你播放条）。导航不再占行 —— 它收进了左侧抽屉（NavDrawer），
+       平时完全不占高度，这比底栏多出 52px 给封面与列表。 */
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto auto;
+    grid-template-rows: 1fr auto;
   }
 
   /* 侧栏收起，导航交给底部标签栏（RT-02）。
@@ -1195,6 +1197,12 @@ kbd {
   .content {
     grid-column: 1;
     padding: 16px;
+  }
+
+  /* 页头给左上角的汉堡键（NavDrawer 的 .nav-toggle，fixed 在 18px 处）让位，
+     否则标题会被压住。16px 内边距 + 42px = 58px，刚好落在按钮右缘（52px）之后。 */
+  .page-head {
+    padding-left: 42px;
   }
 
   /* 播放条 → 迷你条（RT-02：“播放条简化为迷你条，点击展开沉浸式播放页”）。

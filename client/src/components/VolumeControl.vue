@@ -117,20 +117,21 @@ function onKeydown(event: KeyboardEvent): void {
 </template>
 
 <style scoped>
-/* 触发按钮：与两处控件行同一套语言（颜色 / 悬浮 / 尺寸）。
-   它不在 Teleport 里，所以可以正常用 scoped。 */
+/* 触发按钮：与两处的控件行同一套语言（颜色 / 尺寸）。
+   它不在 Teleport 里，所以可以正常用 scoped。
+   **悬浮不放大**（v4.66 需求方）：悬浮已经会开面板，面板就是反馈；
+   再让按钮自己跳一下，鼠标刚落上去目标就变大，反而像在躲。
+   只留颜色变化。播放条上那些只有图标的控件（播放 / 上一首 / 下一首）不动，
+   它们除了放大没有别的反馈。 */
 .vctl {
   color: var(--text-2);
   display: grid;
   place-items: center;
-  transition:
-    color 0.15s,
-    transform 0.1s;
+  transition: color 0.15s;
 }
 
 .vctl:hover {
   color: var(--text-1);
-  transform: scale(1.08);
 }
 
 .vctl .icon {

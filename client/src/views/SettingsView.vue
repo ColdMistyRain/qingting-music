@@ -102,15 +102,15 @@ async function signOut(): Promise<void> {
             </div>
           </div>
           <div class="set-note">
-            默认跟随系统，手动切换后记忆选择（VS-08）。全部颜色走 CSS 变量，切换即时生效。<br />
-            <b>材质</b>可切换比对：玻璃浮岛＝半透明玻璃岛 + 封面光晕 + 描边投影； 实心面板＝中性底色
-            + 实心面板，玻璃只留给浮在内容之上的层（播放条等）。
+            模式默认跟随系统，手动切换后记住选择。<br />
+            <b>玻璃浮岛</b>＝半透明玻璃面板，页面底色与光晕会透上来；<b>实心面板</b>＝中性底色 +
+            实心面板，玻璃只留给浮在内容之上的层（播放条、弹层等）。
           </div>
         </div>
         <div class="set-card card">
-          <b>歌词页布局</b>
+          <b>沉浸式播放页</b>
           <div class="set-row set-row--stack">
-            <span>沉浸式播放页</span>
+            <span>布局</span>
             <div class="lay-cards">
               <button
                 v-for="item in layouts"
@@ -125,11 +125,7 @@ async function signOut(): Promise<void> {
               </button>
             </div>
           </div>
-          <div class="set-note">
-            在播放条点左侧展开沉浸页即可看到，选择按设备记忆。<br />
-            经典双栏＝封面左 · 歌词右；沉浸歌词＝纯歌词居中；海报背景＝歌词左 +
-            右上角一张悬出画面的大彩胶唱片（盘面颜色跟着封面走）。
-          </div>
+          <div class="set-note">点播放条左侧的封面即可展开，选择按设备记忆。</div>
         </div>
       </TabsContent>
 
@@ -142,7 +138,7 @@ async function signOut(): Promise<void> {
             <span class="badge badge--accent">{{ roleLabel }}</span>
           </div>
           <div class="set-note">
-            未登录时仅可播放本地文件；访客密码可听云端曲库与在线音源；管理员密码额外解锁管理控制台（AC-01/03）。
+            未登录时只能播放本地文件；访客密码可听云端曲库与在线音源；管理员密码额外解锁管理控制台。
           </div>
           <div v-if="auth.authEnabled" class="set-actions">
             <button class="btn" @click="signOut">
@@ -164,13 +160,13 @@ async function signOut(): Promise<void> {
             </span>
           </div>
           <div class="set-note">
-            音源地址由部署者经环境变量 NETEASE_API_BASE
-            配置（ON-04）；未配置时"在线搜索"入口隐藏，此处仅作状态展示。
+            音源地址在部署时用环境变量 NETEASE_API_BASE
+            配置；未配置时"在线搜索"入口隐藏，这里只作状态展示。
           </div>
         </div>
         <div class="set-card card">
           <b>QQ 音乐 / 酷狗</b>
-          <div class="set-note">计划后续接入，届时在此显示各自连接状态。</div>
+          <div class="set-note">还在计划中，接入后会在这里显示连接状态。</div>
         </div>
       </TabsContent>
 
@@ -179,15 +175,7 @@ async function signOut(): Promise<void> {
         <div class="set-card card">
           <b>播放快捷键</b>
           <div class="set-row"><span>播放 / 暂停</span><kbd>空格</kbd></div>
-          <div class="set-row">
-            <span>快退 / 快进 5 秒</span><span><kbd>←</kbd><kbd>→</kbd></span>
-          </div>
-          <div class="set-row">
-            <span>音量调节</span><span><kbd>↑</kbd><kbd>↓</kbd></span>
-          </div>
-          <div class="set-note">
-            空格键播放/暂停马上就可以用；快退与音量键随后续版本补上（PL-08）。
-          </div>
+          <div class="set-note">快退 / 快进与音量调节随后续版本补上。</div>
         </div>
       </TabsContent>
 
@@ -196,8 +184,7 @@ async function signOut(): Promise<void> {
         <div class="set-card card">
           <b>均衡器与音效</b>
           <div class="set-note">
-            10 段图形均衡器（31Hz~16kHz）、整体增益、预设与自定义曲线、A/B
-            对比，随后续版本上线（PL-13）；设置按设备本地保存。
+            10 段图形均衡器（31Hz~16kHz）、整体增益、预设与自定义曲线稍后上线，设置会存在本机。
           </div>
         </div>
       </TabsContent>
@@ -219,11 +206,9 @@ async function signOut(): Promise<void> {
       <TabsContent value="about">
         <div class="set-card card">
           <b>轻听音乐</b>
-          <div class="set-row"><span>版本</span><span>v0.1.0 · M1 开发中</span></div>
+          <div class="set-row"><span>版本</span><span>v0.1.0 · 开发中</span></div>
           <div class="set-row"><span>形态</span><span>私有部署 · 仅供个人学习研究</span></div>
-          <div class="set-note">
-            本地 + 自有云端 + 在线聚合的个人音乐中心 · 需求文档见仓库根目录。
-          </div>
+          <div class="set-note">本地 + 自有云端 + 在线聚合的个人音乐中心。</div>
         </div>
       </TabsContent>
     </TabsRoot>

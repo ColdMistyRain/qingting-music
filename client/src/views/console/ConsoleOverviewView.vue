@@ -37,7 +37,7 @@ const stats = computed<StatItem[]>(() => [
       </div>
     </div>
 
-    <p class="roadmap">最常播放、各来源播放占比等图表随 M2 交付。</p>
+    <p class="roadmap">最常播放、各来源播放占比等图表稍后补上。</p>
   </section>
 </template>
 

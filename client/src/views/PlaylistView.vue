@@ -9,15 +9,12 @@ defineProps<{ id: string }>();
 <template>
   <section>
     <div class="page-head">
-      <h1>
-        歌单
-        <div class="sub">歌单 ID：{{ id }}</div>
-      </h1>
+      <h1>歌单</h1>
     </div>
     <EmptyState
       :icon="IconPlaylist"
-      title="歌单功能将在 M2 接入"
-      desc="歌单的创建/重命名/删除、跨来源曲目收录与整单播放属于里程碑 M2（PS-01~05）。侧栏分区与详情页结构已就位。"
+      title="歌单还没上线"
+      desc="创建、重命名、删除、收录曲目与整单播放会在后续版本上线。"
     />
   </section>
 </template>

@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
      所以两个方向要分开写：**隐藏**等淡出播完（延迟 = 时长），**显示**立即生效。
      否则打开后的前半个过渡期里元素仍是 hidden：`focus()` 会静默失败（实测取消键聚焦不上）。 */
   transition:
-    opacity 0.2s var(--ease-ios),
+    opacity 0.2s ease,
     visibility 0s 0.2s;
 }
 
@@ -224,20 +224,21 @@ onBeforeUnmount(() => {
   box-shadow: var(--panel-sheen), var(--panel-shadow);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(8px) scale(0.98);
+  /* ⚠️ **只做透明度，不要加 transform**（v5.54 需求方：“点击取消后的动画有卡顿”）。
+     面板带 `backdrop-filter: blur(64px)`：动 transform 时浏览器每帧都要重算模糊区域、
+     并重新栅格化面板里的文字（实测关闭过程中是 `scale(.989)+translateY(4.35)` → `scale(.983)+translateY(6.98)`），
+     在真机上就是那种“卡一下”的观感。纯 opacity 是合成层上最便宜的一档，永远不会拖帧。
+     关闭曲线用 `ease`（开头就慢慢淡，而不是 `--ease-ios` 那种一上来就掉一半）。 */
   transition:
-    opacity 0.2s var(--ease-ios),
-    transform 0.2s var(--ease-ios),
+    opacity 0.2s ease,
     visibility 0s 0.2s;
 }
 
 .cf-card[data-state="open"] {
   opacity: 1;
   visibility: visible;
-  transform: none;
   transition:
-    opacity 0.2s var(--ease-ios),
-    transform 0.2s var(--ease-ios),
+    opacity 0.18s var(--ease-ios),
     visibility 0s;
 }
 

@@ -211,12 +211,56 @@ function onPointerUp(event: PointerEvent): void {
   gap: 20px;
 }
 
+/* ⚠ 基础规则必须写在媒体查询**之前**：两者特异性相同（都是 (0,1,0)），靠源码顺序分胜负。
+   v5.94 踩过 —— 这两条原本写在文件末尾（媒体查询之后），结果手机档那句 `display: grid`
+   被它压回 `flex`，而同一块里的 `grid-template-areas` 却生效了：**半套生效最难查**
+   （量出来是 `display: flex` + `grid-template-areas: "bar bar" …` 这种不可能的组合）。 */
+.im-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.time {
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+}
+
 @media (max-width: 767px) {
   /* 手机上进度条与走带键**上下调换**（需求方：“播放按钮那一排和进度条调换位置”）：
      进度在上、走带键落在最下面 —— 屏幕底部是拇指最容易够到的区域，留给最常用的三个键，
      进度只是“看一眼”的信息，放它上面。（桌面不动：那里鼠标够得着，沿用原来的顺序。） */
+  /* 时间退到**轨道底部两端**（v5.94，需求方给的参照是 QQ 手机版那张图：`00:03` 在轨道左下、
+     `04:29` 在右下）。手机一整行的横向空间很紧 —— 时间挤在两侧时轨道只剩 250px 左右，
+     挪到下面之后轨道独占整行（既能一眼看清进度，拖拽行程也变长）。
+     用命名 grid 区域而不是 flex-wrap + order 那套：区域名直接说明“谁在哪”，
+     将来多一个子元素也不会错位。`align-items` 沿用基础规则的 center。 */
   .im-progress {
     order: -1;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "bar bar"
+      "elapsed total";
+    gap: 4px 12px;
+  }
+
+  .im-progress .progress {
+    grid-area: bar;
+  }
+
+  /* 两端与**轨道**的两端对齐（轨道横跨整行，所以就是容器的内边距，与下面那排键同一条边界） */
+  .im-progress .time:first-child {
+    grid-area: elapsed;
+    justify-self: start;
+  }
+
+  .im-progress .time:last-child {
+    grid-area: total;
+    justify-self: end;
   }
 
   /* 一排五个键：模式 / 上一曲 / 播放 / 下一曲 / 队列（需求方指定：模式在上一曲左侧、
@@ -271,20 +315,6 @@ function onPointerUp(event: PointerEvent): void {
     --ctl-play-size: 56px;
     --ctl-play-icon: 32px;
   }
-}
-
-.im-progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.time {
-  font-size: 11px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-  min-width: 34px;
 }
 
 /* 进度条本体（轨道 / 填充 / 手柄 / 播放时的柔光）与“手柄何时出现”全在 global.css 的共用规则里

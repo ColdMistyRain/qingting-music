@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import IconClockCounterClockwise from "~icons/ph/clock-counter-clockwise";
 import IconHeartStraight from "~icons/ph/heart-straight";
 import IconPlay from "~icons/ph/play";
 import IconTrash from "~icons/ph/trash";
 import { playlistItemKey, type PlaylistItem, type Track } from "@qingting/shared";
 import EmptyState from "@/components/EmptyState.vue";
 import NavToggle from "@/components/NavToggle.vue";
-import SegmentedControl from "@/components/SegmentedControl.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import { useLibraryStore } from "@/stores/library";
@@ -16,29 +16,32 @@ import { confirmAction } from "@/utils/confirm";
 import { songToTrack } from "@/utils/library";
 
 /**
- * 我的音乐（PS-05）：收藏 / 最近播放两个页签。
+ * 我的收藏 / 最近播放（PS-05）：同一份数据的两个入口，各占一个一级导航位。
+ *
+ * 曾经合成一页「我的音乐」+ 两个页签，需求方反馈“这种布局让你迷惑” —— 两个页签装的
+ * 是两件不同的事（我收下的 / 我听过什么），塞在一页里既没有共同标题、也让侧栏少了一个
+ * 入口。所以拆成两页（`/favorites`、`/recent`），组件共用一份、由路由给 `mode`
+ * （两边只有标题、一处动作与数据源不同），列表骨架与音乐库完全一致。
  *
  * 数据在服务器端（`data/listening.json`）—— 收藏与播放记录跟着服务器走，
  * 不跟着某个浏览器走（手机上收藏的、电脑上看得见）。
  *
  * 列表行复用 `TrackRow`（与音乐库同一套行视觉），多一枚收藏键：收藏页里要能取消收藏，
  * 最近播放里也要能顺手收下。**只列现在还能播的**（云端引用要能在曲库里对上），
- * 对不上的那些不静默消失 —— 下面用一行小字说清楚有几首、为什么。
+ * 对不上的那些不静默消失 —— 用一行小字说清楚有几首、为什么。
  */
+const props = defineProps<{ mode: "favorites" | "recent" }>();
+
 const listening = useListeningStore();
 const library = useLibraryStore();
 const player = usePlayerStore();
 
-const tab = ref<"favorites" | "recent">("favorites");
+const isRecent = computed(() => props.mode === "recent");
+const title = computed(() => (isRecent.value ? "最近播放" : "我的收藏"));
 const busy = ref(false);
 
-const TAB_OPTIONS = [
-  { value: "favorites", label: "收藏" },
-  { value: "recent", label: "最近播放" },
-];
-
 const items = computed<readonly PlaylistItem[]>(() =>
-  tab.value === "favorites" ? listening.favorites : listening.recent,
+  isRecent.value ? listening.recent : listening.favorites,
 );
 
 /** 能播的那些：云端引用 + 曲库里还有这一首（本地引用不带地址、在线音源还没接） */
@@ -97,9 +100,13 @@ async function clearRecent(): Promise<void> {
     <div class="page-head">
       <div class="page-head__title">
         <NavToggle />
-        <h1>我的音乐</h1>
+        <h1>{{ title }}</h1>
         <p class="sub">
-          收藏 {{ listening.favorites.length }} 首 · 最近播放 {{ listening.recent.length }} 条
+          {{
+            isRecent
+              ? `最近 ${listening.recent.length} 条`
+              : `收藏 ${listening.favorites.length} 首`
+          }}
         </p>
       </div>
       <div class="page-head__actions">
@@ -108,7 +115,7 @@ async function clearRecent(): Promise<void> {
           播放全部
         </button>
         <button
-          v-if="tab === 'recent' && listening.recent.length > 0"
+          v-if="isRecent && listening.recent.length > 0"
           class="btn"
           :disabled="busy"
           @click="clearRecent"
@@ -120,10 +127,6 @@ async function clearRecent(): Promise<void> {
     </div>
 
     <p v-if="listening.error" class="my-error" role="alert">{{ listening.error }}</p>
-
-    <div class="my-tabs">
-      <SegmentedControl v-model="tab" :options="TAB_OPTIONS" />
-    </div>
 
     <!-- 列不出来的那些：一句小字说清楚，不静默消失。它说明的是这份列表，所以钉在帧上、不跟着滚 -->
     <p v-if="hidden > 0" class="my-note">
@@ -138,25 +141,25 @@ async function clearRecent(): Promise<void> {
       <EmptyState
         v-if="listening.status === 'loading' && items.length === 0"
         class="page-frame__fill"
-        :icon="IconHeartStraight"
+        :icon="isRecent ? IconClockCounterClockwise : IconHeartStraight"
         title="正在读取…"
         desc="收藏与播放记录都在服务器上，稍等一下。"
       />
 
       <EmptyState
-        v-else-if="items.length === 0 && tab === 'favorites'"
+        v-else-if="items.length === 0 && isRecent"
         class="page-frame__fill"
-        :icon="IconHeartStraight"
-        title="还没有收藏"
-        desc="播放条上那颗心，或在音乐库里点一下 —— 喜欢的歌就会收在这里。"
+        :icon="IconClockCounterClockwise"
+        title="还没有播放记录"
+        desc="听过一首歌之后，这里会留下最近播放的 100 条。"
       />
 
       <EmptyState
         v-else-if="items.length === 0"
         class="page-frame__fill"
-        :icon="IconTrash"
-        title="还没有播放记录"
-        desc="听过一首歌之后，这里会留下最近播放的 100 条。"
+        :icon="IconHeartStraight"
+        title="还没有收藏"
+        desc="播放条上那颗心，或在音乐库里点一下 —— 喜欢的歌就会收在这里。"
       />
 
       <div v-else-if="rows.length === 0" class="page-frame__fill">
@@ -187,10 +190,6 @@ async function clearRecent(): Promise<void> {
   margin: 10px 0;
   font-size: 13px;
   color: var(--danger);
-}
-
-.my-tabs {
-  margin: 4px 0 12px;
 }
 
 /* 列不出来的那些：用一句小字说清楚，不静默消失 */

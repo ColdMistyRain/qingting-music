@@ -33,9 +33,16 @@ const routes: RouteRecordRaw[] = [
       },
       { path: "library", name: "library", component: () => import("@/views/LibraryView.vue") },
       {
-        path: "collection",
-        name: "collection",
-        component: () => import("@/views/CollectionView.vue"),
+        path: "favorites",
+        name: "favorites",
+        component: () => import("@/views/ListeningView.vue"),
+        props: { mode: "favorites" },
+      },
+      {
+        path: "recent",
+        name: "recent",
+        component: () => import("@/views/ListeningView.vue"),
+        props: { mode: "recent" },
       },
       { path: "online", name: "online", component: () => import("@/views/OnlineView.vue") },
       {

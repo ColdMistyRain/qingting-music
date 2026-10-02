@@ -88,7 +88,7 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           confirm（二次确认的唯一入口：队列 + 发答案 - v5.53）、topLayer（“Esc 只关最上面那层”登记处 - v5.53）、
                           themeColor（`<meta name=theme-color>`：状态栏颜色跟主题走 - RT-07）、
                           pointer（触摸点击判定：手机上“点一下就是播这首” - v5.32）、
-client/src/views/         login/local/library/collection/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
+client/src/views/         login/local/library/listening(favorites+recent)/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
 client/src/composables/   usePlayHistory（切歌时记一条最近播放 - PS-05）、
                           useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
                           useMediaQuery（响应式断点：只在“同一处要显示不同内容”时用 - v5.33）、
@@ -128,7 +128,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **提示条（Toast，v5.72）**：`utils/toast.ts`（唯一入口 `showToast` + 队列）+ `components/AppToast.vue`（Reka Toast，挂 App.vue）。**判据**：与当前操作无关、消失也不影响继续操作的消息走提示条（播放异常、后台任务结果）；绑在控件/表单项上的错误留在原地（表单校验、上传某一行失败、带“重试”的失败面板）。**PL-09 的播放提示已改走它**（`stores/player` 的 `notify()`，出错 `danger` + 10s），播放条里那行红字与 `notice` 状态都已移除。
 
-**收藏与最近播放（v5.67，PS-05）**：数据在服务端 `data/listening.json`（手机上收藏的、电脑上看得见；清一次浏览器数据不会把它清掉）。接口 `GET /api/listening` + `POST/DELETE /api/listening/favorites` + `POST/DELETE /api/listening/recent`（均访客级，引用口径与歌单同一套身份键）——收藏幂等、最近播放去重置顶并截到 100 条。前端：`stores/listening`（不做乐观更新，一律用服务端返回的那一份回填）+ `composables/usePlayHistory`（挂在 App.vue，切歌时记一条）+ `views/CollectionView`（/collection，「我的音乐」：收藏 / 最近播放两个页签，行复用 `TrackRow` 的收藏键）+ 播放条与沉浸页各一枚收藏键（播放条那枚在**队列键左侧**、与队列并列在最右 —— 中间那组键因此对进度条左右对称，实测播放键中心与进度条中心重合；状态色由 `.ctl.is-on` 一条规则给三处共用，v5.70）；手机上播放条那两枚一起收起（最右那组整组 `display: none`），入口在沉浸页控制栏。**未做**：均衡器（PL-13）。
+**收藏与最近播放（v5.67，PS-05）**：数据在服务端 `data/listening.json`（手机上收藏的、电脑上看得见；清一次浏览器数据不会把它清掉）。接口 `GET /api/listening` + `POST/DELETE /api/listening/favorites` + `POST/DELETE /api/listening/recent`（均访客级，引用口径与歌单同一套身份键）——收藏幂等、最近播放去重置顶并截到 100 条。前端：`stores/listening`（不做乐观更新，一律用服务端返回的那一份回填）+ `composables/usePlayHistory`（挂在 App.vue，切歌时记一条）+ `views/ListeningView`（`/favorites`「我的收藏」与 `/recent`「最近播放」两页共用一份组件，行复用 `TrackRow` 的收藏键；v5.83 从「我的音乐」+ 两页签拆开的 —— 需求方：“这个标题应该叫我的收藏或者我喜欢，其次最近播放列表应该单开一个在侧边栏里面，现在这种布局让你迷惑”）+ 播放条与沉浸页各一枚收藏键（播放条那枚在**队列键左侧**、与队列并列在最右 —— 中间那组键因此对进度条左右对称，实测播放键中心与进度条中心重合；状态色由 `.ctl.is-on` 一条规则给三处共用，v5.70）；手机上播放条那两枚一起收起（最右那组整组 `display: none`），入口在沉浸页控制栏。**未做**：均衡器（PL-13）。
 
 **均衡器（v5.68，PL-13）**：设置 › 音效。音频路径 `<audio>` → MediaElementSource → 10 段 BiquadFilter 链（31Hz~16kHz）→ 整体增益 → 限幅器（防爆音）→ 输出；**懒建图、拿到用户手势才接线**（`AudioContext` 没手势时 suspended，接进挂起的图里就是静音 —— 所以建图 / `resume()` / 接线分三步），**A/B 关闭时真直通**（source 直接连输出），设置存 `localStorage`（每设备一份）。界面的十根竖杆与整体增益用共用的 `components/Slider.vue`（竖/横同一个实现，几何在 `utils/slider.ts` —— 原生 range 旋转拖不动、填充语义也不对，坑 7 / 23），预设用 Reka Select。**未做**：频谱可视化（VS-05，选型表里与 EQ 共用同一张图）。
 

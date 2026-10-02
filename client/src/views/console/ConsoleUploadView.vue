@@ -84,7 +84,13 @@ function onMetaSaved(song: Song, assets: { lyrics?: string }): void {
   library.applyUpdated(song, assets);
   // 这一行的结果文字里有歌名，改了要跟着变，不然看起来像“没保存”
   const item = items.value.find((entry) => entry.song?.id === song.id);
-  if (item) item.message = `${formatSize(song.size)} · ${song.title}`;
+  if (!item) return;
+  // ⚠️ 连 `song` 一起换掉（v6.13）：这一行是**再次**打开编辑弹窗的数据源，
+  // 留着旧的那份会有两个错处 —— ① 换过封面之后旧 URL 已经被删，弹窗里是一张破图；
+  // ② 刚存上的歌词仍显示“曲库里还没有歌词”；③ `needsMeta` 也拿着旧标签，
+  // 补完歌手这枚键还是着色的（看着像没保存成功）。
+  item.song = song;
+  item.message = `${formatSize(song.size)} · ${song.title}`;
 }
 
 let keySeed = 0;

@@ -81,7 +81,7 @@ client/src/router/        路由表 + 守卫（身份决定可达页面）
 client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、
                           listening（收藏与最近播放：数据在服务端 data/listening.json - PS-05）、
                           library、transfer（本地列表→上传页的 File 交接 - LC-07）
-client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息 / 排序下标）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
+client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息与封面 / 排序下标 - v6.14）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
                           concurrency（带并发上限的批量映射：拖入文件夹时用它，别 forEach 裸并行 - v6.10）、debounce（尾部防抖：列表页搜索框用，输入即时 + 过滤防抖 - v6.10）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
                           equalizer（均衡器：10 段频段 / 预设 / 曲线清洗 - PL-13）、

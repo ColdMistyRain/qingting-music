@@ -66,7 +66,9 @@ const totalSeconds = computed(() =>
   playlist.value ? playlistTotalDuration(playlist.value.items) : 0,
 );
 const playable = computed(() => playableTracks(entries.value));
-const cover = computed(() => entries.value.find((entry) => entry.item.cover)?.item.cover ?? null);
+// 封面拼贴取“第一条有封面的那一条”，用**解析后的实时封面**（`entry.cover`）——
+// 歌单里存的是加入那一刻的快照，换过封面/删过曲目之后那个 URL 就是 404（v6.13）
+const cover = computed(() => entries.value.find((entry) => entry.cover)?.cover ?? null);
 
 const renaming = ref(false);
 const picking = ref(false);
@@ -448,7 +450,7 @@ function exportJson(): void {
               @click="playFrom(entry)"
             >
               <span class="pl-art">
-                <img v-if="entry.item.cover" :src="entry.item.cover" alt="" />
+                <img v-if="entry.cover" :src="entry.cover" alt="" />
                 <IconPlaylist v-else class="icon" />
               </span>
               <span class="pl-text">

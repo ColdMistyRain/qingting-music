@@ -24,15 +24,28 @@ export interface PlaylistEntry {
   title: string;
   /** 显示用的歌手 */
   artist: string;
+  /** 显示用的封面（同样实时优先：换过封面 / 曲目被删之后，快照里的那个 URL 已经是 404） */
+  cover: string | null;
 }
 
 /**
  * 显示用歌名/歌手：能对上实时曲目就用它的 —— 歌单里存的是**加入那一刻的快照**，
  * 曲目信息被手动改过（AD-02）或云端标签重抽过之后，快照就旧了，
  * 显示层必须优先用实时的，否则“曲库改了名、歌单里还是旧的”。
+ *
+ * **封面同理（v6.13）**：封面文件换了名字（手动换封面 = 新文件），
+ * 而快照里存的是旧 URL —— 旧文件已经被删，直接拿它渲染就是一张破图。
+ * 所以封面跟歌名/歌手走同一条规则，不为它开特例。
  */
-function displayMeta(item: PlaylistItem, track: Track | null): { title: string; artist: string } {
-  return { title: track?.title ?? item.title, artist: track?.artist ?? item.artist };
+function displayMeta(
+  item: PlaylistItem,
+  track: Track | null,
+): { title: string; artist: string; cover: string | null } {
+  return {
+    title: track?.title ?? item.title,
+    artist: track?.artist ?? item.artist,
+    cover: track?.cover ?? item.cover ?? null,
+  };
 }
 
 /** 解析歌单里的一条：能不能播、拿什么去播 */

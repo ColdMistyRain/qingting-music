@@ -130,6 +130,30 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
     );
     expect(online.title).toBe("在线歌");
   });
+
+  it("封面同样实时优先：手动换过封面之后，快照里那个旧 URL 已经是 404（v6.13）", () => {
+    const replaced = song({ coverUrl: "/covers/-id-newName.png" });
+    const entry = resolvePlaylistEntry(
+      { ...cloudItem, cover: "/covers/-id-oldName.jpg" },
+      { songs: [replaced], queue: [] },
+    );
+
+    expect(entry.cover).toBe("/covers/-id-newName.png");
+    // 歌单里存的快照不动，只是不拿来渲染
+    expect(entry.item.cover).toBe("/covers/-id-oldName.jpg");
+  });
+
+  it("实时曲目没有封面时也退回快照；两边都没有就是 null", () => {
+    const withoutCover = song({ coverUrl: null });
+    const fallback = resolvePlaylistEntry(
+      { ...cloudItem, cover: "/covers/snapshot.jpg" },
+      { songs: [withoutCover], queue: [] },
+    );
+    expect(fallback.cover).toBe("/covers/snapshot.jpg");
+
+    const none = resolvePlaylistEntry(cloudItem, { songs: [withoutCover], queue: [] });
+    expect(none.cover).toBeNull();
+  });
 });
 
 describe("resolvePlaylist / playableTracks / playlistTotalDuration", () => {

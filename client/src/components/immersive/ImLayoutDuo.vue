@@ -112,7 +112,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   height: 100%;
 }
 
-/* 歌词窗口：双栏下给它一个固定高度，居中的位移才是可预期的 */
+/* 歌词窗口：双栏下给它一个稳定高度，居中的位移才是可预期的 */
 .ly {
   height: min(46vh, 420px);
 }
@@ -124,29 +124,50 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   }
 }
 
-/* 窄屏（RT-08 的最小照顾）：封面与歌词上下叠，不做两栏硬挤 */
+/* 窄屏（RT-08 的最小照顾）：封面与歌词上下叠，不做两栏硬挤。
+   ⚠️ 两行的**行高规则**是这里的要紧处（v6.15）：
+   - 封面那行 `auto`：它按自己的宽度（含 vh）定高；
+   - 右侧那行 `minmax(0, 1fr)`：拿走**剩下的高度** —— 写 `auto` 的话行高就等于内容高，
+     而 `.ly` 原先是 `min(38vh, 300px)` 的固定高度，在 375×667（iPhone SE）上
+     整个 `.right` 比 `.im-body` 高出 48px，而 `.im-body` 不裁剪 ——
+     歌词窗口的下半截就画到了**进度条背后**（实测 `.ly-view` 底 597，`.im-body` 底 549）。
+   - 所以 `.ly` 在窄屏改成“吃剩余空间”（`flex: 1` + `min-height: 0`），只有下限、没有固定高。 */
 @media (max-width: 720px) {
   .duo {
     grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: clamp(12px, 2.6vh, 20px);
     padding: 0 16px;
   }
 
+  /* 封面：`26vh` 让**矮屏自动收一档**（667 → 173px；844 的机器还给到 203px 上下，
+     几乎不变），框住高度的同时不再与歌词抢地方 */
   .cover {
-    width: min(56vw, 220px);
+    width: min(52vw, 26vh, 220px);
+  }
+
+  .right {
+    min-height: 0;
+    gap: clamp(10px, 2vh, 18px);
   }
 
   .ly {
-    height: min(38vh, 300px);
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
   }
 }
 
 /* 横屏手机（RT-06）：宽够、高不够 —— 上下叠会把封面顶出屏幕。
    这里回到两栏（封面在左、歌词在右），但封面尺寸改由**高度**派生：
-   `34vh` 在 375px 高的屏上只有 127px，比竖屏的 220px 小得多，正好塞进上下两条控件之间。 */
+   `34vh` 在 375px 高的屏上只有 127px，比竖屏的 220px 小得多，正好塞进上下两条控件之间。
+   ⚠️ 横屏也属于“高不够”，所以下面这条同样要把歌词改成吃剩余空间。 */
 @media (max-width: 767px) and (orientation: landscape) {
   .duo {
     grid-template-columns: min(38vh, 220px) minmax(0, 1fr);
+    /* 只有一列不写行模板时，隐式行是 `auto` = 按内容定高 —— 内容比容器高就照样溢出去，
+       显式写成 `minmax(0, 1fr)` 才把右列按在容器高度里 */
+    grid-template-rows: minmax(0, 1fr);
     gap: 24px;
   }
 
@@ -155,7 +176,11 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   }
 
   .ly {
-    height: min(46vh, 260px);
+    /* 横屏也是“高不够”：这里同样吃剩余空间，别用固定 vh（375 高的屏上 46vh 只有 172px，
+       但真正该守的是“不许超过容器”，而不是某个具体高度） */
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
   }
 }
 </style>

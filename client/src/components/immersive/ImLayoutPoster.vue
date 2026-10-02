@@ -472,18 +472,56 @@ useBeat(() => posterEl.value);
     /* 窄屏只改盘径：画布尺寸与所有偏移都是它的派生值，不用也不能再手写一份
        ——否则又是“三方各自漂移”的老毛病。
        56vw：把左右各 0.3 盘径的留白也算进去（盘居中，唱臂抬起仍不出屏）。
-       画布以盘为中心，所以栅格直接居中的就是**盘**，不再需要补偿量 */
-    --vinyl-d: min(56vw, 40vh, 300px);
+       画布以盘为中心，所以栅格直接居中的就是**盘**，不再需要补偿量。
+       `26vh` 是 p方版（v6.15）：宽度还够但高度不够的屏（iPhone SE / 手机横屏）
+       把盘收一档，免得下面的歌词被挤到进度条背后。 */
+    --vinyl-d: min(52vw, 26vh, 300px);
   }
 
   .poster__col {
     grid-row: 2;
     width: 100%;
     max-width: none;
+    /* ⚠️ `height: 100%` 是这一条的关键（v6.15）：`.poster` 带 `align-items: center`，
+       所以栅格项默认**不拉伸**，高度是内容高 —— 里面那个 `flex: 1` 的歌词因此没有
+       “剩余空间”可分，直接撑成整份歌词的高度（实测 8502px），整列从容器里溢出去。
+       给它一个确定高度（栅格行是 definite 的）之后，`flex: 1` 才真的是“剩下的高度”。 */
+    height: 100%;
+    min-height: 0;
   }
 
   .ly {
-    height: min(30vh, 260px);
+    /* 吃剩余空间：固定 vh 在矮屏上会把歌词窗口顶到 `.im-body` 外面（与双栏同一个毛病） */
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+}
+
+/* 横屏手机（RT-06，与双栏同一条思路）：宽够、高不够 —— 上下叠会把盘顶出屏幕，
+   而且“盘 + 标题 + 歌词”挤在 375px 高里只剩几像素给歌词（实测 7px，等于看不到歌词）。
+   这里回到**桌面那套两栏**（歌词在左、盘在右），盘径改由高度派生。 */
+@media (max-width: 767px) and (orientation: landscape) {
+  .poster {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
+    justify-items: stretch;
+    padding: 0 16px;
+  }
+
+  .poster__art {
+    grid-row: auto;
+    grid-column: auto;
+    /* `44vh` 而不是 58vh：画布是“盘径 × 1.2 高”（上下各留 0.1 给唱臂抬起），
+       375 高的屏上 58vh 的画布有 261px，比可用高度（208）还高 —— 盘会顶到进度条上。
+       44vh = 165px，画布 198px，正好收在上下两条控件之间。 */
+    --vinyl-d: min(44vh, 300px);
+  }
+
+  .poster__col {
+    grid-row: auto;
+    grid-column: auto;
+    max-width: none;
   }
 }
 </style>

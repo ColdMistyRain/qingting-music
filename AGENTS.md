@@ -198,6 +198,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 26. **别用管道 / 重定向去“安静地”跑 npm 脚本（v5.82 又踩一次）**：`npm.cmd run test *> $null`（以及 `2>&1 | Select-String …`）会让 `$LASTEXITCODE` **假报非 0**，而单测其实全绿 —— npm 的 `notice` 走 stderr，被 PowerShell 当成原生命令错误。判据：**只读 vitest 自己那两行**（`Test Files 16 passed` / `Tests 185 passed`），或让命令原样输出再单独取 `$LASTEXITCODE`。同理，`Get-Content … | Select-String` 处理中文还会输出乱码，看构建结果别加选择器。
 
+27. **全屏页/弹层里的高度只能用“剩余空间”算，别用固定 `vh`（v6.15 实测）**：需求方在 iPhone SE（375×667）上圈出“歌词卡到进度条下面”。量出来是歌词窗口底 **597** vs 容器底 **549**（**溢出 48px**）—— 三布局窄屏给歌词写的是 `38vh / 30vh / 40vh`，它们只知道屏多高、不知道上面已经被封面与标题占掉多少；而 `overflow: hidden` **只管窗口内部**（列表不会溢出窗口），管不住**窗口本身**越过容器，于是下半截画在进度条背后（`.im-bottom` 在 DOM 后面，正好盖住它）。写法：① 高度先拆干净（`grid-template-rows: auto minmax(0, 1fr)` / `flex: 1; min-height: 0`）；② 要伸缩的那层 `flex: 1 1 auto; height: auto; min-height: 0`；③ 真要上限就用 `max-height`（它不会顶破容器）。**同一个坑里挖到的第二半**：`align-items: center` 的栅格里**栅格项默认不拉伸**、高度仍是内容高，里面的 `flex: 1` 就没有“剩余空间”可分 —— 海报布局的歌词窗口因此撑成 **8502px**（要在栅格项上显式给 `height: 100%`）。判据：量**要伸缩那一层的盒子**，别只看它的子元素；改完在**多个尺寸 × 三个布局**上都量一遍“窗口底 − 容器底”，桌面尺寸要能对出“与改前逐像素一致”。
+
 ## 文档索引
 
 | 文档                                                         | 内容                                                                          |

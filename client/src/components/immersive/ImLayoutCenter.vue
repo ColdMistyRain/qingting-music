@@ -66,7 +66,13 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 @media (max-width: 720px) {
   .ly {
-    height: min(40vh, 320px);
+    /* 吃剩余空间（而不是 `min(40vh, 320px)` 的固定高）：
+       固定 vh 在矮屏（iPhone SE 667）上会把歌词窗口顶出 `.im-body`，
+       下半截画到进度条背后（v6.15 实测）。`max-height` 只用来在**高**屏上收住留白。 */
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    max-height: min(48vh, 440px);
   }
 }
 </style>

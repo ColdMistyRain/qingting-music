@@ -680,4 +680,18 @@ onBeforeUnmount(() => {
     transform: none;
   }
 }
+
+/* 矮屏（v6.15，需求方对着 iPhone SE 375×667 的截图：“歌词会卡到进度条下面……
+   歌词字体再小点”）：矮屏上能放的行数本来就少，字号收一档 ——
+   上下文句与当前句都小一档，一屏里看得见的话更多，当前句也不再顶到窗口边缘。
+   只按**高度**判（375 宽的屏一屏比一屏高，宽窄不是这里的病因；横屏手机也会落进来）。 */
+@media (max-height: 700px) {
+  .lyline {
+    font-size: clamp(15px, 2.1vh, 24px);
+  }
+
+  .lyline.current {
+    font-size: clamp(19px, 2.9vh, 30px);
+  }
+}
 </style>

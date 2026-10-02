@@ -107,3 +107,28 @@ export function playlistTotalDuration(items: readonly PlaylistItem[]): number {
 export function playableTracks(entries: readonly PlaylistEntry[]): Track[] {
   return entries.map((entry) => entry.track).filter((track): track is Track => track !== null);
 }
+
+/**
+ * 把第 from 条挪到第 to 条的位置（PS-04 拖拽/键盘排序）。
+ *
+ * 语义是“**插在目标位置**”而不是“跟目标互换”：往下拖时把中间那几条整体前移一格、
+ * 往上拖时整体后移一格 —— 拖拽交互的直觉就是这个，互换会让“拖到末尾”变成一件做不到的事。
+ * 越界会夹到两端（拖到列表外也能落到头/尾）；from 本身越界或目标就是原位时，
+ * 返回一份**同顺序**的副本（调用方可以不区分）。不改变入参（服务端那一份是唯一真相，
+ * 本地列表随时会被它的响应回填）。
+ */
+export function movePlaylistItem(
+  items: readonly PlaylistItem[],
+  from: number,
+  to: number,
+): PlaylistItem[] {
+  const next = [...items];
+  if (from < 0 || from >= next.length) return next;
+
+  const target = Math.max(0, Math.min(next.length - 1, to));
+  if (target === from) return next;
+
+  const [moved] = next.splice(from, 1);
+  next.splice(target, 0, moved);
+  return next;
+}

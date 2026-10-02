@@ -15,6 +15,7 @@ import {
   renamePlaylist as apiRename,
   replacePlaylistItems as apiReplaceItems,
 } from "@/api/playlists";
+import { movePlaylistItem } from "@/utils/playlistEntries";
 
 export type PlaylistsStatus = "idle" | "loading" | "ready" | "error";
 
@@ -98,6 +99,17 @@ export const usePlaylistsStore = defineStore("playlists", () => {
     );
   }
 
+  /**
+   * 歌单内排序（PS-04）：把第 from 条挪到第 to 条的位置。
+   * 排序也是“新的一份顺序”（与添加/移除同一回事），所以直接发整表（`utils/playlistEntries`
+   * 的 `movePlaylistItem` 负责下标运算，纯函数、有单测）。
+   */
+  async function moveItem(id: string, from: number, to: number): Promise<Playlist | null> {
+    const playlist = byId.value.get(id);
+    if (!playlist) return null;
+    return setItems(id, movePlaylistItem(playlist.items, from, to));
+  }
+
   function clearError(): void {
     error.value = "";
   }
@@ -115,6 +127,7 @@ export const usePlaylistsStore = defineStore("playlists", () => {
     setItems,
     addTracks,
     removeItem,
+    moveItem,
     clearError,
   };
 });

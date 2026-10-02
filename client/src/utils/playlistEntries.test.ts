@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Playlist, PlaylistItem, Song, Track } from "@qingting/shared";
 import {
+  movePlaylistItem,
   playableTracks,
   playlistTotalDuration,
   resolvePlaylist,
@@ -161,5 +162,49 @@ describe("resolvePlaylist / playableTracks / playlistTotalDuration", () => {
     expect(playlistTotalDuration([cloudItem, localItem])).toBe(325);
     expect(playlistTotalDuration([cloudItem, { ...cloudItem, duration: undefined }])).toBe(325);
     expect(playlistTotalDuration([])).toBe(0);
+  });
+});
+
+describe("movePlaylistItem（PS-04：拖拽/键盘排序）", () => {
+  /** 用 refId 当身份，看得清哪一条挪到哪儿了 */
+  const items: PlaylistItem[] = ["a", "b", "c", "d"].map((refId) => ({
+    source: "server",
+    refId,
+    title: refId,
+    artist: "人",
+  }));
+  const order = (list: readonly PlaylistItem[]) => list.map((item) => item.refId).join("");
+
+  it("往下拖：中间那几条整体前移一格（是“插入”，不是互换）", () => {
+    expect(order(movePlaylistItem(items, 0, 2))).toBe("bcad");
+    expect(order(movePlaylistItem(items, 0, 3))).toBe("bcda");
+  });
+
+  it("往上拖：中间那几条整体后移一格", () => {
+    expect(order(movePlaylistItem(items, 3, 1))).toBe("adbc");
+    expect(order(movePlaylistItem(items, 2, 0))).toBe("cabd");
+  });
+
+  it("挪到原位（或 from 越界）：顺序不变，但给的是新数组", () => {
+    expect(order(movePlaylistItem(items, 1, 1))).toBe("abcd");
+    expect(order(movePlaylistItem(items, 9, 0))).toBe("abcd");
+    expect(order(movePlaylistItem(items, -1, 2))).toBe("abcd");
+    expect(movePlaylistItem(items, 1, 1)).not.toBe(items);
+  });
+
+  it("目标越界夹到两端：拖到列表外也能落到头/尾", () => {
+    expect(order(movePlaylistItem(items, 0, 99))).toBe("bcda");
+    expect(order(movePlaylistItem(items, 3, -5))).toBe("dabc");
+  });
+
+  it("不改动入参（本地列表随时会被服务端响应的那一份回填）", () => {
+    const before = order(items);
+    movePlaylistItem(items, 0, 3);
+    expect(order(items)).toBe(before);
+  });
+
+  it("空歌单 / 只有一条：不报错", () => {
+    expect(movePlaylistItem([], 0, 1)).toEqual([]);
+    expect(order(movePlaylistItem([items[0]], 0, 5))).toBe("a");
   });
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import {
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui";
+import IconDotsSixVertical from "~icons/ph/dots-six-vertical";
 import IconPencilSimple from "~icons/ph/pencil-simple";
 import IconPlay from "~icons/ph/play";
 import IconPlaylist from "~icons/ph/playlist";
@@ -63,6 +64,7 @@ const picking = ref(false);
 const keyword = ref("");
 const busy = ref(false);
 const actionError = ref("");
+const listEl = ref<HTMLOListElement | null>(null);
 
 /** 选择器只列"还没进这个歌单"的曲目：已在里面的不再出现，免得点了像没反应 */
 const candidates = computed(() => {
@@ -113,6 +115,113 @@ async function submitRename(name: string): Promise<void> {
 
 async function removeEntry(entry: PlaylistEntry): Promise<void> {
   await run(() => playlists.removeItem(props.id, entry.item));
+}
+
+/**
+ * PS-04：歌单内排序。
+ *
+ * 拖动用**指针事件自己实现**（浏览器原生的 HTML5 拖放做不出“行跟手”的观感，
+ * 触屏上也基本不可用）：按下把手 → 抓住指针 → 行跟着 `translateY` 走、
+ * 越过某行中心线就把它定为落点 → 松手发一次整表替换（服务端那一份顺序是唯一真相）。
+ * 排序是管理型操作，但对键盘用户不能没有出路：焦点在把手上时 ↑ ↓ 就能挪一格。
+ */
+const dragFrom = ref(-1);
+const dragTo = ref(-1);
+const dragOffset = ref(0);
+let dragStartY = 0;
+let rowCenters: number[] = [];
+let scroller: HTMLElement | null = null;
+
+const dragging = computed(() => dragFrom.value >= 0);
+
+/** 被拖的行往上/往下找第一个能滚的祖先（长歌单不滚就够不着首尾） */
+function findScroller(from: HTMLElement): HTMLElement | null {
+  let node = from.parentElement;
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function startDrag(index: number, event: PointerEvent): void {
+  if (busy.value || entries.value.length < 2) return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+
+  const handle = event.currentTarget as HTMLElement;
+  const list = handle.closest(".pl-list");
+  if (!list) return;
+
+  // 行高、间距都可能在主题/断点下不同，所以量一次实际几何，不要拿常量算
+  rowCenters = [...list.querySelectorAll(".pl-row")].map((row) => {
+    const rect = row.getBoundingClientRect();
+    return rect.top + rect.height / 2;
+  });
+  scroller = findScroller(handle);
+
+  handle.setPointerCapture(event.pointerId);
+  dragStartY = event.clientY;
+  dragFrom.value = index;
+  dragTo.value = index;
+  dragOffset.value = 0;
+}
+
+function moveDrag(event: PointerEvent): void {
+  if (!dragging.value) return;
+  dragOffset.value = event.clientY - dragStartY;
+
+  // 越过某行的中心线，就把目标定在它之后（拖拽的常规手感）
+  let slot = 0;
+  for (let i = 0; i < rowCenters.length; i += 1) {
+    if (event.clientY > rowCenters[i]) slot = i + 1;
+  }
+  // slot 是“插在第几条之前”，而它自己还占着一格：往下拖时要减掉自己
+  const to = slot > dragFrom.value ? slot - 1 : slot;
+  dragTo.value = Math.max(0, Math.min(entries.value.length - 1, to));
+
+  if (!scroller) return;
+  const rect = scroller.getBoundingClientRect();
+  const edge = 56;
+  if (event.clientY < rect.top + edge) scroller.scrollTop -= 14;
+  else if (event.clientY > rect.bottom - edge) scroller.scrollTop += 14;
+}
+
+/** 松手：位置真变了才发请求（返回失败会走 run 的报错提示，列表保持服务端那一份） */
+async function endDrag(): Promise<void> {
+  const from = dragFrom.value;
+  const to = dragTo.value;
+  resetDrag();
+  if (from < 0 || from === to) return;
+  await run(() => playlists.moveItem(props.id, from, to));
+}
+
+function resetDrag(): void {
+  dragFrom.value = -1;
+  dragTo.value = -1;
+  dragOffset.value = 0;
+  rowCenters = [];
+  scroller = null;
+}
+
+/** 键盘排序：焦点在把手上时 ↑ ↓ 挪一格 */
+async function nudge(index: number, delta: number): Promise<void> {
+  const to = index + delta;
+  if (busy.value || to < 0 || to >= entries.value.length) return;
+
+  busy.value = true;
+  actionError.value = "";
+  try {
+    await playlists.moveItem(props.id, index, to);
+    await nextTick();
+    // 行是按身份键渲染的（Vue 直接搬同一个节点），而**节点被搬动时焦点会丢** ——
+    // 不送回的话，键盘用户每挪一格就得重新 Tab 一遍，连按 ↑ ↓ 也就废了
+    listEl.value?.querySelectorAll<HTMLElement>(".pl-grip")[to]?.focus();
+  } catch (error) {
+    actionError.value = playlistErrorMessage(error);
+  } finally {
+    busy.value = false;
+  }
 }
 
 /** PS-02：把曲库里的歌加进来 */
@@ -211,20 +320,43 @@ async function removePlaylist(): Promise<void> {
         这个歌单还是空的。点「添加曲目」从音乐库里挑，或把当前播放列表整体加进来。
       </p>
 
-      <ol v-else class="pl-list">
+      <ol v-else ref="listEl" class="pl-list" :class="{ 'is-dragging': dragging }">
         <li
           v-for="(entry, index) in entries"
           :key="entry.key"
           class="pl-row"
-          :class="{ 'is-missing': !entry.track }"
+          :class="{
+            'is-missing': !entry.track,
+            'is-dragging': dragFrom === index,
+            'is-drop-line': dragging && dragFrom !== dragTo && dragTo === index,
+          }"
+          :style="dragFrom === index ? { '--drag-offset': `${dragOffset}px` } : undefined"
         >
+          <!-- 序号格就是拖拽把手（不另占一列，也不和行里的播放按钮抢点击）：
+               hover / 键盘聚焦时数字换成把手图标，触屏直接显示把手 -->
+          <button
+            class="pl-grip"
+            :class="{ 'is-active': dragFrom === index }"
+            :disabled="entries.length < 2"
+            :title="`拖动排序：${entry.title}（也可用 ↑ ↓）`"
+            :aria-label="`拖动排序 ${entry.title}，共 ${entries.length} 首，当前第 ${index + 1} 首`"
+            @pointerdown="startDrag(index, $event)"
+            @pointermove="moveDrag"
+            @pointerup="endDrag"
+            @pointercancel="resetDrag"
+            @keydown.up.prevent="nudge(index, -1)"
+            @keydown.down.prevent="nudge(index, 1)"
+          >
+            <span class="pl-grip__num">{{ index + 1 }}</span>
+            <IconDotsSixVertical class="icon pl-grip__icon" />
+          </button>
+
           <button
             class="pl-main"
             :disabled="!entry.track"
             :title="entry.track ? `播放 ${entry.title}` : entry.reason"
             @click="playFrom(entry)"
           >
-            <span class="pl-index">{{ index + 1 }}</span>
             <span class="pl-art">
               <img v-if="entry.item.cover" :src="entry.item.cover" alt="" />
               <IconPlaylist v-else class="icon" />
@@ -376,6 +508,19 @@ async function removePlaylist(): Promise<void> {
   gap: 8px;
 }
 
+/* 窄屏：四个按钮挤在同一行会把曲目名压成一字一行（实测 390px 下“排序实测”是竖着的），
+   所以让按钮整组换到第二行，封面与名称留在第一行 */
+@media (max-width: 640px) {
+  .pl-head {
+    flex-wrap: wrap;
+  }
+
+  .pl-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}
+
 .pl-error {
   margin-bottom: 10px;
   font-size: 13px;
@@ -397,6 +542,7 @@ async function removePlaylist(): Promise<void> {
 }
 
 .pl-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -404,7 +550,38 @@ async function removePlaylist(): Promise<void> {
   border-radius: var(--radius-row);
 }
 
-.pl-row:hover {
+/* 拖拽中：不选文字（行跟着指针跑的时候会把歌名选上），也不给悬浮底色干扰 */
+.pl-list.is-dragging {
+  user-select: none;
+}
+
+/* 跟手的那一行：抬起来（只动 transform / opacity，不动模糊相关属性）。
+   底色必须是**不透明**的：`--hover` 那类半透明色会让下面那一行透上来，
+   看起来就是两行字叠在一起（实测截图里“光辉岁月”就是这么糊掉的）。 */
+.pl-row.is-dragging {
+  z-index: 2;
+  /* 底必须**不透明**：透的话被盖住的那一行会从下面浮上来，看着就是两行字叠在一起。
+     `--plane` 本身就是实心面板色（#fff / #232326），直接用即可。 */
+  background: var(--plane);
+  box-shadow: var(--card-shadow);
+  transform: translateY(var(--drag-offset, 0px));
+}
+
+/* 落点提示：画在“它即将占据的那一行”的上沿，颜色只表达状态（简约优先） */
+.pl-row.is-drop-line::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -3px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+/* 跟手那一行自己也满足 :hover（指针就在它上面），而两条规则特异性相同、这条在后面 ——
+   不加 :not() 的话悬浮底色会盖掉拖拽态的不透明底，被盖住的行就透上来了（实测）。 */
+.pl-row:hover:not(.is-dragging) {
   background: var(--hover);
 }
 
@@ -419,7 +596,7 @@ async function removePlaylist(): Promise<void> {
   display: grid;
   align-items: center;
   gap: var(--row-gap);
-  grid-template-columns: 28px 40px minmax(0, 1fr) 56px;
+  grid-template-columns: 40px minmax(0, 1fr) 56px;
   padding: 10px 4px 10px 0;
   text-align: left;
 }
@@ -428,11 +605,66 @@ async function removePlaylist(): Promise<void> {
   cursor: default;
 }
 
-.pl-index {
-  font-size: 12px;
+/* 序号格兼拖拽把手：默认显示序号，hover / 键盘聚焦 / 触屏时显示把手图标 */
+.pl-grip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 30px;
+  border-radius: var(--radius-control);
   color: var(--text-3);
-  text-align: center;
+  cursor: grab;
+  /* 触屏上拖把手不能变成滚动页面 */
+  touch-action: none;
+}
+
+.pl-grip:disabled {
+  cursor: default;
+}
+
+.pl-grip__num {
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.pl-grip__icon {
+  display: none;
+  width: 16px;
+  height: 16px;
+}
+
+.pl-grip:hover:not(:disabled),
+.pl-grip:focus-visible {
+  background: var(--hover);
+  color: var(--text-1);
+}
+
+.pl-grip:hover:not(:disabled) .pl-grip__num,
+.pl-grip:focus-visible .pl-grip__num,
+.pl-grip.is-active .pl-grip__num {
+  display: none;
+}
+
+.pl-grip:hover:not(:disabled) .pl-grip__icon,
+.pl-grip:focus-visible .pl-grip__icon,
+.pl-grip.is-active .pl-grip__icon {
+  display: block;
+}
+
+.pl-grip:active {
+  cursor: grabbing;
+}
+
+@media (hover: none) {
+  /* 触屏没有 hover：直接把把手显出来，不然无从下手 */
+  .pl-grip__num {
+    display: none;
+  }
+
+  .pl-grip__icon {
+    display: block;
+  }
 }
 
 .pl-text {

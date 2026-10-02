@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, type Component } from "vue";
-import { toPlaylistItem } from "@qingting/shared";
 import IconArrowRight from "~icons/ph/arrow-right";
-import IconHeartFill from "~icons/ph/heart-fill";
-import IconHeartStraight from "~icons/ph/heart-straight";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
 import IconRepeat from "~icons/ph/repeat";
@@ -12,7 +9,6 @@ import IconShuffle from "~icons/ph/shuffle";
 import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import { usePlayerStore } from "@/stores/player";
-import { useListeningStore } from "@/stores/listening";
 import AppTooltip from "@/components/AppTooltip.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
@@ -26,24 +22,13 @@ import type { PlayMode } from "@/utils/player";
  * 状态与动作全部走 player store —— 与播放条是同一个来源，不存在"两套播放状态"。
  * 已知债务：这里的**标记与进度条交互**与 PlayerBar 有重复（逻辑没有重复，store 是唯一来源），
  * 等 PL-06 播放队列弹层落地（第三个消费者）时一起抽成 PlaybackControls，见开发约定。
+ *
+ * ⚠️ **控件数要取奇数（v5.98）**：这一排是「模式 / 上一首 / 播放 / 下一首 / 音量」共 5 个
+ * —— 奇数才有一枚落在正中，而它必须正是**播放键**（左右各两个、宽度也对称）。
+ * 原先这里还有第六个（收藏），偶数时“正中”落在两组之间，需求方一眼就看出不对称。
+ * 所以收藏键挪去了歌名旁边（`ImTitle`，歌曲强相关的动作归歌曲自己的位置）。
  */
 const player = usePlayerStore();
-
-/** 收藏（PS-05）：算的是“正在播的那一首”的引用（与歌单/历史同一套身份键） */
-const listening = useListeningStore();
-const currentItem = computed(() =>
-  player.currentTrack ? toPlaylistItem(player.currentTrack) : null,
-);
-const canFavorite = computed(() => currentItem.value !== null);
-const isFavorite = computed(() => {
-  const item = currentItem.value;
-  return item !== null && listening.isFavorite(item);
-});
-
-function toggleFavorite(): void {
-  const item = currentItem.value;
-  if (item) void listening.toggleFavorite(item);
-}
 
 const MODE_ICONS: Record<PlayMode, Component> = {
   seq: IconArrowRight,
@@ -132,20 +117,8 @@ function onPointerUp(event: PointerEvent): void {
              手机整枚收起（样式在下面），音量由系统音量键接管。 -->
         <VolumeControl />
 
-        <!-- 收藏（PS-05）：播放条那枚在手机上收起了（迷你条只留两枚键），
-             所以这里是手机端收下当前这首歌的地方（与播放条那枚共用同一个 store） -->
-        <AppTooltip :label="isFavorite ? '取消收藏' : '收藏'">
-          <button
-            class="ctl im-fav"
-            :class="{ 'is-on': isFavorite }"
-            :disabled="!canFavorite"
-            :aria-pressed="isFavorite"
-            @click="toggleFavorite"
-          >
-            <IconHeartFill v-if="isFavorite" class="icon" />
-            <IconHeartStraight v-else class="icon" />
-          </button>
-        </AppTooltip>
+        <!-- 收藏键不在这一排（v5.98）：它挪到了歌名旁边（ImTitle）—— ① 它是歌曲强相关的
+             动作；② 这一排的控件数必须是奇数，加它就成了 6 个，正中那枚就不是播放键了。 -->
       </div>
     </div>
 
@@ -270,7 +243,7 @@ function onPointerUp(event: PointerEvent): void {
   /* 宽度交给容器（下方 .im-ctl 的 100%），这里只管“三组怎么摆”。
      v5.93 需求方：“底部的进度条和按钮组能否距离两边更近一点” ——
      原来那一簇只占 74vw（390px 的屏上两侧各空 51px，窄窗口下空得更多），
-     现在模式贴左、队列与收藏贴右、走带键居中，可用宽度全用上。
+     现在模式贴左、队列贴右、走带键居中，可用宽度全用上。
      **用 grid 的 `1fr auto 1fr` 而不是 space-between**：后者中间那组会被两侧宽度差推偏
      （左组 22px vs 右组 66px，播放键会左偏 22px），而 `1fr auto 1fr` 的中间列永远是容器正中
      —— 播放键与进度条中心对齐这条（v5.70 定的）在手机上同样要成立。

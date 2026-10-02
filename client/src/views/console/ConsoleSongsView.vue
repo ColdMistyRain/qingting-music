@@ -398,6 +398,16 @@ async function removeSelected(): Promise<void> {
   .songs {
     gap: var(--row-list-gap);
   }
+
+  /* 窄屏不画行间细线，分隔交给间距 —— 但间距必须加在**行与行之间**：
+     v5.80 把滚动区移进卡之后，行住在 `.page-frame__scroll` 里，`.songs` 的 gap
+     只分开「表头 / 滚动区」两段，行与行反而贴在一起了（实测行距恒 64px，线又被
+     `display: none` 掉 → 一整列行没有分隔）。 */
+  .songs > .page-frame__scroll {
+    display: flex;
+    flex-direction: column;
+    gap: var(--row-list-gap);
+  }
 }
 
 /* 列：勾选 / 封面 / 曲目 / 大小 / 上传时间 / 操作 */

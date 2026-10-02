@@ -340,31 +340,36 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   }
 }
 
-/* 窄屏（RT-08 的最小照顾）：两列摆不下（字会被压成一条），改成盘在上、歌词在下，
-   盘仍然是完整的（唱臂也照旧工作）。 */
+/* 窄屏（RT-08 的最小照顾）：两列摆不下（字会被压成一条），改成上下两行 ——
+   **盘在上、歌在下面**（v5.86 需求方：“移动端布局时把唱片放到歌词头上，唱片不能缩的太小了”）：
+   ① 盘是这一页的主视觉，手机竖屏下先看到它才像“唱片机”；
+   ② 盘要占满宽度才有尺寸 —— 原来那条 `34vmin` 在 390px 宽的手机上只剩 133px。
+   `78vw` 是手机竖屏的主驱动，`44vh` 与 `400px` 是横屏 / 大屏的安全网。 */
 @media (max-width: 720px) {
   .poster {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     justify-items: center;
-    gap: 12px;
-    padding: 6px 16px 0;
+    gap: 16px;
+    padding: 4px 16px 0;
   }
 
+  /* 用行号把盘摆到第一行（DOM 里歌词列在前，这里不动 DOM 顺序） */
   .poster__art {
+    grid-row: 1;
     /* 窄屏只改盘径：画布尺寸与所有偏移都是它的派生值，不用也不能再手写一份
        ——否则又是“三方各自漂移”的老毛病 */
-    --vinyl-d: min(34vmin, 52vw, 260px);
+    --vinyl-d: min(78vw, 44vh, 400px);
   }
 
   .poster__col {
+    grid-row: 2;
     width: 100%;
     max-width: none;
-    justify-content: flex-start;
   }
 
   .ly {
-    height: min(30vh, 260px);
+    height: min(26vh, 230px);
   }
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
+import AppTooltip from "@/components/AppTooltip.vue";
 import IconArrowCounterClockwise from "~icons/ph/arrow-counter-clockwise";
 import IconFileText from "~icons/ph/file-text";
 import { usePlayerStore } from "@/stores/player";
@@ -15,8 +16,8 @@ import { decodeLyricsBytes } from "@/utils/lyricsLibrary";
  *
  * 行为层仍然交给 Reka 的 Popover（打开/关闭、Esc、点外部、焦点归还，铁律 1）；
  * 触发键由本组件自己渲染（`.ctl` + 文件图标），调用方只传 `label` —— 理由见 QueuePopover：
- * “按钮”与“包住按钮的触发器”必须在同一个文件里；且**不要**再套 `AppTooltip`
- * （两层 `PopperAnchor` 会把浮层锚点算成零尺寸、面板被摆到屏幕外）。
+ * “按钮”与“包住按钮的触发器”必须在同一个文件里；提示则挂在**按钮里面的图标**上
+ * （不能让两层 `PopperAnchor` 抢同一个元素，否则浮层会被摆到屏幕外）。
  */
 withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const player = usePlayerStore();
@@ -67,8 +68,10 @@ function clearImported(): void {
 <template>
   <PopoverRoot v-model:open="open" @update:open="failed = false">
     <PopoverTrigger as-child>
-      <button class="ctl" :aria-label="label || undefined" :title="label || undefined">
-        <IconFileText class="icon" />
+      <button class="ctl" :aria-label="label || undefined">
+        <AppTooltip :label="label" :disabled="!label">
+          <IconFileText class="icon" />
+        </AppTooltip>
       </button>
     </PopoverTrigger>
 

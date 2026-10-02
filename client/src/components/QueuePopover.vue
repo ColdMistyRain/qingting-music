@@ -14,6 +14,7 @@ import {
   PopoverTrigger,
 } from "reka-ui";
 import IconQueue from "~icons/ph/queue";
+import AppTooltip from "@/components/AppTooltip.vue";
 import QueuePanel from "@/components/QueuePanel.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { isTouchTap } from "@/utils/pointer";
@@ -39,10 +40,12 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  * `PopoverTrigger` 就会去合并一个组件而不是按钮，表现是**点了完全没反应**（v5.73 实测踩到过）。
  * 收进同一个文件后，这条链不可能再被外力拆开。
  *
- * ⚠️ 这里**不要**再套我们自己的 `AppTooltip`（v5.74 实测）：Reka 的 `PopoverTrigger` 自己会包一层
- * `PopperAnchor`，而 `AppTooltip`（`TooltipTrigger`）又在外面包一层 —— 两层 `as-child` 锚点套在同一个
- * 按钮上时，**内层（浮层）的锚点算出来是零尺寸**，浮层被摆到 `y = -208`（屏幕外）：状态、
- * `aria-expanded` 全对，用户却什么都看不到（“点了没反应”）。所以这一枚用原生 `title` 说名字。
+ * ⚠️ 提示（`AppTooltip`）要挂在**按钮里面的图标**上，不能套在按钮（或 `PopoverTrigger`）外面（v5.74/5.75 实测）：
+ * Reka 的 `PopoverTrigger` 自己会包一层 `PopperAnchor`，`TooltipTrigger` 又包一层 —— 两层 `as-child` 锚点
+ * 抢**同一个元素**时，内层（浮层）的锚点算出来是零尺寸，浮层被摆到屏幕外（实测 `.q-pop` 盒 `0,-208`），
+ * 而 `data-state` / `visibility` / `opacity` 全对：用户只看到“点了没反应”。
+ * 挂在图标上时，提示的锚点是图标（相邻几像素、位置观感一致），浮层那条链一个锚点都不多。
+ * 代价：`aria-describedby` 落在图标（`<svg>`）而不是按钮上 —— 键的**名字**仍由按钮自己的 `aria-label` 给，不受影响。
  */
 withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const open = ref(false);
@@ -103,8 +106,10 @@ onBeforeUnmount(() => {
   <!-- 桌面：贴着触发器弹出的浮层 -->
   <PopoverRoot v-if="!isMobile" v-model:open="open">
     <PopoverTrigger as-child>
-      <button class="ctl" :aria-label="label || undefined" :title="label || undefined">
-        <IconQueue class="icon" />
+      <button class="ctl" :aria-label="label || undefined">
+        <AppTooltip :label="label" :disabled="!label">
+          <IconQueue class="icon" />
+        </AppTooltip>
       </button>
     </PopoverTrigger>
 
@@ -119,8 +124,10 @@ onBeforeUnmount(() => {
        断点变化时只是换壳，不会出现“两个都开”。 -->
   <DialogRoot v-else v-model:open="open">
     <DialogTrigger as-child>
-      <button class="ctl" :aria-label="label || undefined" :title="label || undefined">
-        <IconQueue class="icon" />
+      <button class="ctl" :aria-label="label || undefined">
+        <AppTooltip :label="label" :disabled="!label">
+          <IconQueue class="icon" />
+        </AppTooltip>
       </button>
     </DialogTrigger>
 

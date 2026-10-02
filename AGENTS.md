@@ -124,7 +124,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **PWA（v5.65，RT-07）**：`vite-plugin-pwa`（选型表指定）—— manifest（standalone、192/512/maskable 图标、`theme_color` 与页面底色一致）+ Service Worker **只预缓存应用外壳与构建产物**（93 项，音频不缓存）；`/api`、`/audio`、`/covers` 进 `navigateFallbackDenylist`（否则离线时被 SPA 兜底成一份 index.html）。图标由 `client/public/` 下的四张 PNG 提供，**用应用自己的 `logo-mark.png` 在真实浏览器里合成**（alpha 涂白 + 主题色圆角底），与界面里的 `.brand-mark` 同源；`theme-color` 跟手动主题走（`utils/themeColor.ts`）；iOS 另补 `apple-touch-icon` 与三个 `apple-mobile-web-app-*` meta。实测：断网重载外壳照旧打开，`/audio` 不被兜底。
 
-**提示（Tooltip，v5.71）**：Reka 的 Tooltip 落地成共用的 `components/AppTooltip.vue`，`App.vue` 挂**一个** `TooltipProvider`（400ms 延迟；连续移到下一枚键不再等；只有键盘聚焦才开；指针离开即收）。**只有图标的按钮用它**（`label` 同时就是 `aria-label` —— 图标键没有可见文字，名字不能丢），有可见文字的控件仍写原生 `title`（截断时看全文）。队列键与歌词来源键的触发键收在壳层组件里（`QueuePopover` / `LyricsSourceMenu`，调用方只传 `label`），且**不套我们的 Tooltip**（两层 `PopperAnchor` 会把浮层摆到屏幕外，见坑 25）—— 这两枚用 `aria-label` + 原生 `title`。
+**提示（Tooltip，v5.71）**：Reka 的 Tooltip 落地成共用的 `components/AppTooltip.vue`，`App.vue` 挂**一个** `TooltipProvider`（400ms 延迟；连续移到下一枚键不再等；只有键盘聚焦才开；指针离开即收）。**只有图标的按钮用它**（`label` 同时就是 `aria-label` —— 图标键没有可见文字，名字不能丢），有可见文字的控件仍写原生 `title`（截断时看全文）。队列键与歌词来源键的触发键收在壳层组件里（`QueuePopover` / `LyricsSourceMenu`，调用方只传 `label`）；提示挂在这两枚**按钮里面的图标**上（见坑 25）。
 
 **提示条（Toast，v5.72）**：`utils/toast.ts`（唯一入口 `showToast` + 队列）+ `components/AppToast.vue`（Reka Toast，挂 App.vue）。**判据**：与当前操作无关、消失也不影响继续操作的消息走提示条（播放异常、后台任务结果）；绑在控件/表单项上的错误留在原地（表单校验、上传某一行失败、带“重试”的失败面板）。**PL-09 的播放提示已改走它**（`stores/player` 的 `notify()`，出错 `danger` + 10s），播放条里那行红字与 `notice` 状态都已移除。
 
@@ -177,7 +177,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 24. **`force-mount` 的弹层要当心两件“库内部判别”的事（v5.71 实测）**：① Reka 的 DismissableLayer 靠 `index === layers.size - 1`（“我得是最上面那层”）决定吃不吃 Esc；常驻 DOM 的层会一直登记在 `layers` 里 —— 所以**凡是我们自己 `force-mount` 的层，Esc 都自己接**（走 `utils/topLayer` 的捕获监听，别留给行为层的默认实现）；判断“某层的 Esc 好不好使”不能只看代码，得在真浏览器里按一下。② **进场动画必须挂在 `[data-state]` 上，不能写在内容的基础类里**：Reka 的 Presence 靠 `animationName` 判断“要不要等退场动画放完”，基础类上永远挂着一个动画名时，关闭时它会去等一个**永远不来的 `animationend`** —— 节点不卸载（表现是提示“赖着不走”，还一直占着 ① 里那个名额），修法：`.tip[data-state="delayed-open"], .tip[data-state="instant-open"] { animation: … }`。
 
-25. **别把我们的 Tooltip 套在 Reka 的 Popover / Dialog 触发器外面（v5.74 实测）**：`PopoverTrigger` 自己会包一层 `PopperAnchor`，而 `TooltipTrigger` 也包一层 —— 两层 `as-child` 锚点叠在同一个按钮上时，**内层（浮层）的锚点算出来是零尺寸**，浮层被摆到屏幕外（实测 `.q-pop` 盒 `0,-208`，`elementFromPoint` 拿到 `null`）。阴的是它**不报错**：`data-state` 是 `open`、`visibility` 是 `visible`、`opacity` 是 `1`，从代码上看一切正常，用户看到的却是“点了没反应”。所以：① 组合触发键（队列 / 歌词来源）**不套** `AppTooltip`，用 `aria-label` + 原生 `title` 说名字；② **判断“浮层开了没有”必须量它的盒子在不在视口内**，别只读 `data-state`（我上一轮就是只读状态才漏过去的）。
+25. **别把我们的 Tooltip 套在 Reka 的 Popover 触发器外面（v5.74 / v5.75 实测）**：`PopoverTrigger` 自己会包一层 `PopperAnchor`，`TooltipTrigger` 也包一层 —— 两层 `as-child` 锚点抢**同一个元素**时，内层（浮层）的锚点算出来是零尺寸，浮层被摆到屏幕外（实测 `.q-pop` 盒 `0,-208`，`elementFromPoint` 拿到 `null`），而 `data-state` / `visibility` / `opacity` 全对 —— 用户看到的只是“点了没反应”。**两个都要的办法（v5.75）**：把提示挂在**按钮里面的图标**上（`<button :aria-label="…"><AppTooltip :label="…"><IconX class="icon" /></AppTooltip></button>`）—— 图标本身就是个元素，提示的锚点就是它（相邻几像素、观感一致），而浮层那条链**一个锚点都不多**；代价是 `aria-describedby` 落在图标上，键的**名字**仍由按钮自己的 `aria-label` 给。判据：**判断“浮层开了没有”必须量它的盒子在不在视口内**，别只读 `data-state`（我因此漏过两轮）。
 
 ## 文档索引
 

@@ -1004,7 +1004,8 @@ select {
    而音量条那边还是 6px 轨道 + 13px 无光圆点的一版（需求方：“音量条样式也优化一下吧”）。
    各自只保留定位（一个靠 left/top 一个靠 bottom + translateY），视觉全在这里。 */
 .progress .knob,
-.vol-pop__thumb {
+.vol-pop__thumb,
+.vsl__thumb {
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -1025,7 +1026,10 @@ select {
 .progress.seeking .knob,
 .vol-pop__track:hover .vol-pop__thumb,
 .vol-pop__track:focus-within .vol-pop__thumb,
-.vol-pop__track.dragging .vol-pop__thumb {
+.vol-pop__track.dragging .vol-pop__thumb,
+.vsl:hover .vsl__thumb,
+.vsl:focus-within .vsl__thumb,
+.vsl.dragging .vsl__thumb {
   opacity: 1;
 }
 

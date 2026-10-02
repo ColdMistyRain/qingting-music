@@ -77,6 +77,7 @@ client/src/stores/        auth、config、theme、player（播放器单例：队
                           library、transfer（本地列表→上传页的 File 交接 - LC-07）
 client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息 / 排序下标）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
+                          equalizer（均衡器：10 段频段 / 预设 / 曲线清洗 - PL-13）、
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
@@ -97,6 +98,8 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           QueuePopover（PL-06，两套壳层：桌面 Reka Popover 浮层 / 手机 Reka Dialog 半屏底部抽屉 - v5.40）、
                           QueuePanel（队列内容：标题行 + 清空 + 列表，两壳共用一份 - v5.40）、
                           ConfirmDialog（应用内二次确认：Reka Dialog + 自绘玻璃，挂 App.vue 全站一份 - v5.53）、
+                          VerticalSlider（自绘竖向滑杆：音量条与均衡器十根竖杆共用 - PL-13）、
+                          EqualizerPanel（均衡器面板：设置页「音效」Tab - PL-13）、
                           SongMetaDialog（元信息编辑弹窗：上传页与曲库管理共用一份 - AD-02 / v5.61）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
                           TrackRow（通用曲目行）、EmptyState、
@@ -119,7 +122,9 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **收藏与最近播放（v5.67，PS-05）**：数据在服务端 `data/listening.json`（手机上收藏的、电脑上看得见；清一次浏览器数据不会把它清掉）。接口 `GET /api/listening` + `POST/DELETE /api/listening/favorites` + `POST/DELETE /api/listening/recent`（均访客级，引用口径与歌单同一套身份键）——收藏幂等、最近播放去重置顶并截到 100 条。前端：`stores/listening`（不做乐观更新，一律用服务端返回的那一份回填）+ `composables/usePlayHistory`（挂在 App.vue，切歌时记一条）+ `views/CollectionView`（/collection，「我的音乐」：收藏 / 最近播放两个页签，行复用 `TrackRow` 的收藏键）+ 播放条与沉浸页各一枚收藏键（手机上播放条那枚收起，入口在沉浸页控制栏）。**未做**：均衡器（PL-13）。
 
-**下一步**（建议顺序）：均衡器（PL-13）可插空做 → **在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
+**均衡器（v5.68，PL-13）**：设置 › 音效。音频路径 `<audio>` → MediaElementSource → 10 段 BiquadFilter 链（31Hz~16kHz）→ 整体增益 → 限幅器（防爆音）→ 输出；**懒建图、拿到用户手势才接线**（`AudioContext` 没手势时 suspended，接进挂起的图里就是静音 —— 所以建图 / `resume()` / 接线分三步），**A/B 关闭时真直通**（source 直接连输出），设置存 `localStorage`（每设备一份）。界面的十根竖杆用共用的 `components/VerticalSlider.vue`（原生 range 旋转拖不动，坑 7），预设用 Reka Select。**未做**：频谱可视化（VS-05，选型表里与 EQ 共用同一张图）。
+
+**下一步**（建议顺序）：**在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 
@@ -131,7 +136,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 4. **中文 commit message 用文件传入**：PowerShell 5.1 向原生程序传中文参数存在编码风险，一律 `git commit -F <UTF-8 文件>`（写文件时用 `[IO.File]::WriteAllText($p, $m, (New-Object Text.UTF8Encoding($false)))` 避免 BOM）。
 5. **`<template>` 里别挂"测量用隐藏元素"**：为一个 `.vue` 模板多加一个 `visibility:hidden` 的探针 span，`vue-tsc` 会生成错误的虚拟代码——实测表现为模板里明明在用 `IconSkipBack`/`playIcon` 等，却报 4 个 `TS6133 声明未读取`，且改样式/重跑都不消失（删掉那个 span 立刻恢复正常）。需要量尺寸就用离屏探针（`utils/marquee.ts` 的 `measureTextWidth`，注入宿主便于单测），模板保持干净。判断技巧：`vue-tsc` 只报“模板专用符号未使用”，而模板里的类型错误照常报出，就是踩了这个坑。
 6. **Teleport 出去的内容没有 scoped 属性**：用 Reka 等库做弹层时，内容会被 Teleport 到 `body`，而 Vue 的 `<style scoped>` 生成的是 `.cls[data-v-x]`——**元素上没有 `data-v-x`，规则直接不匹配**，表现是“弹层弹得出来但完全没样式”（不是被覆盖，是从没生效）。弹层样式一律写在**非 scoped** 的 `<style>` 里，隔离靠类名前缀。v4.60 实测：两个弹层同时中招。
-7. **原生 `input[type=range]` 旋转后拖不动**：加 `transform: rotate(-90deg)` 做竖向滑杆时，**点击映射是对的、拖动不跟手**（浏览器用未旋转的几何算位移；实测从底拖到顶只动 1%）。竖向滑杆一律自绘（pointer 事件 + 自己算比例），键盘与 `role="slider"` 一并自己补。v4.64 实测。
+7. **原生 `input[type=range]` 旋转后拖不动**：加 `transform: rotate(-90deg)` 做竖向滑杆时，**点击映射是对的、拖动不跟手**（浏览器用未旋转的几何算位移；实测从底拖到顶只动 1%）。竖向滑杆一律自绘（pointer 事件 + 自己算比例），键盘与 `role="slider"` 一并自己补。v4.64 实测。**v5.68 起统一收到 `components/VerticalSlider.vue`**（音量条与均衡器十根竖杆共用），要竖向滑杆就用它，别再写第二份。
 8. **页面不可见（`visibility: hidden` / 后台标签）时 CSS `transition` 不推进**：`getComputedStyle(el).transform` 读到的是**动画开始前的旧值**（与已知的「不可见时 rAF 不触发」同源）。v4.82 实测——我因此一度误判歌词列表“位移慢一拍”，其实内联 `style` 一直是对的。判断这类问题**看 `el.getAttribute("style")`（绑定值），不要看 computed（动画中间值）**。
 9. **许可（v4.86）**：本项目自身未指定开源许可，且**不含 AGPL / GPL 代码**（v4.84 曾接入 AMLL 的 npm 包 → v4.85 改为移植其代码 → v4.86 连移植也换成**按公式/按效果自行实现**）。装新依赖前先 `npm view <pkg> license`，**不要再引入强拷贝依赖**；想拄某个实现必须先看许可（AGPL 不能拄，只能参考思路）。
 10. **逐帧推进的动画在页面不可见时会停住（rAF 不触发）**（v4.85）：歌词列表位移改成弹簧逐帧推之后，后台标签页里弹簧不推进、位置会停在旧值。所以 `driveTo()` 在 `document.visibilityState !== "visible"` 时直接落位（不做动画）；其它新加的逐帧动画也要给这条退路。

@@ -6,6 +6,7 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import IconSignIn from "~icons/ph/sign-in";
 import IconSignOut from "~icons/ph/sign-out";
 import SegmentedControl from "@/components/SegmentedControl.vue";
+import EqualizerPanel from "@/components/EqualizerPanel.vue";
 import { useActiveIndicator } from "@/composables/useActiveIndicator";
 import { useAuthStore } from "@/stores/auth";
 import { useConfigStore } from "@/stores/config";
@@ -266,14 +267,9 @@ async function signOut(): Promise<void> {
         </div>
       </TabsContent>
 
-      <!-- 音效 -->
+      <!-- 音效（均衡器，PL-13） -->
       <TabsContent value="fx">
-        <div class="set-card card">
-          <b>均衡器与音效</b>
-          <div class="set-note">
-            10 段图形均衡器（31Hz~16kHz）、整体增益、预设与自定义曲线稍后上线，设置会存在本机。
-          </div>
-        </div>
+        <EqualizerPanel />
       </TabsContent>
 
       <!-- 管理（仅管理员） -->

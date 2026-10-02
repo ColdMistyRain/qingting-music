@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { HoverCardContent, HoverCardPortal, HoverCardRoot, HoverCardTrigger } from "reka-ui";
 import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
+import VerticalSlider from "@/components/VerticalSlider.vue";
 import { usePlayerStore } from "@/stores/player";
 
 /**
@@ -24,48 +25,11 @@ const icon = computed(() => (silent.value ? IconSpeakerSlash : IconSpeakerHigh))
 const sliderValue = computed(() => (silent.value ? 0 : player.volume));
 const levelPercent = computed(() => (silent.value ? "0%" : `${Math.round(player.volume * 100)}%`));
 
-/* ---------- 竖向拖拽：自绘，不用旋转的原生 range（v4.64） ----------
-   原生 range 旋转 -90° 之后，**点击映射是对的、但拖动不跟手**：
-   Chrome 用未旋转的几何算拖动位移，指针从底部拖到顶部值只动了 1%
-   （实测；需求方报的“无法拖拽”就是这个）。旋转写法本身撑不住，改成自绘：
-   与播放条的进度条同一套 pointer 交互，向上 = 变大。 */
-const trackRef = ref<HTMLElement | null>(null);
-const dragging = ref(false);
-
-function ratioFromPointer(event: PointerEvent): number {
-  const rect = trackRef.value?.getBoundingClientRect();
-  if (!rect || rect.height <= 0) return sliderValue.value;
-  return Math.min(1, Math.max(0, 1 - (event.clientY - rect.top) / rect.height));
-}
-
-function onDown(event: PointerEvent): void {
-  trackRef.value?.setPointerCapture(event.pointerId);
-  dragging.value = true;
-  player.setVolume(ratioFromPointer(event));
-}
-
-function onMove(event: PointerEvent): void {
-  if (!dragging.value) return;
-  player.setVolume(ratioFromPointer(event));
-}
-
-function onUp(event: PointerEvent): void {
-  if (!dragging.value) return;
-  dragging.value = false;
-  trackRef.value?.releasePointerCapture(event.pointerId);
-}
-
-/** 键盘也自己接：原生 range 的键盘能力随旋转一起放弃了 */
-function onKeydown(event: KeyboardEvent): void {
-  const step = event.shiftKey ? 0.1 : 0.05;
-  let next: number | null = null;
-  if (event.key === "ArrowUp" || event.key === "ArrowRight") next = sliderValue.value + step;
-  else if (event.key === "ArrowDown" || event.key === "ArrowLeft") next = sliderValue.value - step;
-  else if (event.key === "Home") next = 0;
-  else if (event.key === "End") next = 1;
-  if (next === null) return;
-  event.preventDefault();
-  player.setVolume(Math.min(1, Math.max(0, next)));
+/* ---------- 竖向拖拽交给 VerticalSlider（自绘，v4.64 / v5.68 抽成共用件） ----------
+   原生 range 加 rotate(-90deg) 之后点击映射对、拖动不跟手（AGENTS 坑 7），
+   所以音量与均衡器共用同一个自绘竖杆；这里只管把 0~1 的音量映射过去。 */
+function setVolume(ratio: number): void {
+  player.setVolume(Math.min(1, Math.max(0, ratio)));
 }
 </script>
 
@@ -90,27 +54,16 @@ function onKeydown(event: KeyboardEvent): void {
         role="group"
         aria-label="音量调节"
       >
-        <div
-          ref="trackRef"
+        <VerticalSlider
           class="vol-pop__track"
-          :class="{ dragging }"
-          role="slider"
-          tabindex="0"
-          aria-label="音量"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuenow="Math.round(sliderValue * 100)"
-          :aria-valuetext="levelPercent"
-          aria-orientation="vertical"
-          @pointerdown="onDown"
-          @pointermove="onMove"
-          @pointerup="onUp"
-          @pointercancel="onUp"
-          @keydown="onKeydown"
-        >
-          <div class="vol-pop__fill" :style="{ height: `${sliderValue * 100}%` }" />
-          <div class="vol-pop__thumb" :style="{ bottom: `${sliderValue * 100}%` }" />
-        </div>
+          :model-value="sliderValue"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          label="音量"
+          :value-text="levelPercent"
+          @update:model-value="setVolume"
+        />
         <span class="vol-pop__value">{{ levelPercent }}</span>
       </HoverCardContent>
     </HoverCardPortal>
@@ -180,54 +133,9 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 .vol-pop__track {
-  position: relative;
-  /* 命中区比可见轨道宽：6px 的细条不好抓（面板宽度已经收窄过，这里再给点余量） */
-  width: 18px;
-  height: 84px;
-  cursor: pointer;
-  touch-action: none;
-}
-
-/* 底轨：自绘时最容易漏的一块——它原来是原生 range 的轨道（tokens.css 里画的），
-   换成自绘后不画就没有了（v4.65 补回）。
-   ::before 在绘制顺序上等价于第一个子元素，所以不用 z-index，填充与滑块自然压在它上面。
-   宽度 5px 与进度条轨道一致（v4.95）；面板只有 18px 宽，轨道再粗就显得笨。 */
-.vol-pop__track::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 5px;
-  margin-left: -2.5px;
-  border-radius: 99px;
-  background: var(--fill-track);
-}
-
-.vol-pop__fill {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 5px;
-  margin-left: -2.5px;
-  border-radius: 99px;
-  background: var(--accent);
-}
-
-/* 滑块：**视觉配方在 global.css 的共用规则里**（`.progress .knob, .vol-pop__thumb`，
-   v4.95：尺寸/颜色/柔光与进度条手柄同一份）；这里只管竖向定位——
-   bottom 是“值的位置”，所以要把滑块自身往上提半格才对齐。 */
-.vol-pop__thumb {
-  position: absolute;
-  left: 50%;
-  margin-left: -4.5px;
-  transform: translateY(50%);
-}
-
-.vol-pop__track:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 99px;
+  /* 尺寸交给共用竖杆（--vsl-*）；命中区比可见轨道宽那一点也在那里 */
+  --vsl-width: 18px;
+  --vsl-height: 84px;
 }
 
 .vol-pop__value {

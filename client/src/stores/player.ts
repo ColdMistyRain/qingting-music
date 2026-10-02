@@ -605,6 +605,7 @@ export const usePlayerStore = defineStore("player", () => {
     importLyrics,
     clearImportedLyrics,
     // 动作
+    ensureAudio,
     play,
     pause,
     toggle,

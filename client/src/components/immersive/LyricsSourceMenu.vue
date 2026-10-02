@@ -119,11 +119,19 @@ function clearImported(): void {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--chrome-bg);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow-2);
+  border-radius: var(--radius-panel);
+  /* 与 `.pl-menu` / `.fx-menu` 同一套**菜单材质**（v5.78 收口）：
+     菜单里是成片的小字（状态行 + 两行说明），所以取“大面”那一档 `--tray-*`（0.88 / 0.80），
+     而不是列表浮层的 `--panel-*`（0.52 / 0.46）；层级照旧交给三件套
+     （描边 + 顶部内高光 + 投影），跟随封面主题色的光晕就在 `--panel-shadow` 里。
+     ⚠️ 别在这里自己拼材质：原来写的是 `--chrome-bg` + `blur(18px)` + `--line` + `--shadow-2` ——
+     `--chrome-*` 是给**无边无影的常驻条**（播放条）用的 chrome 玻璃，落在菜单上就是
+     “一块平的深色块”，跟其它菜单也对不上（需求方 v5.78 指出：“这个是不是也要加上阴影和玻璃拟态”）。 */
+  background: var(--tray-bg);
+  backdrop-filter: var(--tray-blur);
+  -webkit-backdrop-filter: var(--tray-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--panel-sheen), var(--panel-shadow);
   color: var(--text-1);
   font-size: 13px;
 }

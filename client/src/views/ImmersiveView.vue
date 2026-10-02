@@ -218,8 +218,10 @@ onBeforeUnmount(() => {
           <IconCaretDown class="icon" />
         </button>
       </AppTooltip>
-      <span class="im-top__label">正在播放</span>
-      <!-- 歌词来源 / 导入 .lrc、.yrc（LR-02）：与左侧关闭按钮同尺寸，标题才真的居中 -->
+      <!-- 这里原来有一句“正在播放”—— 需求方：“多此一举”（v5.84）：
+           这一页满屏都是正在播的那首（封面 / 歌名 / 歌词 / 走带进度），一句话不说也知道；
+           去掉后顶栏只剩两枚键，靠 space-between 分列两端。 -->
+      <!-- 歌词来源 / 导入 .lrc、.yrc（LR-02） -->
       <LyricsSourceMenu label="歌词来源 / 导入歌词" />
     </header>
 
@@ -417,19 +419,14 @@ onBeforeUnmount(() => {
   flex: none;
   display: flex;
   align-items: center;
+  /* 只有两枚键（收起 / 歌词来源），分列两端 —— 从前中问那句标签靠 `margin: 0 auto`
+     把右侧那个顶到边上，标签一去就得自己撑开（v5.84）。 */
+  justify-content: space-between;
   gap: 12px;
   padding: 14px 20px;
 }
 
-.im-top__label {
-  margin: 0 auto;
-  font-size: 11px;
-  letter-spacing: 0.34em;
-  color: var(--text-3);
-  text-transform: uppercase;
-}
-
-/* 顶栏左右两个按钮等宽，label 才真的居中（不是靠 padding 凑） */
+/* 两枚键等宽：图标形状不一样（小箭头 vs 列表），等宽才看起来对称 */
 .im-top .ctl {
   width: 21px;
 }

@@ -15,15 +15,15 @@ const config = useConfigStore();
       <div class="page-head__title">
         <NavToggle />
         <h1>在线搜索</h1>
-        <div class="sub">音源：网易云（ON-02/03）</div>
+        <div class="sub">音源：网易云</div>
       </div>
     </div>
 
     <EmptyState
       v-if="config.onlineEnabled"
       :icon="IconGlobe"
-      title="音源已连上，搜索即将可用"
-      desc="后端已检测到音源服务。搜索、试听与歌词随后续版本上线。"
+      title="音源已连上"
+      desc="这个页面暂时还没有可搜索的内容。本地播放、云端曲库与歌单都能照常用。"
       fill
     />
     <EmptyState

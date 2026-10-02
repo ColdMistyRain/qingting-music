@@ -63,8 +63,6 @@ const items = computed<StatItem[]>(() => [
         <span>{{ item.label }}</span>
       </div>
     </div>
-
-    <p class="roadmap">最常播放、各来源播放占比等图表稍后补上。</p>
   </section>
 </template>
 
@@ -91,11 +89,5 @@ const items = computed<StatItem[]>(() => [
 .stat span {
   font-size: 12.5px;
   color: var(--text-2);
-}
-
-.roadmap {
-  font-size: 12px;
-  color: var(--text-3);
-  padding: 2px 2px 0;
 }
 </style>

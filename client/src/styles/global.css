@@ -873,9 +873,6 @@ select {
 .ctl.is-on .icon path:not([opacity]) {
   opacity: 0.65;
 }
-.ctl.is-on {
-  color: var(--accent);
-}
 
 .ctl {
   color: var(--text-2);

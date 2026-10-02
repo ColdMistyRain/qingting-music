@@ -218,7 +218,7 @@ function removeCustom(name: string): void {
    （v5.99，与主按钮 / 分段控件选中底板同一套配方） */
 .fx__pill.is-on {
   background: var(--accent-soft);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border: 1px solid var(--accent-line);
   color: var(--accent);
   /* 与主按钮共用同一层光晕（v6.0）——两处尺寸同级、又是同一类控件 */
   box-shadow: var(--soft-btn-glow);

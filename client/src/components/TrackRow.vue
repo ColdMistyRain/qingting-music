@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Track } from "@qingting/shared";
-import IconHeartFill from "~icons/ph/heart-fill";
 import IconHeartStraight from "~icons/ph/heart-straight";
+import IconHeartStraightDuotone from "~icons/ph/heart-straight-duotone";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconX from "~icons/ph/x";
 import AppTooltip from "@/components/AppTooltip.vue";
@@ -86,7 +86,7 @@ function onRowClick(): void {
           :aria-pressed="favorite"
           @click.stop="emit('toggleFavorite', index)"
         >
-          <IconHeartFill v-if="favorite" class="icon" />
+          <IconHeartStraightDuotone v-if="favorite" class="icon" />
           <IconHeartStraight v-else class="icon" />
         </button>
       </AppTooltip>
@@ -244,7 +244,14 @@ function onRowClick(): void {
    v5.96 进一步：那一列里连播放/暂停键也不放了（见 onRowClick），只留“对这首歌的动作”。 */
 .row__actions .ctl {
   opacity: 0;
-  transition: opacity 0.15s;
+  /* 过渡补齐（v6.5）：这条 (0,2,0) 原先只写 opacity，把 global.css `.ctl` 的
+     `color / filter` 过渡整条覆盖掉了 —— 于是行内这几枚键的**悬浮光**是硬切
+     （列表里看得很明显，旁边播放条上同款键却是渐变的）。
+     现在与本仓所有光效同拍：颜色 0.15s、光熄灭那程 0.12s。 */
+  transition:
+    opacity 0.15s,
+    color 0.15s,
+    filter 0.12s ease;
 }
 
 .row:hover .row__actions .ctl {

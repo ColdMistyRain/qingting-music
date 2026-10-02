@@ -107,7 +107,7 @@ function onUpdate(value: unknown): void {
   /* 选中的底板同样是**软底**（v5.99，与主按钮 / 选中曲目行 / 播放键一致）：
      实心主题色块只留给状态标记（复选框打勾那种），选项本身就是个可点控件。 */
   background: var(--accent-soft);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border: 1px solid var(--accent-line);
   transform: translateX(var(--pill-x, 0));
   /* 未量到之前（is-ready 未加）不显示也不过渡，否则开页时会从 0 滑到第一格 */
   opacity: 0;

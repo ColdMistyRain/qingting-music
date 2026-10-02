@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { toPlaylistItem } from "@qingting/shared";
-import IconHeartFill from "~icons/ph/heart-fill";
 import IconHeartStraight from "~icons/ph/heart-straight";
+import IconHeartStraightDuotone from "~icons/ph/heart-straight-duotone";
 import AppTooltip from "@/components/AppTooltip.vue";
 import { useListeningStore } from "@/stores/listening";
 import { usePlayerStore } from "@/stores/player";
@@ -51,7 +51,7 @@ function toggleFavorite(): void {
           :aria-pressed="isFavorite"
           @click="toggleFavorite"
         >
-          <IconHeartFill v-if="isFavorite" class="icon" />
+          <IconHeartStraightDuotone v-if="isFavorite" class="icon" />
           <IconHeartStraight v-else class="icon" />
         </button>
       </AppTooltip>

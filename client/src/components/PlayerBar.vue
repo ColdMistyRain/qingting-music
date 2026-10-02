@@ -3,8 +3,8 @@ import { computed, ref, type Component } from "vue";
 import { useRouter } from "vue-router";
 import { toPlaylistItem } from "@qingting/shared";
 import IconArrowRight from "~icons/ph/arrow-right";
-import IconHeartFill from "~icons/ph/heart-fill";
 import IconHeartStraight from "~icons/ph/heart-straight";
+import IconHeartStraightDuotone from "~icons/ph/heart-straight-duotone";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
@@ -308,7 +308,7 @@ const marqueeActive = computed(() => player.playing || hovering.value);
           :aria-pressed="isFavorite"
           @click="toggleFavorite"
         >
-          <IconHeartFill v-if="isFavorite" class="icon" />
+          <IconHeartStraightDuotone v-if="isFavorite" class="icon" />
           <IconHeartStraight v-else class="icon" />
         </button>
       </AppTooltip>

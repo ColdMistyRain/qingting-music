@@ -47,6 +47,12 @@
     from var(--cover-src-2) clamp(0.62, calc(l + 0.08), 0.8) clamp(0.11, c, 0.16) h
   );
   --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  /* 30% 主题色**线**：软底控件那一圈淡描边（主按钮、分段底板、音效药丸、点亮的收藏键），
+     顺带当文本选中底色。抽成令牌的理由：这档不透明度原先在四处各写了一遍
+     `color-mix(in srgb, var(--accent) 30%, transparent)`，改一处忘一处就会出来两种轮廓浓度。
+     与 `--glow-ring`（16%）的区别：那条属于**光效**（flat 下会被撤成透明），
+     这条属于**轮廓**（两种材质都保留 —— 需求方指着的「播放全部」在实心面板下也带这圈边）。 */
+  --accent-line: color-mix(in srgb, var(--accent) 30%, transparent);
   /* 填在主题色**底**上的文字颜色：不能写 white ——取色管道接上后主题色由封面决定，
      白字压在亮色主题色上对比度实测只有 2.1:1（需求方实拍：暖色封面下主按钮发糊）。
      用 --bg-base 就自动对了：它永远在主题色的另一端（深色主题近黑、浅色主题近白），
@@ -249,7 +255,7 @@ input[type="checkbox"]:checked::after {
 
 /* ---------- 文本选中色与键盘焦点环：跟主题走 ---------- */
 ::selection {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-line);
 }
 
 :focus-visible {

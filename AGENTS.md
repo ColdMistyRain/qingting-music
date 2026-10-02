@@ -36,15 +36,16 @@
 
 > Windows PowerShell 下 `npm.ps1` 会被执行策略拦截 → **一律用 `npm.cmd`**；链接命令用 `;`，不要用 `&&`。
 
-| 命令                                  | 说明                                                 |
-| ------------------------------------- | ---------------------------------------------------- |
-| `npm.cmd install`                     | 装齐三个包（workspace）                              |
-| `npm.cmd run dev`                     | 前端 5173 + 后端 3000 同时启动                       |
-| `npm.cmd run test`                    | 全量单测（server 103 例 + client 275 例）            |
-| `npm.cmd run typecheck`               | `tsc --noEmit` + `vue-tsc --noEmit`                  |
-| `npm.cmd run build`                   | 后端 tsup → `server/dist`，前端 vite → `client/dist` |
-| `npm.cmd run format`                  | Prettier 全量格式化                                  |
-| `npm.cmd run dev -w @qingting/server` | 只起后端                                             |
+| 命令                                  | 说明                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| `npm.cmd install`                     | 装齐三个包（workspace）                                                   |
+| `npm.cmd run dev`                     | 前端 5173 + 后端 3000 同时启动                                            |
+| `npm.cmd run test`                    | 全量单测（server 103 例 + client 275 例）                                 |
+| `npm.cmd run typecheck`               | `tsc --noEmit` + `vue-tsc --noEmit`                                       |
+| `npm.cmd run build`                   | 后端 tsup → `server/dist`，前端 vite → `client/dist`                      |
+| `npm.cmd start`                       | **生产形态**：后端一并托管 `client/dist`（一个域名同时服务前端与 `/api`） |
+| `npm.cmd run format`                  | Prettier 全量格式化                                                       |
+| `npm.cmd run dev -w @qingting/server` | 只起后端                                                                  |
 
 启用门禁（三档权限）本地调试：
 
@@ -58,6 +59,7 @@ $env:USER_PASSWORD='guest123'; $env:ADMIN_PASSWORD='admin123'; npm.cmd run dev
 shared/src/index.ts       前后端共享类型与纯函数（Track/Song/Playlist/Role、扩展名白名单、hasAccess）
 server/src/config.ts      环境变量 → AppConfig（PRD 5.5 全量清单，含 parseSize/parseTtl）
 server/src/http.ts        统一响应 sendOk/sendFail + errorHandler
+server/src/static.ts      前端静态托管（生产）：SPA 兜底 + 缓存策略（入口/SW 不缓存，assets 长缓存）
 server/src/services/auth.ts  签名 Cookie 签发/验签、密码比对、密钥持久化
 server/src/services/storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退 + 内嵌歌词）、lyrics（data/lyrics/<id>.lrc 按需读写）、range（Range 解析）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
@@ -113,7 +115,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **PWA（v5.65，RT-07）**：`vite-plugin-pwa`（选型表指定）—— manifest（standalone、192/512/maskable 图标、`theme_color` 与页面底色一致）+ Service Worker **只预缓存应用外壳与构建产物**（93 项，音频不缓存）；`/api`、`/audio`、`/covers` 进 `navigateFallbackDenylist`（否则离线时被 SPA 兜底成一份 index.html）。图标由 `client/public/` 下的四张 PNG 提供，**用应用自己的 `logo-mark.png` 在真实浏览器里合成**（alpha 涂白 + 主题色圆角底），与界面里的 `.brand-mark` 同源；`theme-color` 跟手动主题走（`utils/themeColor.ts`）；iOS 另补 `apple-touch-icon` 与三个 `apple-mobile-web-app-*` meta。实测：断网重载外壳照旧打开，`/audio` 不被兜底。
 
-**下一步**（建议顺序）：生产静态托管（服务端，让一个域名同时服务前端与 `/api`）→ P2 的收藏/最近播放（PS-05）、均衡器（PL-13）可插空做 → **在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。
+**下一步**（建议顺序）：P2 的收藏/最近播放（PS-05）、均衡器（PL-13）可插空做 → **在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** 环境变量来源（process.env 或测试用的普通对象） */
 export type EnvSource = Record<string, string | undefined>;
@@ -46,6 +47,11 @@ export interface AppConfig {
   neteaseApiBase: string | null;
   /** 在线音源功能开关（ON-04） */
   onlineEnabled: boolean;
+  /**
+   * 前端静态产物目录（生产托管）：`STATIC_DIR` 指向 vite 的 `client/dist`，
+   * 目录不存在时自动关闭（开发期由 Vite 自己服务前端，后端没必要插手）。
+   */
+  staticDir: string | null;
 }
 
 /** 门禁组合形态（AC-05），用于启动日志与前端提示 */
@@ -84,6 +90,16 @@ function readString(input: string | undefined): string | null {
   return value ? value : null;
 }
 
+/**
+ * 前端产物的默认位置：仓库里 `client/dist`，与后端产物 `server/dist/index.js` 同级。
+ * 用 `import.meta.url` 而不是 `process.cwd()`：从哪个目录启动都能找对；
+ * 开发期（tsx 跑 `server/src/index.ts`）与生产期（跑 `server/dist/index.js`）
+ * 相对这个文件的深度一样，所以一个式子两处都对。
+ */
+function defaultStaticDir(): string {
+  return fileURLToPath(new URL("../../client/dist", import.meta.url));
+}
+
 /** 判定门禁组合形态（AC-05） */
 export function describeAuthMode(
   userPassword: string | null,
@@ -117,5 +133,6 @@ export function loadConfig(env: EnvSource): AppConfig {
     authEnabled: describeAuthMode(userPassword, adminPassword) !== "closed",
     neteaseApiBase,
     onlineEnabled: neteaseApiBase !== null,
+    staticDir: path.resolve(readString(env.STATIC_DIR) ?? defaultStaticDir()),
   };
 }

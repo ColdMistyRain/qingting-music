@@ -9,6 +9,7 @@ import { createConfigRouter } from "./routes/config.js";
 import { createPlaylistsRouter } from "./routes/playlists.js";
 import { createSongsRouter } from "./routes/songs.js";
 import { createStatsRouter } from "./routes/stats.js";
+import { attachStaticSite } from "./static.js";
 
 /** GET /api/health 的返回体 */
 export interface HealthInfo {
@@ -50,6 +51,11 @@ export function createApp(config: AppConfig): Express {
   app.use("/covers", createCoversRouter(config));
 
   app.use("/api", apiNotFound);
+
+  // 前端静态产物（生产）：/api 已经处理完了，所以下面的兜底只会碰到页面路径。
+  // 目录不在（开发期）时这个函数什么都不做，行为与以前完全一致。
+  attachStaticSite(app, config.staticDir);
+
   app.use(errorHandler);
 
   return app;

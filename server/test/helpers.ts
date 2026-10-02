@@ -9,7 +9,7 @@ export async function tempDirs(): Promise<{ dataDir: string; uploadDir: string }
   return { dataDir: path.join(root, "data"), uploadDir: path.join(root, "uploads") };
 }
 
-/** 测试用配置：默认门禁关闭（AC-05 的最小运行形态） */
+/** 测试用配置：默认门禁关闭（AC-05 的最小运行形态）、静态托管关闭 */
 export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     port: 0,
@@ -23,6 +23,8 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     authEnabled: false,
     neteaseApiBase: null,
     onlineEnabled: false,
+    // 默认 null：不让集成测试去发真实的 client/dist（要测托管就显式给一个临时目录）
+    staticDir: null,
     ...overrides,
   };
 }

@@ -4,7 +4,7 @@ import { createApp } from "../src/app.js";
 import type { AppConfig } from "../src/config.js";
 import { LOGIN_MAX_FAILURES } from "../src/config.js";
 
-/** 测试用配置：默认门禁关闭（AC-05 的最小运行形态） */
+/** 测试用配置：默认门禁关闭（AC-05 的最小运行形态）、不托管前端产物 */
 function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     port: 0,
@@ -18,6 +18,7 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     authEnabled: false,
     neteaseApiBase: null,
     onlineEnabled: false,
+    staticDir: null,
     ...overrides,
   };
 }

@@ -248,8 +248,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
    臂体高 = 盘径的 75%、臂体自身的旋转轴心在图片的 61.9% / 15.3%（就是那张图里轴承圆心的
    位置）—— 两个 transform-origin 因此重合：“整臂绕支点转”与“臂体自己轻摆”用的是同一个点。
    角度：抬起 -15°（针在盘外）、落针 -4°（针落在外圈纹槽上，够不到中间那张封面）；
-   0.9s 与 cubic-bezier(0.34, 1.1, 0.4, 1) 也是参照实测的“过冲一点但很快稳”。
-   **不抄它的 arm-sway**（落针后持续轻摆）：那是装饰，不承载信息（简约优先）。 */
+   0.9s 与 cubic-bezier(0.34, 1.1, 0.4, 1) 也是参照实测的“过冲一点但很快稳”。 */
 .tonearm {
   position: absolute;
   inset: 0;
@@ -273,6 +272,13 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   width: auto;
   transform-origin: 61.9% 15.3%;
   filter: drop-shadow(0 8px 16px rgba(6, 10, 20, 0.5));
+}
+
+/* 落针后随音乐轻摆（v5.87，参照实现的 arm-sway）：延迟 0.9s —— 等落针动画走完再开始；
+   幅度只有 ±0.8°，首尾都回 0deg（循环不跳帧）。我 v5.85 把它当成“装饰不承载信息”
+   砍掉了，那是判断错：这一下轻摆正是“唱片在转、针在纹槽里走”的体感，需求方按参照指出来了。 */
+.poster.is-playing .tonearm__arm {
+  animation: v-arm-sway 4.4s ease-in-out 0.9s infinite;
 }
 
 /* 底座：不随臂转，拧在盘外右上角（圆心 = 支点）。图是 84×116，所以宽 10.5% 时高 14.5%，
@@ -327,6 +333,20 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   }
 }
 
+/* 唱臂左右摆动：幅度很小，只是“活的”的感觉；首尾都回 0deg，循环时不会跳帧 */
+@keyframes v-arm-sway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-0.8deg);
+  }
+  75% {
+    transform: rotate(0.8deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v-disc,
   .vinyl-glow,
@@ -337,6 +357,11 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   /* 唱臂落下是**状态**（播放/暂停），不是循环动效，所以保留，只去掉那 0.9s 的过渡 */
   .tonearm {
     transition: none;
+  }
+
+  /* 轻摆是持续动效，减动效时关掉（落针/抬起那个状态切换保留） */
+  .poster.is-playing .tonearm__arm {
+    animation: none;
   }
 }
 

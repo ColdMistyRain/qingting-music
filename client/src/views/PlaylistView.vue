@@ -40,6 +40,7 @@ import { songToTrack } from "@/utils/library";
 import { playableTracks, playlistTotalDuration, resolvePlaylist } from "@/utils/playlistEntries";
 import type { PlaylistEntry } from "@/utils/playlistEntries";
 import { exportFileName, toExportJson, toM3U8 } from "@/utils/playlistExport";
+import { togglePointerCapture } from "@/utils/pointer";
 
 /**
  * 歌单详情（PRD 3.6 / 原型 v2.6）：头部（封面 / 名称 / 曲目数 / 总时长）+ 操作 + 编号曲目列表。
@@ -170,7 +171,7 @@ function startDrag(index: number, event: PointerEvent): void {
   });
   scroller = findScroller(handle);
 
-  handle.setPointerCapture(event.pointerId);
+  togglePointerCapture(handle, event.pointerId, true);
   dragStartY = event.clientY;
   dragFrom.value = index;
   dragTo.value = index;

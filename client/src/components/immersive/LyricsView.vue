@@ -9,6 +9,7 @@ import {
   type LyricLine,
 } from "@/utils/lyrics";
 import { emphasisKeyframes, emphasisParams } from "@/utils/lyricEmphasis";
+import { togglePointerCapture } from "@/utils/pointer";
 import { POS_Y_SPRING_BASE, Spring, posYSpringParams } from "@/utils/spring";
 
 /**
@@ -322,23 +323,9 @@ function onPointerDown(event: PointerEvent): void {
   dragStartY = event.clientY;
   dragStartShift = displayShift.value;
   // 捕获/释放都会动到指针，而它们**可能抛**（指针已经不在了 / 被系统收走）：
-  // 不能让它把后半段逻辑带走 —— `onPointerUp` 里释放排在“跳转”前面，一抛就白点一下。
-  togglePointerCapture(handleEl(event), event.pointerId, true);
-}
-
-/** 指针捕获 / 释放的统一入口（两个方向都会抛，吞掉即可，理由见调用处） */
-function togglePointerCapture(target: HTMLElement, pointerId: number, on: boolean): void {
-  try {
-    if (on) target.setPointerCapture?.(pointerId);
-    else target.releasePointerCapture?.(pointerId);
-  } catch {
-    // 拿不到 / 放不掉捕获都能继续：只是指针移出元素后可能丢事件
-  }
-}
-
-/** 正在处理这个事件的元素（`currentTarget` 只在处理期间有效，取出来存住再传） */
-function handleEl(event: PointerEvent): HTMLElement {
-  return event.currentTarget as HTMLElement;
+  // 不能让它把后半段逻辑带走（`onPointerUp` 里释放排在“跳转”前面，一抛就白点一下）
+  // —— 共用入口 `utils/pointer.ts` 里包了 try/catch，四处拖动都走它。
+  togglePointerCapture(event.currentTarget as HTMLElement, event.pointerId, true);
 }
 
 function onPointerMove(event: PointerEvent): void {
@@ -354,7 +341,7 @@ function onPointerMove(event: PointerEvent): void {
 function onPointerUp(event: PointerEvent): void {
   if (!dragging.value) return;
   dragging.value = false;
-  togglePointerCapture(handleEl(event), event.pointerId, false);
+  togglePointerCapture(event.currentTarget as HTMLElement, event.pointerId, false);
   const index = pressedIndex;
   const wasDrag = dragged;
   pressedIndex = -1;
@@ -375,7 +362,7 @@ function onPointerCancel(event: PointerEvent): void {
   dragging.value = false;
   pressedIndex = -1;
   dragged = false;
-  togglePointerCapture(handleEl(event), event.pointerId, false);
+  togglePointerCapture(event.currentTarget as HTMLElement, event.pointerId, false);
 }
 
 /** 事件目标落在哪一行（行下标；不在行上就 -1） */

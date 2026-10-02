@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { togglePointerCapture } from "@/utils/pointer";
 import { fillGeometry, sliderRatio, stepValue, valueFromRatio } from "@/utils/slider";
 
 /**
@@ -74,7 +75,7 @@ function commit(event: PointerEvent): void {
 }
 
 function onDown(event: PointerEvent): void {
-  trackRef.value?.setPointerCapture(event.pointerId);
+  togglePointerCapture(trackRef.value, event.pointerId, true);
   dragging.value = true;
   commit(event);
 }
@@ -87,7 +88,7 @@ function onMove(event: PointerEvent): void {
 function onUp(event: PointerEvent): void {
   if (!dragging.value) return;
   dragging.value = false;
-  trackRef.value?.releasePointerCapture(event.pointerId);
+  togglePointerCapture(trackRef.value, event.pointerId, false);
 }
 
 function onKeydown(event: KeyboardEvent): void {

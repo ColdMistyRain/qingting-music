@@ -1209,6 +1209,11 @@ select {
   background: var(--fill-track);
   position: relative;
   cursor: pointer;
+  /* 自己处理拖动，所以必须声明 `touch-action`（v6.23）：不写时真机上手指一拖，浏览器会把
+     这次触摸当成“它要滚页面 / 手势”而接管，我们连 `pointermove` 都收不到（只收到
+     `pointercancel`）—— 表现是**手机上拖不动进度条**，桌面用鼠标看不出来。
+     与歌词窗口 / 沉浸页整页 / 滑杆 / 播放条滑动区同一规则（细节见开发约定）。 */
+  touch-action: none;
 }
 
 .progress--disabled {

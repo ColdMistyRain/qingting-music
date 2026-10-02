@@ -21,3 +21,31 @@
 export function isTouchTap(pointerType: string | undefined): boolean {
   return pointerType === "touch";
 }
+
+/** 能用指针捕获的最小形状（写宽一点：单测可以传真元素，不必上 jsdom） */
+export type PointerCaptureTarget = {
+  setPointerCapture?: (pointerId: number) => void;
+  releasePointerCapture?: (pointerId: number) => void;
+};
+
+/**
+ * 指针捕获 / 释放的统一入口（两个方向都包了 try/catch）。
+ *
+ * 两边都可能抛：指针已经没了、被系统/手势收走、元素刚好被重渲染卸载。而调用点的顺序
+ * 常常是「先放捕获、再做正事」—— 一抛就把正事吞了。实测两个坑（v6.22）：
+ * ① 歌词行——释放排在“跳转”前面，一抛白点一下；
+ * ② 播放进度条——释放排在 `endSeek()` 前面，一抛 `seeking` 就永远挂着（进度条会跟着串）。
+ * 抢不到 / 放不掉捕获都能继续拖动，只是指针移出元素后可能丢事件，所以吞掉即可。
+ */
+export function togglePointerCapture(
+  target: PointerCaptureTarget | null,
+  pointerId: number,
+  on: boolean,
+): void {
+  try {
+    if (on) target?.setPointerCapture?.(pointerId);
+    else target?.releasePointerCapture?.(pointerId);
+  } catch {
+    // 见函数注释：捕获只是“更稳”，不是“必需”
+  }
+}

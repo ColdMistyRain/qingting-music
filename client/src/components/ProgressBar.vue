@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { usePlayback } from "@/composables/usePlayback";
 import { formatTime } from "@/utils/format";
+import { togglePointerCapture } from "@/utils/pointer";
 import { seekKeyTarget } from "@/utils/seek";
 
 /**
@@ -29,7 +30,7 @@ function ratioFromEvent(event: PointerEvent): number {
 
 function onPointerDown(event: PointerEvent): void {
   if (!player.hasTrack) return;
-  trackRef.value?.setPointerCapture(event.pointerId);
+  togglePointerCapture(trackRef.value, event.pointerId, true);
   player.beginSeek(ratioFromEvent(event));
 }
 
@@ -40,8 +41,9 @@ function onPointerMove(event: PointerEvent): void {
 
 function onPointerUp(event: PointerEvent): void {
   if (!player.seeking) return;
+  // 释放放在 `endSeek()` 前面，所以它**不能抛**（抛了 seeking 就永远挂着）——走共用兜底入口
+  togglePointerCapture(trackRef.value, event.pointerId, false);
   // endSeek 不带参数：拖拽过程中 updateSeek 已经把目标写进 store（PL-03）
-  trackRef.value?.releasePointerCapture(event.pointerId);
   player.endSeek();
 }
 

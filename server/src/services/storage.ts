@@ -1,5 +1,3 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { nanoid } from "nanoid";
 import {
   SONG_EDITABLE_FIELDS,
@@ -10,39 +8,48 @@ import {
   type SongListResult,
   type SongMetaPatch,
 } from "@qingting/shared";
+import { createJsonStore } from "./jsonStore.js";
 
 /**
  * 曲库索引读写（LB-04 / LB-11，PRD 12 数据目录结构）。
  *
  * 索引就是 `data/songs.json` 一个文件：单进程自用场景没必要上数据库（PRD 5.1）。
- * 写入用「先写 .tmp 再 rename」的原子替换——同文件系统内 rename 是原子的，
- * 进程半路被杀也不会留下半个 JSON 把索引搞坏。
- * 每次请求现读现写（文件很小），不做内存缓存：省掉一整套缓存失效的坑。
+ * 原子写、读-改-写串行化、坏文件留证都在 `services/jsonStore.ts` 里（歌单与收藏共用同一份）。
  */
 
+const store = createJsonStore<Song[]>({
+  fileName: "songs.json",
+  fallback: () => [],
+  parse: (value) => {
+    if (!Array.isArray(value)) throw new Error("songs.json 不是一个数组");
+    return value.filter(isSong);
+  },
+});
+
 export function songsFilePath(dataDir: string): string {
-  return path.join(dataDir, "songs.json");
+  return store.filePath(dataDir);
 }
 
 /** 读取曲库索引；文件不存在或内容损坏都当空库处理（宁可重建，也不要启动即崩） */
-export async function loadSongs(dataDir: string): Promise<Song[]> {
-  try {
-    const raw = await readFile(songsFilePath(dataDir), "utf8");
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isSong);
-  } catch {
-    return [];
-  }
+export function loadSongs(dataDir: string): Promise<Song[]> {
+  return store.load(dataDir);
 }
 
 /** 原子写入曲库索引 */
-export async function saveSongs(dataDir: string, songs: readonly Song[]): Promise<void> {
-  await mkdir(dataDir, { recursive: true });
-  const target = songsFilePath(dataDir);
-  const temp = `${target}.tmp`;
-  await writeFile(temp, JSON.stringify(songs, null, 2), "utf8");
-  await rename(temp, target);
+export function saveSongs(dataDir: string, songs: readonly Song[]): Promise<void> {
+  return store.save(dataDir, [...songs]);
+}
+
+/**
+ * 读-改-写曲库索引（v6.8）：路由里的“读一份、改一份、写回”要走这里。
+ * 两个并发上传各自读到同一份旧列表时，后写的会把先写的整条覆盖掉（lost update）——
+ * 同一个文件的 update 在进程内排队，逐个读-改-写，就不会丢。
+ */
+export function updateSongs(
+  dataDir: string,
+  change: (songs: Song[]) => Song[] | Promise<Song[]>,
+): Promise<Song[]> {
+  return store.update(dataDir, change);
 }
 
 /** 曲目 id（nanoid）：给前端引用用，与落盘名分开生成 */

@@ -1,5 +1,3 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { nanoid } from "nanoid";
 import {
   dedupePlaylistItems,
@@ -7,41 +5,44 @@ import {
   type PlaylistItem,
   type TrackSource,
 } from "@qingting/shared";
+import { createJsonStore } from "./jsonStore.js";
 
 /**
  * 歌单存储（PS-01 / PRD 12：`data/playlists.json`）。
  *
- * 与曲库索引（`services/storage.ts`）完全同一套做法：单文件 JSON、**先写 .tmp 再 rename**
- * 的原子替换、每次请求现读现写、读坏了的条目跳过而不是让接口崩。
- * 单进程自用场景没必要上数据库（PRD 5.1）。
+ * 与曲库索引（`services/storage.ts`）完全同一套做法，而且共用同一份实现
+ * （`services/jsonStore.ts`）：单文件 JSON、原子写、读-改-写串行、读坏了的条目跳过而不是让接口崩。
  */
 
+const store = createJsonStore<Playlist[]>({
+  fileName: "playlists.json",
+  fallback: () => [],
+  parse: (value) => {
+    if (!Array.isArray(value)) throw new Error("playlists.json 不是一个数组");
+    return value.map(sanitizePlaylist).filter((entry): entry is Playlist => entry !== null);
+  },
+});
+
 export function playlistsFilePath(dataDir: string): string {
-  return path.join(dataDir, "playlists.json");
+  return store.filePath(dataDir);
 }
 
 /** 读取歌单；文件不存在、内容损坏、条目脏都按“少一个歌单”处理 */
-export async function loadPlaylists(dataDir: string): Promise<Playlist[]> {
-  try {
-    const raw = await readFile(playlistsFilePath(dataDir), "utf8");
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(sanitizePlaylist).filter((entry): entry is Playlist => entry !== null);
-  } catch {
-    return [];
-  }
+export function loadPlaylists(dataDir: string): Promise<Playlist[]> {
+  return store.load(dataDir);
 }
 
 /** 原子写入歌单 */
-export async function savePlaylists(
+export function savePlaylists(dataDir: string, playlists: readonly Playlist[]): Promise<void> {
+  return store.save(dataDir, [...playlists]);
+}
+
+/** 读-改-写歌单（v6.8）：路由里的新建 / 改名 / 整表替换 / 删除都走这里 */
+export function updatePlaylists(
   dataDir: string,
-  playlists: readonly Playlist[],
-): Promise<void> {
-  await mkdir(dataDir, { recursive: true });
-  const target = playlistsFilePath(dataDir);
-  const temp = `${target}.tmp`;
-  await writeFile(temp, JSON.stringify(playlists, null, 2), "utf8");
-  await rename(temp, target);
+  change: (playlists: Playlist[]) => Playlist[] | Promise<Playlist[]>,
+): Promise<Playlist[]> {
+  return store.update(dataDir, change);
 }
 
 /** 新建歌单：id 用 nanoid，与曲库曲目 id 独立 */

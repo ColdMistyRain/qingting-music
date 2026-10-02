@@ -62,6 +62,10 @@ server/src/http.ts        统一响应 sendOk/sendFail + errorHandler
 server/src/static.ts      前端静态托管（生产）：SPA 兜底 + 缓存策略（入口/SW 不缓存，assets 长缓存）
 server/src/services/auth.ts  签名 Cookie 签发/验签、密码比对、密钥持久化
 server/src/services/storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退 + 内嵌歌词）、lyrics（data/lyrics/<id>.lrc 按需读写）、range（Range 解析）
+server/src/services/jsonStore.ts  单文件 JSON 存储的**唯一实现**（原子写＝临时名带随机后缀 + rename、读-改-写**串行**、坏文件改名留证）- v6.8：
+                          曲库索引 / 歌单 / 收藏三份数据都是它的薄封装，**加新的 JSON 数据也走它**（别再手写 load→改→save）
+server/src/services/fileStream.ts 流式响应唯一入口 `pipeFile`（v6.8）：源流挂 error + 响应结束时销毁源流 ——
+                          **别再写 `createReadStream(...).pipe(res)`**（文件在 stat 之后被删 = 未捕获异常 = 进程退出）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
 server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/内嵌歌词）、audio（/audio + /covers）、stats、playlists
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen

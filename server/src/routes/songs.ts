@@ -19,9 +19,9 @@ import {
   createSongId,
   createStoredName,
   loadSongs,
-  saveSongs,
   songEditedFields,
   toSongListResult,
+  updateSongs,
   withSongMeta,
 } from "../services/storage.js";
 
@@ -131,17 +131,24 @@ export function createSongsRouter(config: AppConfig): Router {
         hasLyrics: parsed.lyrics !== null,
       };
 
-      // 覆盖：先把旧文件与旧歌词删掉再写索引（反过来的话，中途失败会留下指向已删文件的条目）
-      if (duplicate) {
-        await removeSongFiles(config, duplicate);
-        await removeLyrics(config.dataDir, duplicate.id);
-      }
       // 先清再写：新上传的这个文件完全可能没有歌词，留着旧的就是挂了一首别的内容的歌词
       await removeLyrics(config.dataDir, id);
       if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
 
-      const kept = songs.filter((song) => song.id !== duplicate?.id);
-      await saveSongs(config.dataDir, [...kept, song]);
+      // 索引：换掉旧那条、指向刚落的这个文件。
+      // 走 update（读-改-写串行）：两个上传同时完成时，各写各的那份会把对方成果盖掉
+      await updateSongs(config.dataDir, (current) => [
+        ...current.filter((entry) => entry.id !== duplicate?.id),
+        song,
+      ]);
+
+      // 覆盖时旧的文件与旧歌词**等索引写完再删** —— 与 DELETE 路由同一条纪律
+      // （v6.8 对齐：原先这里是先删后写）：中途失败最多留个孤儿文件（reindex 能捞回来），
+      // 反过来就是索引里一条指向已删文件的记录 —— 界面上是一排点不动的鬼影（坑 20）
+      if (duplicate) {
+        await removeSongFiles(config, duplicate);
+        await removeLyrics(config.dataDir, duplicate.id);
+      }
 
       sendOk(res, song, 201);
     }),
@@ -168,9 +175,8 @@ export function createSongsRouter(config: AppConfig): Router {
       // 只改索引、不动文件里的标签：改写音频标签是另一件事（要重写容器，风险高），
       // 这里的语义是“曲库里显示的元信息”，而 editedFields 会保证重建索引不会把它冲掉
       const updated = withSongMeta(song, patch.value);
-      await saveSongs(
-        config.dataDir,
-        songs.map((entry) => (entry.id === id ? updated : entry)),
+      await updateSongs(config.dataDir, (current) =>
+        current.map((entry) => (entry.id === id ? updated : entry)),
       );
       sendOk(res, updated);
     }),
@@ -190,10 +196,7 @@ export function createSongsRouter(config: AppConfig): Router {
 
       // 先写索引再删文件：万一删文件失败，最多留个孤儿文件（reindex 能捞回来），
       // 反过来则会留下指向已删文件的条目，界面上就是一排点不开的鬼影
-      await saveSongs(
-        config.dataDir,
-        songs.filter((entry) => entry.id !== id),
-      );
+      await updateSongs(config.dataDir, (current) => current.filter((entry) => entry.id !== id));
       await removeSongFiles(config, song);
       await removeLyrics(config.dataDir, id);
 
@@ -205,53 +208,58 @@ export function createSongsRouter(config: AppConfig): Router {
     "/reindex",
     requireAccess("admin"),
     asyncHandler(async (_req, res) => {
-      const existing = await loadSongs(config.dataDir);
       const names = await readdir(config.uploadDir).catch(() => [] as string[]);
       const audioNames = names.filter(isAudioFileName);
-      const known = new Map(existing.map((song) => [song.storedName, song]));
-
-      const songs: Song[] = [];
       let added = 0;
+      let before = 0;
 
-      for (const name of audioNames) {
-        const fullPath = path.join(config.uploadDir, name);
-        const info = await stat(fullPath);
-        const previous = known.get(name);
-        // 重建时尽量保住 originalName：文件名回退解析（LB-03）靠它，
-        // 只有索引也丢了才退化成用落盘随机名（此时至少还有标签）
-        const originalName = previous?.originalName ?? name;
-        const parsed = await parseAudioFile(fullPath, originalName);
-        const id = previous?.id ?? createSongId();
-        const coverName = await saveCover(config, id, parsed.cover);
+      // 整段重建都跑在 update 里（读-改-写串行）：重建期间并发上传的那首歌不会被这次覆盖写掉
+      const songs = await updateSongs(config.dataDir, async (existing) => {
+        before = existing.length;
+        const known = new Map(existing.map((song) => [song.storedName, song]));
+        const next: Song[] = [];
 
-        // 歌词跟着重建一起重抽：以前上传的曲目就是这样补上歌词的
-        if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
-        else await removeLyrics(config.dataDir, id);
+        for (const name of audioNames) {
+          const fullPath = path.join(config.uploadDir, name);
+          const info = await stat(fullPath);
+          const previous = known.get(name);
+          // 重建时尽量保住 originalName：文件名回退解析（LB-03）靠它，
+          // 只有索引也丢了才退化成用落盘随机名（此时至少还有标签）
+          const originalName = previous?.originalName ?? name;
+          const parsed = await parseAudioFile(fullPath, originalName);
+          const id = previous?.id ?? createSongId();
+          const coverName = await saveCover(config, id, parsed.cover);
 
-        // 手动改过的字段（AD-02）必须保住：重建索引是拿文件里的标签重抽的，
-        // 不记账的话用户填的歌名/歌手会被一次 reindex 冲回原样
-        const edited = previous ? songEditedFields(previous) : [];
-        const keep = (field: "title" | "artist" | "album", parsedValue: string): string =>
-          previous && edited.includes(field) ? previous[field] : parsedValue;
+          // 歌词跟着重建一起重抽：以前上传的曲目就是这样补上歌词的
+          if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
+          else await removeLyrics(config.dataDir, id);
 
-        songs.push({
-          id,
-          title: keep("title", parsed.title),
-          artist: keep("artist", parsed.artist),
-          album: keep("album", parsed.album),
-          duration: parsed.duration,
-          coverUrl: coverName ? `/covers/${coverName}` : (previous?.coverUrl ?? null),
-          originalName,
-          storedName: name,
-          size: info.size,
-          uploadedAt: previous?.uploadedAt ?? info.mtime.toISOString(),
-          hasLyrics: parsed.lyrics !== null,
-          ...(edited.length > 0 ? { editedFields: [...edited] } : {}),
-        });
-        if (!previous) added += 1;
-      }
+          // 手动改过的字段（AD-02）必须保住：重建索引是拿文件里的标签重抽的，
+          // 不记账的话用户填的歌名/歌手会被一次 reindex 冲回原样
+          const edited = previous ? songEditedFields(previous) : [];
+          const keep = (field: "title" | "artist" | "album", parsedValue: string): string =>
+            previous && edited.includes(field) ? previous[field] : parsedValue;
 
-      await saveSongs(config.dataDir, songs);
+          next.push({
+            id,
+            title: keep("title", parsed.title),
+            artist: keep("artist", parsed.artist),
+            album: keep("album", parsed.album),
+            duration: parsed.duration,
+            coverUrl: coverName ? `/covers/${coverName}` : (previous?.coverUrl ?? null),
+            originalName,
+            storedName: name,
+            size: info.size,
+            uploadedAt: previous?.uploadedAt ?? info.mtime.toISOString(),
+            hasLyrics: parsed.lyrics !== null,
+            ...(edited.length > 0 ? { editedFields: [...edited] } : {}),
+          });
+          if (!previous) added += 1;
+        }
+
+        return next;
+      });
+
       // 收尾：索引里已经没有的歌词文件一并清掉（只能是从前删歌时留下的余），
       // 不把数量报给前端：这是内部清理，用户不需要知道
       await pruneLyrics(
@@ -262,7 +270,7 @@ export function createSongsRouter(config: AppConfig): Router {
       sendOk(res, {
         scanned: audioNames.length,
         added,
-        removed: existing.length - (audioNames.length - added),
+        removed: before - (audioNames.length - added),
         total: songs.length,
       });
     }),

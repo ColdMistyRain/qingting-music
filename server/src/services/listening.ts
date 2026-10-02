@@ -1,5 +1,3 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import path from "node:path";
 import {
   EMPTY_LISTENING,
   RECENT_LIMIT,
@@ -8,45 +6,54 @@ import {
   type PlaylistItem,
   type RecentEntry,
 } from "@qingting/shared";
+import { createJsonStore } from "./jsonStore.js";
 import { sanitizePlaylistItem } from "./playlists.js";
 
 /**
  * 收藏与最近播放的存储（PS-05 / PRD 12：`data/listening.json`）。
  *
- * 与曲库索引、歌单完全同一套做法（单文件 JSON、先写 .tmp 再 rename、读坏了当空），
+ * 与曲库索引、歌单共用同一份实现（`services/jsonStore.ts`）：原子写、读-改-写串行、读坏了当空。
  * 为什么要放**服务端**而不是 localStorage：这两份是“我的音乐”的一部分 ——
  * 手机上收藏的、电脑上要能看见；清一次浏览器数据不该把它清掉（自部署的私有数据）。
  *
  * 两个列表放同一个文件：它们总是一起被读、一起被写，分成两个文件只会多一份原子写入的代码。
  */
 
+const store = createJsonStore<ListeningData>({
+  fileName: "listening.json",
+  fallback: () => ({ ...EMPTY_LISTENING }),
+  parse: (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("listening.json 不是一个对象");
+    }
+    const record = value as Record<string, unknown>;
+    return { favorites: sanitizeItems(record.favorites), recent: sanitizeRecent(record.recent) };
+  },
+});
+
 export function listeningFilePath(dataDir: string): string {
-  return path.join(dataDir, "listening.json");
+  return store.filePath(dataDir);
 }
 
 /** 读取；文件不存在、内容损坏、条目脏都按“还没有”处理（不崩） */
-export async function loadListening(dataDir: string): Promise<ListeningData> {
-  try {
-    const raw = await readFile(listeningFilePath(dataDir), "utf8");
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return { ...EMPTY_LISTENING };
-    const raw_ = parsed as Record<string, unknown>;
-    return {
-      favorites: sanitizeItems(raw_.favorites),
-      recent: sanitizeRecent(raw_.recent),
-    };
-  } catch {
-    return { ...EMPTY_LISTENING };
-  }
+export function loadListening(dataDir: string): Promise<ListeningData> {
+  return store.load(dataDir);
 }
 
 /** 原子写入 */
-export async function saveListening(dataDir: string, data: ListeningData): Promise<void> {
-  await mkdir(dataDir, { recursive: true });
-  const target = listeningFilePath(dataDir);
-  const temp = `${target}.tmp`;
-  await writeFile(temp, JSON.stringify(data, null, 2), "utf8");
-  await rename(temp, target);
+export function saveListening(dataDir: string, data: ListeningData): Promise<void> {
+  return store.save(dataDir, data);
+}
+
+/**
+ * 读-改-写收藏/最近播放（v6.8）：mutator 原样返回同一个引用则视为“没变化”不落盘
+ * —— 现有 `withFavorite` / `withoutFavorite` 就是这么写的（幂等请求不必反复写盘）。
+ */
+export function updateListening(
+  dataDir: string,
+  change: (current: ListeningData) => ListeningData | Promise<ListeningData>,
+): Promise<ListeningData> {
+  return store.update(dataDir, change);
 }
 
 function sanitizeItems(value: unknown): PlaylistItem[] {

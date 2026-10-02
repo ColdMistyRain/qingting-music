@@ -14,14 +14,16 @@ import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { formatTime } from "@/utils/format";
+import { SEEK_STEP_SECONDS } from "@/utils/shortcuts";
 import type { PlayMode } from "@/utils/player";
 
 /**
  * 沉浸页底部控制与进度（VS-03：「底部居中控制与进度」；VS-09：三布局**共享**的子组件）。
  *
  * 状态与动作全部走 player store —— 与播放条是同一个来源，不存在"两套播放状态"。
- * 已知债务：这里的**标记与进度条交互**与 PlayerBar 有重复（逻辑没有重复，store 是唯一来源），
- * 等 PL-06 播放队列弹层落地（第三个消费者）时一起抽成 PlaybackControls，见开发约定。
+ * ⚠️ **已知重复**（v6.8 记清）：这一份与 `PlayerBar` 各自写了一遍“模式映射 / 走带键 /
+ * 进度条交互与 DOM”，抽 `PlaybackControls` 是个独立的活（两边宿主尺寸与断点行为不同，
+ * 得先设计好插槽与令牌再动），不想再拖成一句空 TODO —— 改这一处时**记得同步另一处**。
  *
  * ⚠️ **控件数要取奇数（v5.98）**：这一排是「模式 / 上一首 / 播放 / 下一首 / 音量」共 5 个
  * —— 奇数才有一枚落在正中，而它必须正是**播放键**（左右各两个、宽度也对称）。
@@ -64,6 +66,34 @@ function onPointerDown(event: PointerEvent): void {
 function onPointerMove(event: PointerEvent): void {
   if (!player.seeking) return;
   player.updateSeek(ratioFromEvent(event));
+}
+
+/* 键盘拖进度（v6.8，与播放条同一套）：← → 各 5 秒（PL-08 的步长）、Home/End 到两端。
+   处理完 `stopPropagation()`：全局快捷键挂在 `window` 冒泡阶段，不停住会两处各跳一次。 */
+function onBarKeydown(event: KeyboardEvent): void {
+  if (!player.hasTrack) return;
+  let next: number | null = null;
+  switch (event.key) {
+    case "ArrowLeft":
+    case "ArrowDown":
+      next = player.displaySeconds - SEEK_STEP_SECONDS;
+      break;
+    case "ArrowRight":
+    case "ArrowUp":
+      next = player.displaySeconds + SEEK_STEP_SECONDS;
+      break;
+    case "Home":
+      next = 0;
+      break;
+    case "End":
+      next = totalSeconds.value;
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  player.seekTo(next);
 }
 
 function onPointerUp(event: PointerEvent): void {
@@ -133,6 +163,16 @@ function onPointerUp(event: PointerEvent): void {
           seeking: player.seeking,
         }"
         :style="{ '--p': `${player.displayRatio * 100}%` }"
+        role="slider"
+        tabindex="0"
+        aria-label="播放进度"
+        aria-orientation="horizontal"
+        :aria-valuemin="0"
+        :aria-valuemax="Math.round(totalSeconds)"
+        :aria-valuenow="Math.round(player.displaySeconds)"
+        :aria-valuetext="`${formatTime(player.displaySeconds)} / ${formatTime(totalSeconds)}`"
+        :aria-disabled="!player.hasTrack"
+        @keydown="onBarKeydown"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"

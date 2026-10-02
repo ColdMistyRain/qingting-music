@@ -1,4 +1,4 @@
-import { watch } from "vue";
+import { onScopeDispose, watch } from "vue";
 import { useEqualizerStore } from "@/stores/equalizer";
 import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
@@ -128,4 +128,14 @@ export function useBeat(target: () => HTMLElement | null): void {
   }
 
   watch(() => [player.playing, theme.glowBeat], sync, { immediate: true });
+
+  /* 组件卸载（切到别的沉浸页布局、退出沉浸页）时把循环停掉。
+     `watch` 会随组件销毁自动失效，但**已经排出去的那一帧不会** —— 不停的话这个循环
+     会一直跑到会话结束，每帧还要取一次频谱、做一轮归一（移动端就是白耗电，
+     v6.8 实测：离开彩胶布局后仍在跑）。`getTarget` 先置空：`stop()` 里那句 `write(0)`
+     要允许目标已经不在。 */
+  onScopeDispose(() => {
+    getTarget = null;
+    stop();
+  });
 }

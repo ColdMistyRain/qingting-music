@@ -316,56 +316,6 @@ async function removeSelected(): Promise<void> {
   cursor: pointer;
 }
 
-.fail {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 40px 24px 34px;
-  text-align: center;
-}
-
-.fail__badge {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-  color: var(--danger);
-}
-
-.fail__title {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.fail__desc {
-  font-size: 12.5px;
-  color: var(--text-2);
-  max-width: 380px;
-}
-
-.strip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  color: var(--danger);
-  font-size: 12.5px;
-}
-
-.strip .icon {
-  width: 16px;
-  height: 16px;
-}
-
-.strip .btn {
-  margin-left: auto;
-}
-
 .songs {
   padding: 6px 10px 10px;
   /* 行间距跟着“宽/窄”换档（v4.91，与曲目列表同一套口径）：

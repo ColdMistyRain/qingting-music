@@ -22,6 +22,7 @@ import IconMusicNotes from "~icons/ph/music-notes";
 import IconPencilSimple from "~icons/ph/pencil-simple";
 import IconPlay from "~icons/ph/play";
 import IconPlaylist from "~icons/ph/playlist";
+import IconWarningCircle from "~icons/ph/warning-circle";
 import IconPlus from "~icons/ph/plus";
 import IconTrash from "~icons/ph/trash";
 import IconX from "~icons/ph/x";
@@ -30,7 +31,6 @@ import EmptyState from "@/components/EmptyState.vue";
 import InlineNameInput from "@/components/InlineNameInput.vue";
 import NavToggle from "@/components/NavToggle.vue";
 import { playlistErrorMessage } from "@/api/playlists";
-import { useAuthStore } from "@/stores/auth";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { usePlaylistsStore } from "@/stores/playlists";
@@ -50,13 +50,12 @@ import { exportFileName, toExportJson, toM3U8 } from "@/utils/playlistExport";
 const props = defineProps<{ id: string }>();
 
 const router = useRouter();
-const auth = useAuthStore();
 const playlists = usePlaylistsStore();
 const library = useLibraryStore();
 const player = usePlayerStore();
 
-/** 歌单是访客级（AC-03）；未登录时本页没有内容可给（AC-01） */
-const canEdit = computed(() => auth.role !== "anonymous");
+/** 歌单是访客级（AC-03），但 `/playlist/:id` 没开 `meta.anonymous` —— 未登录访问会被路由守卫直接送去登录页，
+    所以这里不需要“未登录”分支（v6.8 删掉，原先那一段永远看不到）。 */
 const playlist = computed(() => playlists.byId.get(props.id) ?? null);
 const entries = computed(() =>
   playlist.value
@@ -88,7 +87,6 @@ const candidates = computed(() => {
 });
 
 onMounted(async () => {
-  if (!canEdit.value) return;
   await playlists.load();
   await library.load();
 });
@@ -375,19 +373,29 @@ function exportJson(): void {
 
     <p v-if="playlist && actionError" class="pl-error" role="alert">{{ actionError }}</p>
 
-    <!-- 只有列表滚动（与其它列表页同一套骨架）：状态撑满帧并居中，曲目列表才是滚动内容 -->
+    <!-- 只有列表滚动（与其它列表页同一套骨架）：状态撑满帧并居中，曲目列表才是滚动内容。
+         三态齐全（v6.8）：读取中 → 读不出来（带重试）→ 读到了但歌单不在（已删）。
+         原先少了前两态，直达本页或后端临时不可用时会剩下一片空白，而且无法自救。 -->
     <div class="page-frame__scroll">
-      <!-- 未登录（AC-01）：歌单是服务器功能，只给一句引导，不渲染点不动的假控件 -->
       <EmptyState
-        v-if="!canEdit"
+        v-if="playlist === null && playlists.status === 'loading'"
         class="page-frame__fill"
         :icon="IconPlaylist"
-        title="登录后才能用歌单"
-        desc="歌单存在服务器上，登录后就能把喜欢的歌收进来。"
+        title="正在读取…"
+        desc="歌单存在服务器上，稍等一下。"
       />
 
+      <div v-else-if="playlist === null && playlists.status === 'error'" class="page-frame__fill">
+        <div class="fail card">
+          <span class="fail__badge"><IconWarningCircle class="icon" /></span>
+          <div class="fail__title">歌单没能读出来</div>
+          <p class="fail__desc">{{ playlists.error }}</p>
+          <button class="btn btn-primary" @click="playlists.load(true)">重试</button>
+        </div>
+      </div>
+
       <EmptyState
-        v-else-if="!playlist && playlists.status === 'ready'"
+        v-else-if="playlist === null"
         class="page-frame__fill"
         :icon="IconPlaylist"
         title="这个歌单不在了"

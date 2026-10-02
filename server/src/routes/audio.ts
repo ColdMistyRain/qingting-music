@@ -1,4 +1,3 @@
-import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Router } from "express";
@@ -6,6 +5,7 @@ import { fileExtension } from "@qingting/shared";
 import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
+import { pipeFile } from "../services/fileStream.js";
 import { parseRangeHeader } from "../services/range.js";
 
 /**
@@ -70,12 +70,12 @@ export function createAudioRouter(config: AppConfig): Router {
         res.status(206);
         res.setHeader("Content-Range", `bytes ${start}-${end}/${size}`);
         res.setHeader("Content-Length", String(end - start + 1));
-        createReadStream(fullPath, { start, end }).pipe(res);
+        pipeFile(res, fullPath, parsed.range);
         return;
       }
 
       res.setHeader("Content-Length", String(size));
-      createReadStream(fullPath).pipe(res);
+      pipeFile(res, fullPath);
     }),
   );
 
@@ -98,7 +98,7 @@ export function createCoversRouter(config: AppConfig): Router {
       res.setHeader("Content-Type", info.mime);
       res.setHeader("Content-Length", String(info.size));
       res.setHeader("Cache-Control", "private, max-age=86400");
-      createReadStream(info.fullPath).pipe(res);
+      pipeFile(res, info.fullPath);
     }),
   );
 

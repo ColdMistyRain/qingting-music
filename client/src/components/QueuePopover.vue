@@ -81,6 +81,23 @@ function onGripUp(event: PointerEvent): void {
  * 同一原因也会让别的常驻层失效，所以凡是我们自己 `force-mount` 的层，都自己接 Esc。
  */
 const layerId = ref<number | null>(null);
+
+/* 面板**内容**只在该挂的时候才挂（v6.8）：壳层为了退场动画是 `force-mount` 的
+   （坑 18），而队列行数跟着队列长度走 —— 一条 300 多首的队列就是 300 多个 `<li>`
+   加上每行的提示触发器，一直待在 DOM 里（关闭态只是 `visibility: hidden`，照样参与布局）。
+   开过之后才挂、收起等淡出动画放完再摘：`onBeforeUnmount` 那类“跟着数据一起消失”的
+   坑（坑 18 ③）不会重现，因为摘的时机在动画之后。 */
+const CONTENT_LIST_MS = 200; // 略大于 `.q-pop` 的 opacity 0.18s
+const mounted = ref(false);
+watch(open, (isOpen) => {
+  if (isOpen) {
+    mounted.value = true;
+    return;
+  }
+  setTimeout(() => {
+    if (!open.value) mounted.value = false;
+  }, CONTENT_LIST_MS);
+});
 watch(open, (isOpen) => {
   if (isOpen && layerId.value === null) layerId.value = pushTopLayer();
   else if (!isOpen && layerId.value !== null) {
@@ -116,7 +133,7 @@ onBeforeUnmount(() => {
 
     <PopoverPortal>
       <PopoverContent class="q-pop" side="top" align="end" :side-offset="10" force-mount>
-        <QueuePanel @close="open = false" />
+        <QueuePanel v-if="mounted" @close="open = false" />
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>
@@ -158,7 +175,7 @@ onBeforeUnmount(() => {
           <span class="q-grip" aria-hidden="true" />
         </div>
 
-        <QueuePanel @close="open = false" />
+        <QueuePanel v-if="mounted" @close="open = false" />
       </DialogContent>
     </DialogPortal>
   </DialogRoot>

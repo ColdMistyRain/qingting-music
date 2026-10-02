@@ -7,8 +7,8 @@ import {
   createPlaylist,
   loadPlaylists,
   renamePlaylist,
-  savePlaylists,
   sanitizePlaylistItem,
+  updatePlaylists,
   withPlaylistItems,
 } from "../services/playlists.js";
 
@@ -48,9 +48,8 @@ export function createPlaylistsRouter(config: AppConfig): Router {
         return;
       }
 
-      const playlists = await loadPlaylists(config.dataDir);
       const playlist = createPlaylist(name.name);
-      await savePlaylists(config.dataDir, [...playlists, playlist]);
+      await updatePlaylists(config.dataDir, (current) => [...current, playlist]);
       sendOk(res, playlist, 201);
     }),
   );
@@ -60,24 +59,26 @@ export function createPlaylistsRouter(config: AppConfig): Router {
     requireAccess("visitor"),
     asyncHandler(async (req, res) => {
       const id = String(req.params.id);
-      const playlists = await loadPlaylists(config.dataDir);
-      const current = playlists.find((entry) => entry.id === id);
-      if (!current) {
-        sendFail(res, 404, "这个歌单不在了");
-        return;
-      }
-
       const name = validatePlaylistName((req.body as { name?: unknown } | undefined)?.name);
       if (!name.ok) {
         sendFail(res, 400, name.message);
         return;
       }
 
-      const updated = renamePlaylist(current, name.name, new Date().toISOString());
-      await savePlaylists(
-        config.dataDir,
-        playlists.map((entry) => (entry.id === id ? updated : entry)),
-      );
+      const now = new Date().toISOString();
+      const next = await updatePlaylists(config.dataDir, (current) => {
+        const target = current.find((entry) => entry.id === id);
+        // 没这个歌单：原样返回（不写盘），下面统一回 404
+        if (!target) return current;
+        return current.map((entry) =>
+          entry.id === id ? renamePlaylist(target, name.name, now) : entry,
+        );
+      });
+      const updated = next.find((entry) => entry.id === id);
+      if (!updated) {
+        sendFail(res, 404, "这个歌单不在了");
+        return;
+      }
       sendOk(res, updated);
     }),
   );
@@ -87,13 +88,6 @@ export function createPlaylistsRouter(config: AppConfig): Router {
     requireAccess("visitor"),
     asyncHandler(async (req, res) => {
       const id = String(req.params.id);
-      const playlists = await loadPlaylists(config.dataDir);
-      const current = playlists.find((entry) => entry.id === id);
-      if (!current) {
-        sendFail(res, 404, "这个歌单不在了");
-        return;
-      }
-
       const raw = (req.body as { items?: unknown } | undefined)?.items;
       if (!Array.isArray(raw)) {
         sendFail(res, 400, "items 必须是数组");
@@ -105,15 +99,25 @@ export function createPlaylistsRouter(config: AppConfig): Router {
         return;
       }
 
-      const updated = withPlaylistItems(
-        current,
-        items.filter((item) => item !== null),
-        new Date().toISOString(),
-      );
-      await savePlaylists(
-        config.dataDir,
-        playlists.map((entry) => (entry.id === id ? updated : entry)),
-      );
+      const now = new Date().toISOString();
+      const next = await updatePlaylists(config.dataDir, (current) => {
+        const target = current.find((entry) => entry.id === id);
+        if (!target) return current;
+        return current.map((entry) =>
+          entry.id === id
+            ? withPlaylistItems(
+                target,
+                items.filter((item) => item !== null),
+                now,
+              )
+            : entry,
+        );
+      });
+      const updated = next.find((entry) => entry.id === id);
+      if (!updated) {
+        sendFail(res, 404, "这个歌单不在了");
+        return;
+      }
       sendOk(res, updated);
     }),
   );
@@ -123,16 +127,16 @@ export function createPlaylistsRouter(config: AppConfig): Router {
     requireAccess("visitor"),
     asyncHandler(async (req, res) => {
       const id = String(req.params.id);
-      const playlists = await loadPlaylists(config.dataDir);
-      if (!playlists.some((entry) => entry.id === id)) {
+      let found = false;
+      await updatePlaylists(config.dataDir, (current) => {
+        found = current.some((entry) => entry.id === id);
+        // 没这个歌单：原样返回（不写盘），下面统一回 404
+        return found ? current.filter((entry) => entry.id !== id) : current;
+      });
+      if (!found) {
         sendFail(res, 404, "这个歌单不在了");
         return;
       }
-
-      await savePlaylists(
-        config.dataDir,
-        playlists.filter((entry) => entry.id !== id),
-      );
       sendOk(res, { id });
     }),
   );

@@ -23,6 +23,7 @@ import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { formatTime } from "@/utils/format";
 import { currentLineIndex, parseLyrics } from "@/utils/lyrics";
 import { isTouchTap } from "@/utils/pointer";
+import { SEEK_STEP_SECONDS } from "@/utils/shortcuts";
 import type { PlayMode } from "@/utils/player";
 
 /**
@@ -155,6 +156,37 @@ function onPointerMove(event: PointerEvent): void {
   player.updateSeek(ratioFromEvent(event));
 }
 
+/* 键盘也能拖进度（v6.8）：进度条是自绘的，`role` / `aria-*` / 键盘步进都要自己补
+   （开发约定“换自绘时这几样一并补”，共用滑杆 `Slider.vue` 就是这么做的）。
+   步长取与全局快捷键同一份 `SEEK_STEP_SECONDS`（PL-08：±5 秒），按住可连发。
+   ⚠️ 处理完要 `stopPropagation()`：全局快捷键挂在 `window` 上（冒泡阶段），
+   不停住的话按一下方向键会同时按“全局 +5s”与这里各跳一次（10 秒）。 */
+function onBarKeydown(event: KeyboardEvent): void {
+  if (!player.hasTrack) return;
+  let next: number | null = null;
+  switch (event.key) {
+    case "ArrowLeft":
+    case "ArrowDown":
+      next = player.displaySeconds - SEEK_STEP_SECONDS;
+      break;
+    case "ArrowRight":
+    case "ArrowUp":
+      next = player.displaySeconds + SEEK_STEP_SECONDS;
+      break;
+    case "Home":
+      next = 0;
+      break;
+    case "End":
+      next = totalSeconds.value;
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  player.seekTo(next);
+}
+
 /* 长文本滚动（歌名 / 歌手 · 专辑）：宽度从 store 与 utils 拿，滚动交给 ScrollingText */
 const titleText = computed(() => player.currentTrack?.title ?? "尚未播放");
 const subtitleText = computed(() =>
@@ -278,6 +310,16 @@ const marqueeActive = computed(() => player.playing || hovering.value);
             playing: player.playing,
             seeking: player.seeking,
           }"
+          role="slider"
+          tabindex="0"
+          aria-label="播放进度"
+          aria-orientation="horizontal"
+          :aria-valuemin="0"
+          :aria-valuemax="Math.round(totalSeconds)"
+          :aria-valuenow="Math.round(player.displaySeconds)"
+          :aria-valuetext="`${formatTime(player.displaySeconds)} / ${formatTime(totalSeconds)}`"
+          :aria-disabled="!player.hasTrack"
+          @keydown="onBarKeydown"
           @pointerdown="onPointerDown"
           @pointermove="onPointerMove"
           @pointerup="player.endSeek()"

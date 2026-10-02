@@ -4,7 +4,7 @@ import { asyncHandler, sendFail, sendOk } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
 import {
   loadListening,
-  saveListening,
+  updateListening,
   withFavorite,
   withRecent,
   withoutFavorite,
@@ -44,11 +44,8 @@ export function createListeningRouter(config: AppConfig): Router {
         sendFail(res, 400, "曲目引用不完整");
         return;
       }
-      const current = await loadListening(config.dataDir);
-      const next = withFavorite(current, item);
-      // 幂等：已经在收藏里就不必再写一次盘
-      if (next !== current) await saveListening(config.dataDir, next);
-      sendOk(res, next);
+      // 幂等：已经在收藏里就不必再写一次盘（update 见到 mutator 原样返回同一个引用就跳过写）
+      sendOk(res, await updateListening(config.dataDir, (current) => withFavorite(current, item)));
     }),
   );
 
@@ -57,10 +54,10 @@ export function createListeningRouter(config: AppConfig): Router {
     requireAccess("visitor"),
     asyncHandler(async (req, res) => {
       const key = String(req.params.key);
-      const current = await loadListening(config.dataDir);
-      const next = withoutFavorite(current, key);
-      if (next !== current) await saveListening(config.dataDir, next);
-      sendOk(res, next);
+      sendOk(
+        res,
+        await updateListening(config.dataDir, (current) => withoutFavorite(current, key)),
+      );
     }),
   );
 
@@ -73,10 +70,11 @@ export function createListeningRouter(config: AppConfig): Router {
         sendFail(res, 400, "曲目引用不完整");
         return;
       }
-      const current = await loadListening(config.dataDir);
-      const next = withRecent(current, item, new Date().toISOString());
-      await saveListening(config.dataDir, next);
-      sendOk(res, next);
+      const now = new Date().toISOString();
+      sendOk(
+        res,
+        await updateListening(config.dataDir, (current) => withRecent(current, item, now)),
+      );
     }),
   );
 
@@ -84,9 +82,10 @@ export function createListeningRouter(config: AppConfig): Router {
     "/recent",
     requireAccess("visitor"),
     asyncHandler(async (_req, res) => {
-      const current = await loadListening(config.dataDir);
-      const next = { ...current, recent: [] };
-      await saveListening(config.dataDir, next);
+      const next = await updateListening(config.dataDir, (current) =>
+        // 已经是空的就不写盘
+        current.recent.length === 0 ? current : { ...current, recent: [] },
+      );
       sendOk(res, next);
     }),
   );

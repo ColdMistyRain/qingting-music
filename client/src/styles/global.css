@@ -704,6 +704,61 @@ select {
 
 /* ---------- 空态：样式随组件走（EmptyState.vue），全局不再定义 ---------- */
 
+/* ---------- 读取失败时的两种说法（v6.8 提出来） ----------
+   原先音乐库与控制台曲库各抄了一份、一字不差，现在歌单页是第三个用户 —— 收到这里。
+   · `.fail`：整块撑满帧的失败面板（说清原因 + 一个重试入口），不要只留一片空白；
+   · `.strip`：手上还有列表时的轻提示条（列表照旧能用，只在上面说一句）。
+   两者都只用 `--danger` 一档颜色：失败是**状态**，不是装饰（v4.30）。 */
+.fail {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 24px 34px;
+  text-align: center;
+}
+
+.fail__badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+
+.fail__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fail__desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+  max-width: 380px;
+}
+
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+.strip .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.strip .btn {
+  margin-left: auto;
+}
+
 /* ---------- 播放条（PRD 3.8：常驻底部） ---------- */
 .playerbar {
   grid-column: 1 / 3;

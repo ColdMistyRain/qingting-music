@@ -131,8 +131,9 @@ select {
    ⚠️ 判“岛里有没有页框”要用**后代**匹配，不能只认直接子元素：控制台的页框外面还套了
    一层 `.cs-body`（手机端用它整块隐藏），只写 `>` 时会失配 —— 岛继续自己滚、页框的
    `height: 100%` 又没有确定高度可依，症状就是**页头跟着列表一起滚走**
-   （v5.79 实测：控制台曲库管理页头 top 从 14 滚到 −226，而音乐库稳定在 36）。 */
-.content:has(> section.page-frame),
+   （v5.79 实测：控制台曲库管理页头 top 从 14 滚到 −226，而音乐库稳定在 36）。
+   下面三条一律用后代匹配 —— 只要有一处写成 `>`，下次再包一层就同样静默失配。 */
+.content:has(section.page-frame),
 .cs-main:has(section.page-frame) {
   overflow: hidden;
 }
@@ -140,7 +141,7 @@ select {
 /* 岛与页框之间的包装层：把高度传下去，`height: 100%` 这条链不能断
    （否则页框长成“内容有多高就多高”，内层滚动区永远不滚）。
    只在这一层确实包着页框时才动它，别的包装层不受影响。 */
-.cs-body:has(> section.page-frame) {
+.cs-body:has(section.page-frame) {
   height: 100%;
   min-height: 0;
 }

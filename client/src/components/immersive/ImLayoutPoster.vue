@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import IconMusicNotes from "~icons/ph/music-notes";
 import ImTitle from "@/components/immersive/ImTitle.vue";
 import LyricsView from "@/components/immersive/LyricsView.vue";
-import VinylBeatGlow from "@/components/immersive/VinylBeatGlow.vue";
+import { useBeat } from "@/composables/useBeat";
 import type { LyricLine } from "@/utils/lyrics";
 
 /**
@@ -24,10 +25,14 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{ seek: [seconds: number] }>();
+
+/** 节奏起伏（v5.90 / v5.91）：`--beat` 写在本布局根节点上，CSS 自己把它变成缩放与亮度 */
+const posterEl = ref<HTMLElement | null>(null);
+useBeat(() => posterEl.value);
 </script>
 
 <template>
-  <div class="poster" :class="{ 'is-playing': playing }">
+  <div ref="posterEl" class="poster" :class="{ 'is-playing': playing }">
     <div class="poster__col">
       <ImTitle :title="title" :subtitle="subtitle" />
       <LyricsView class="ly" :lines="lines" :time="time" @seek="emit('seek', $event)" />
@@ -39,11 +44,12 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
          v5.85：彩胶从“右上角溢出的背景”改成**自己一列**（需求方：“改成左边歌词右边胶”）
          —— 唱臂的支点在盘外右上方，盘不完整就没地方放它。 -->
     <div class="poster__art" aria-hidden="true">
-      <div class="vinyl-glow"></div>
-
-      <!-- 节奏光晕（v5.90）：只做加法的一层，压在盘**下面** —— 不遮盘面、
-           没有音频/关掉开关/减动效时自动退回纯 CSS 底光 -->
-      <VinylBeatGlow />
+      <!-- 外圈柔光：.glow-pulse 只负责“跟着节奏起伏”（缩放 + 亮度，由 --beat 驱动），
+           里面的 .vinyl-glow 管材质与自转 —— 分两层是因为内层的 transform / opacity
+           分别被 8s 自转与呼吸动画占着，CSS 动画优先于普通声明，写在里面会被吃掉 -->
+      <div class="glow-pulse">
+        <div class="vinyl-glow"></div>
+      </div>
 
       <div class="vinyl-assembly">
         <div class="v-disc">
@@ -143,12 +149,26 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
      但**多团叠加**可以，而且比一张固定形状的图更“活”。）
    位置与尺寸全部从盘径与画布留白派生（与盘同源），比盘大 40%、以盘心为中心
    —— 改了留白却忘了这里，柔光就会跑偏（v5.88 踩到，看着像“盘发灰发虚”）。 */
-.vinyl-glow {
+.glow-pulse {
   position: absolute;
   left: calc(var(--art-pad) - var(--vinyl-d) * 0.2);
   bottom: calc(var(--art-pad-y) - var(--vinyl-d) * 0.2);
   width: calc(var(--vinyl-d) * 1.4);
   aspect-ratio: 1;
+  /* 节奏起伏（v5.91，需求方：“光晕会随着音乐的节奏起伏就好了”）：只做“大一点、亮一点”，
+     两个属性都在合成层上跑 —— 逐帧改 `--beat` 不会重绘渐层。
+     **主脉是缩放**（1 → 1.11）：既明显又零代价；亮度只给 0.96 → 1（4%）——
+     底不要压到 1 以下太多，否则暂停（--beat = 0）时光晕会比改前暗一截（v5.91 实测踩到）。
+     为什么套在外层：里层的 transform 被 8s 自转占着、opacity 被呼吸动画占着，
+     **CSS 动画优先于普通声明**，写在里层会被吃掉（同理 `--beat` 没注册成 `<number>`
+     也没关系 —— 它只参与 calc，不需要可插值的过渡）。 */
+  transform: scale(calc(1 + var(--beat, 0) * 0.11));
+  opacity: calc(0.96 + var(--beat, 0) * 0.04);
+}
+
+.vinyl-glow {
+  position: absolute;
+  inset: 0;
   /* 颜色只在容器上取一次（跟随封面），三团都用 currentColor —— JS 依旧只写 --cover-src；
      上一行是不支持相对色语法时的退回值 */
   color: var(--cv1);

@@ -81,7 +81,7 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           slider（滑杆几何：值↔比例 / 步长对齐 / 填充几何 / 键盘步进 - PL-13）、
                           toast（应用内提示条：唯一入口 + 队列，纯函数可测 - v5.72）、
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
-                          audioReactive（节奏分析：低频能量 → 包络 → 自适应击打，三个纯函数 - v5.90）、
+                          audioReactive（节奏起伏：低频**峰值** → 包络 → 相对常态归一，纯函数 - v5.91）、
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
                           spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）、
@@ -96,7 +96,7 @@ client/src/composables/   usePlayHistory（切歌时记一条最近播放 - PS-0
                           useNavDrawer（手机抽屉开合状态：按钮在页头、面板在外壳，两处共享 - v5.35）
                           useNavItems（一级导航项：侧栏与手机底栏共用一份 - RT-02）、
                           useMediaSession（把播放器状态接到锁屏/通知栏，挂 App.vue - RT-04）、
-                          useBeat（节奏：把音频分析成「强度 + 击打」逐帧喂给订阅者，全局只跑一个 rAF - v5.90）
+                          useBeat（节奏起伏：把低频强度归一成“比常态重多少”，每帧写 CSS 变量 --beat，全局只跑一个 rAF - v5.91）
 client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavToggle（手机抽屉入口，渲染在页头里 - v5.35）、
                           NavDrawer（手机左侧导航抽屉的面板 - RT-02）、
                           QueuePopover（PL-06，两套壳层：桌面 Reka Popover 浮层 / 手机 Reka Dialog 半屏底部抽屉 - v5.40）、
@@ -134,7 +134,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **均衡器（v5.68，PL-13）**：设置 › 音效。音频路径 `<audio>` → MediaElementSource → 10 段 BiquadFilter 链（31Hz~16kHz）→ 整体增益 → 限幅器（防爆音）→ 输出；**懒建图、拿到用户手势才接线**（`AudioContext` 没手势时 suspended，接进挂起的图里就是静音 —— 所以建图 / `resume()` / 接线分三步），**A/B 关闭时真直通**（source 直接连输出），设置存 `localStorage`（每设备一份）。界面的十根竖杆与整体增益用共用的 `components/Slider.vue`（竖/横同一个实现，几何在 `utils/slider.ts` —— 原生 range 旋转拖不动、填充语义也不对，坑 7 / 23），预设用 Reka Select。**未做**：频谱可视化（VS-05，选型表里与 EQ 共用同一张图）。
 
-**节奏光晕（v5.90，VS-09 彩胶唱片布局）**：外圈柔光从"一张图当遮罩"改成纯 CSS 三团渐变（v5.89），再叠一层 **canvas 加法光**跟着歌曲节奏动 —— 需求方定的方案（先问过"是不是 canvas 更好"，对比过 Houdini Paint Worklet：Firefox / Safari 不支持，不能用）。分析走 `AnalyserNode` 旁路挂在**均衡器那份**音频图上（`createMediaElementSource` 一个元素只能建一次，所以必须复用；`stores/equalizer` 导出 `getAnalyser()`）；算法三层全在 `utils/audioReactive.ts`（低频能量 → 快起慢落包络 → 自适应击打，纯函数 + 19 例单测）；循环只有一份（`composables/useBeat`，消费者订阅），画布 `VinylBeatGlow` 压在盘下面、**只做加法**（`lighter`）—— 没有音频 / 关开关 / 减动效时自动为零，不需要降级分支。开关在 设置 › 外观「光晕跟随节奏」（默认开，`qt-glow-beat`）。
+**节奏起伏（v5.91，VS-09 彩胶唱片布局；v5.90 曾用 canvas 加法光）**：外圈柔光从“一张图当遮罩”改成纯 CSS 三团渐变（v5.89），再让它在鼓点上**吞吐**一下 —— 需求方：“我的想法光晕会随着音乐的节奏起伏就好了”（对比过 Houdini Paint Worklet：Firefox / Safari 不支持，不能用）。分析走 `AnalyserNode` 旁路挂在**均衡器那份**音频图上（`createMediaElementSource` 一个元素只能建一次，所以必须复用；`stores/equalizer` 导出 `getAnalyser()`）；算法全在 `utils/audioReactive.ts`（低频峰值 → 快起慢落包络 → 相对常态归一，纯函数 + 20 例单测）；循环只有一份（`composables/useBeat`）—— 它每帧**只写一个 CSS 变量 `--beat`**，缩放与亮度交给 CSS 的 `calc()`（`.glow-pulse` 那层包装元素就是为此加的：里面的 transform / opacity 被自转与呼吸动画占着），**没有音频 / 关开关 / 减动效时 `--beat` 恒为 0 = 纯底光，不需要降级分支**。v5.91 撤掉了 v5.90 那层 canvas（随机甩光斑）：“其他不用做那么多”；也记下第一版的坑：**只把原始强度缩放上去等于没动**（实测 `--beat` 挤在 0.70~0.89、缩放只差 1.3%），所以指标改峰值 + 加一层“相对常态”归一（细节见 PRD v5.91 行）。开关在 设置 › 外观「光晕跟随节奏」（默认开，`qt-glow-beat`）。
 
 **下一步**（建议顺序）：**在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 

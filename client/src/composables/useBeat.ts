@@ -1,50 +1,69 @@
-import { ref, watch, type Ref } from "vue";
+import { watch } from "vue";
 import { useEqualizerStore } from "@/stores/equalizer";
 import { usePlayerStore } from "@/stores/player";
 import { useThemeStore } from "@/stores/theme";
-import { ONSET_WINDOW, envelope, isOnset, lowBandEnergy } from "@/utils/audioReactive";
+import {
+  BASELINE_MS,
+  SPREAD_MS,
+  envelope,
+  follow,
+  lowBandEnergy,
+  pulse,
+} from "@/utils/audioReactive";
 
 /**
- * 节奏（v5.90）：把音频分析成「这一帧多强 + 这一下是不是击打」，逐帧喂给订阅者。
+ * 节奏起伏（v5.90 立项，v5.91 按需求方收窄）：算出「这一帧音乐有多强」（归一后 0~1），
+ * 把它写成 CSS 变量 `--beat` 挂在目标元素上，**表达全部交给 CSS**。
  *
- * 为什么是「一个循环 + 订阅」而不是每个消费者各跑一个 rAF：
- * 分析只该做一次（同一份频谱），画面那边按帧画就行 —— 两处各跑一圈既重复又难同步。
+ * v5.90 曾做成「一个循环 + 订阅者回调 + 每次击打随机甩一团光」的 canvas 层；
+ * v5.91 需求方把目标收窄为“光晕会随着音乐的节奏起伏就好了，其他不用做那么多” ——
+ * 于是只留**一个数**（低频能量的包络，再归一成“比常态重多少”），
+ * `transform: scale()` 与 `opacity` 就够了。canvas 因此撤掉：它的价值（任意形状、
+ * 随机光斑）用不上了，而逐帧光栅化比合成层变换贵得多（要回到“按拍甩光斑”那一版，
+ * 见 git 历史 v5.90）。
  *
- * 三个门都要过才会跑：
- *  ① 在播（暂停就停：画面留住最后一帧，回调不再来）
- *  ② 设置里「光晕跟随节奏」开着（`theme.glowBeat`）
- *  ③ 没开「减弱动效」
- * 另外音频图是**懒建**的（`equalizer.activate()` 需要用户手势），所以这里在开跑时顺手
- * 踢一下 —— 拿不到分析节点就安静地不跑，画面退回纯 CSS 柔光（不报错、不空转）。
+ * ⚠️ 归一那一步（减基线、除以常态波动）不能省：实测用均值做原始强度时，
+ * 整首歌的 `--beat` 都挤在 0.70~0.89，光晕缩放只差 1.3% —— 等于没动。
  *
- * 静音 / 拿到全零数据时 energy = 0，包络自然落到 0，击打也不会触发（见 audioReactive 单测）。
+ * 只做一件事的好处：**没有降级分支**。拿不到频谱（还没手势 / 跨域音源 / 关了开关 /
+ * 减动效）时 `--beat` 一直是 0，CSS 里就是纯底光 —— 不报错、不空转、也不需要兜底样式。
+ *
+ * 三个门都要过才会跑：① 在播 ② 设置里开着「光晕跟随节奏」 ③ 没开「减弱动效」。
+ * 音频图是**懒建**的（`equalizer.activate()` 要用户手势），所以开跑时顺手踢一下。
  */
-export interface BeatFrame {
-  /** 包络后的强度 0~1（快起慢落） */
-  level: number;
-  /** 这一帧是不是一次击打 */
-  onset: boolean;
-  /** 与上一帧的间隔（毫秒）：画布用它算衰减，别自己猜 16.7 */
-  dt: number;
-}
-
-type BeatListener = (frame: BeatFrame) => void;
-
-/** 当前强度（给需要响应式读的地方用；画布走订阅，不必每帧触发 Vue 更新） */
-const level = ref(0);
-const listeners = new Set<BeatListener>();
+export const BEAT_VAR = "--beat";
+/** 每帧写变量的最小变化量：低于它就跳过 —— 省掉大量无意义的样式失效 */
+const WRITE_EPSILON = 0.004;
 
 let loopId: number | null = null;
-let history: number[] = [];
-let current = 0;
+/** 包络后的原始强度（0~1） */
+let smoothed = 0;
+/** 这首歌当前的常态强度，以及常态波动 —— 归一用（见 utils/audioReactive 的 pulse） */
+let baseline = 0;
+let spread = 0;
 let lastTs = 0;
 let nextTry = 0;
+let written = -1;
 let analyserData: Uint8Array<ArrayBuffer> | null = null;
+let getTarget: (() => HTMLElement | null) | null = null;
 
 function reducedMotion(): boolean {
   return (
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
+}
+
+/** 写变量：JS 只写**数值**，颜色与形状一律留在 CSS（铁律 3 的同一条思路） */
+function write(value: number, force = false): void {
+  const element = getTarget?.();
+  if (!element) return;
+  if (!force && Math.abs(value - written) < WRITE_EPSILON) return;
+  written = value;
+  element.style.setProperty(BEAT_VAR, value.toFixed(3));
+}
+
+function schedule(): void {
+  if (loopId === null) loopId = requestAnimationFrame(tick);
 }
 
 function tick(ts: number): void {
@@ -54,8 +73,8 @@ function tick(ts: number): void {
   const dt = lastTs ? Math.min(64, Math.max(1, ts - lastTs)) : 16.7;
   lastTs = ts;
 
-  // 图还没接上（用户还没产生过播放手势）—— 每半秒再试一次，这一帧先不画。
-  // ⚠️ 必须继续排帧：不然循环第一帧就死了（最初就是这么写的，一直没动静）
+  // 图还没接上（用户还没产生过播放手势）—— 每半秒再试一次，这一帧先不写。
+  // ⚠️ 必须继续排帧：不然循环第一帧就死了（v5.90 最初就是这么写的，一直没动静）
   if (!analyser) {
     if (ts >= nextTry) {
       nextTry = ts + 500;
@@ -64,28 +83,20 @@ function tick(ts: number): void {
     schedule();
     return;
   }
-  // 缓冲区按当前 fftSize 重建（换分析器 / 改 fftSize 时长度会变）——
-  // 类型要写 `Uint8Array<ArrayBuffer>`：TS 5.9 起 `getByteFrequencyData` 只收这个（默认的 ArrayBufferLike 不收）
+
+  // 缓冲区按当前 fftSize 重建 —— 类型要写 `Uint8Array<ArrayBuffer>`：
+  // TS 5.9 起 `getByteFrequencyData` 只收这个（默认的 ArrayBufferLike 不收）
   if (analyserData?.length !== analyser.frequencyBinCount) {
     analyserData = new Uint8Array(analyser.frequencyBinCount);
   }
   analyser.getByteFrequencyData(analyserData);
   const energy = lowBandEnergy(analyserData, analyser.context.sampleRate, analyser.fftSize);
-  current = envelope(current, energy, dt);
-
-  history.push(current);
-  if (history.length > ONSET_WINDOW) history.shift();
-  const onset = isOnset(history, current);
-
-  level.value = current;
-  const frame: BeatFrame = { level: current, onset, dt };
-  for (const listener of listeners) listener(frame);
+  smoothed = envelope(smoothed, energy, dt);
+  baseline = follow(baseline, smoothed, dt, BASELINE_MS);
+  spread = follow(spread, Math.abs(smoothed - baseline), dt, SPREAD_MS);
+  write(pulse(smoothed, baseline, spread));
 
   schedule();
-}
-
-function schedule(): void {
-  if (loopId === null) loopId = requestAnimationFrame(tick);
 }
 
 function stop(): void {
@@ -93,27 +104,21 @@ function stop(): void {
     cancelAnimationFrame(loopId);
     loopId = null;
   }
-  history = [];
-  current = 0;
+  smoothed = 0;
+  baseline = 0;
+  spread = 0;
   lastTs = 0;
   nextTry = 0;
-  level.value = 0;
+  write(0, true);
 }
 
 /**
- * 订阅节奏帧。返回取消订阅的函数（组件卸载时调用）。
- * 组件里用：`const off = onBeat((f) => draw(f))`。
+ * 开启节奏起伏。`getTarget` 给承载 `--beat` 的元素（通常是布局根节点）——
+ * 传函数而不是元素本身，是因为调用发生在 setup 里，元素那时还没挂上。
+ * 自动跟随「在播 / 开关 / 减弱动效」三个门启停；全局只有一个循环（模块级单例）。
  */
-export function onBeat(listener: BeatListener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-/**
- * 在组件（或 App 级）里开启节奏分析。返回当前强度 ref，并自动跟随
- * 「在播 / 开关 / 减弱动效」三个门启停。
- */
-export function useBeat(): { level: Ref<number> } {
+export function useBeat(target: () => HTMLElement | null): void {
+  getTarget = target;
   const player = usePlayerStore();
   const theme = useThemeStore();
 
@@ -123,6 +128,4 @@ export function useBeat(): { level: Ref<number> } {
   }
 
   watch(() => [player.playing, theme.glowBeat], sync, { immediate: true });
-
-  return { level };
 }

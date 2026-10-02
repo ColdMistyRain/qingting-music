@@ -1,15 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ONSET_FLOOR,
-  ONSET_MIN_HISTORY,
-  ONSET_RATIO,
-  ONSET_WINDOW,
-  baseBlobs,
-  bandRange,
-  envelope,
-  isOnset,
-  lowBandEnergy,
-} from "./audioReactive";
+import { bandRange, envelope, follow, lowBandEnergy, pulse } from "./audioReactive";
 
 /** 造一段频谱：`filled(value)` 表示低频那几格填多少，其余为 0 */
 function spectrum(value: number, length = 512): Uint8Array {
@@ -51,12 +41,15 @@ describe("lowBandEnergy", () => {
     expect(lowBandEnergy(spectrum(255), 48000, 2048)).toBe(1);
   });
 
-  it("取的是均值：低频段只填一半格 → 约 0.5（不是按格求和）", () => {
-    const [start, end] = bandRange(512, 48000, 2048, 40, 160)!;
+  it("取的是峰值，不是均值：低频段只有一格跳起来（鼓点）就按它算", () => {
+    const [start] = bandRange(512, 48000, 2048, 40, 160)!;
     const data = new Uint8Array(512);
-    const filled = Math.floor((end - start + 1) / 2);
-    for (let i = start; i < start + filled; i += 1) data[i] = 255;
-    expect(lowBandEnergy(data, 48000, 2048)).toBeCloseTo(filled / (end - start + 1), 3);
+    data[start + 1] = 200;
+    expect(lowBandEnergy(data, 48000, 2048)).toBeCloseTo(200 / 255, 3);
+  });
+
+  it("整段填一半 → 峰值就是那一半（不是按格求和）", () => {
+    expect(lowBandEnergy(spectrum(128), 48000, 2048)).toBeCloseTo(128 / 255, 3);
   });
 
   it("高频再响也不影响低频能量（人声 / 镲片不带动光晕）", () => {
@@ -95,47 +88,45 @@ describe("envelope", () => {
   });
 });
 
-describe("isOnset", () => {
-  const flat = (n: number, value = 0.3) => Array.from({ length: n }, () => value);
-
-  it("基准不足（开头几帧）不算击打", () => {
-    expect(isOnset([], 0.9)).toBe(false);
-    expect(isOnset(flat(ONSET_MIN_HISTORY - 1), 0.9)).toBe(false);
+describe("follow", () => {
+  it("一阶低通：一步只走一部分，tau 越大走得越少", () => {
+    const slow = follow(0, 1, 100, 2200);
+    const fast = follow(0, 1, 100, 300);
+    expect(slow).toBeGreaterThan(0);
+    expect(fast).toBeGreaterThan(slow);
+    expect(slow).toBeLessThan(0.1);
   });
 
-  it("明显超出滑动平均 → 算一次击打", () => {
-    expect(isOnset(flat(ONSET_WINDOW), 0.3 * ONSET_RATIO + 0.01)).toBe(true);
+  it("长时间保持 → 收敛到目标值（约 5 个时间常数）", () => {
+    let value = 0;
+    for (let i = 0; i < 700; i += 1) value = follow(value, 0.6, 16, 2200);
+    expect(value).toBeCloseTo(0.6, 2);
   });
 
-  it("只是略高于平均 → 不算（避免颤音连续触发）", () => {
-    expect(isOnset(flat(ONSET_WINDOW), 0.3 * (ONSET_RATIO - 0.02))).toBe(false);
-  });
-
-  it("低于地板值 → 不算（静音段落不闪）", () => {
-    expect(isOnset(flat(ONSET_WINDOW, 0.01), ONSET_FLOOR - 0.01)).toBe(false);
-  });
-
-  it("历史为空值 / 全零时，静音不误判、有信号才判定", () => {
-    expect(isOnset(flat(ONSET_WINDOW, 0), 0.5)).toBe(true);
-    expect(isOnset(flat(ONSET_WINDOW, 0), 0.05)).toBe(false);
+  it("dt 为 0 / 负数时不跳变；tau 非法也不炸", () => {
+    expect(follow(0.3, 1, 0, 2200)).toBe(0.3);
+    expect(follow(0.3, 1, -5, 2200)).toBe(0.3);
+    expect(Number.isFinite(follow(0.3, 1, 16, 0))).toBe(true);
   });
 });
 
-describe("baseBlobs", () => {
-  it("角度均分、速度两两不同、大小都在合理区间", () => {
-    const blobs = baseBlobs(6);
-    expect(blobs).toHaveLength(6);
-    expect(new Set(blobs.map((b) => b.speed)).size).toBe(6);
-    blobs.forEach((blob, index) => {
-      expect(blob.angle).toBeCloseTo((index / 6) * Math.PI * 2, 6);
-      expect(Math.abs(blob.speed)).toBeGreaterThan(0.05);
-      expect(blob.size).toBeGreaterThanOrEqual(0.5);
-      expect(blob.size).toBeLessThan(0.9);
-    });
+describe("pulse", () => {
+  it("正好在常态上 → 0；超出常态波动的一个跨度 → 满值", () => {
+    expect(pulse(0.8, 0.8, 0.1)).toBe(0);
+    expect(pulse(0.8 + 0.1 * 1.6, 0.8, 0.1)).toBeCloseTo(1, 3);
   });
 
-  it("数量为 0 / 负数时至少给一个（避免画布空转）", () => {
-    expect(baseBlobs(0)).toHaveLength(1);
-    expect(baseBlobs(-3)).toHaveLength(1);
+  it("落在常态以下 → 0（不出现负值）", () => {
+    expect(pulse(0.5, 0.8, 0.1)).toBe(0);
+  });
+
+  it("常态几乎不波动时用下限兜住（不把噪声放大成闪烁）", () => {
+    // 波动 0.001 算出来的跨度只有 0.0016，会被下限 0.05 换掉
+    expect(pulse(0.81, 0.8, 0.001)).toBeCloseTo(0.2, 3);
+  });
+
+  it("整体音量小也照样有起伏（减基线之后才与音量无关）", () => {
+    // 幅度只有 0.03，但跨度下限 0.05 仍能给出六成
+    expect(pulse(0.18, 0.15, 0.02)).toBeCloseTo(0.6, 3);
   });
 });

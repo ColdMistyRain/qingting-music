@@ -32,6 +32,11 @@ const routes: RouteRecordRaw[] = [
         meta: { anonymous: true },
       },
       { path: "library", name: "library", component: () => import("@/views/LibraryView.vue") },
+      {
+        path: "collection",
+        name: "collection",
+        component: () => import("@/views/CollectionView.vue"),
+      },
       { path: "online", name: "online", component: () => import("@/views/OnlineView.vue") },
       {
         path: "playlist/:id",

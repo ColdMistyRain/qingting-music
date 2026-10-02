@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, type Component } from "vue";
 import { useRouter } from "vue-router";
+import { toPlaylistItem } from "@qingting/shared";
 import IconArrowRight from "~icons/ph/arrow-right";
+import IconHeartFill from "~icons/ph/heart-fill";
+import IconHeartStraight from "~icons/ph/heart-straight";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
@@ -12,6 +15,7 @@ import IconShuffle from "~icons/ph/shuffle";
 import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import { usePlayerStore } from "@/stores/player";
+import { useListeningStore } from "@/stores/listening";
 import ScrollingText from "@/components/ScrollingText.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
@@ -27,6 +31,22 @@ import type { PlayMode } from "@/utils/player";
  */
 const player = usePlayerStore();
 const router = useRouter();
+
+/** 收藏（PS-05）：按“正在播的那一首”的引用口径算（与歌单/历史同一套身份键） */
+const listening = useListeningStore();
+const currentItem = computed(() =>
+  player.currentTrack ? toPlaylistItem(player.currentTrack) : null,
+);
+const canFavorite = computed(() => currentItem.value !== null);
+const isFavorite = computed(() => {
+  const item = currentItem.value;
+  return item !== null && listening.isFavorite(item);
+});
+
+function toggleFavorite(): void {
+  const item = currentItem.value;
+  if (item) void listening.toggleFavorite(item);
+}
 
 /** VS-03：点击播放条左侧（封面 / 歌曲信息）展开沉浸式播放页。
  *  就是一次普通跳页 —— 动效由沉浸页自己负责：它作为一张从底部升起的 sheet 上场，
@@ -243,6 +263,20 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
         <!-- 音量：与沉浸页共用同一个控件（components/VolumeControl.vue，v4.62） -->
         <VolumeControl />
+
+        <!-- 收藏（PS-05）：对**正在播的那一首**生效（本地/云端都能收）。
+             手机不显示：迷你条按 v5.33 的定调只留两枚键，手机上的收藏入口在沉浸页控制栏。 -->
+        <button
+          class="ctl pb-fav"
+          :class="{ 'is-on': isFavorite }"
+          :title="isFavorite ? '取消收藏' : '收藏'"
+          :disabled="!canFavorite"
+          :aria-pressed="isFavorite"
+          @click="toggleFavorite"
+        >
+          <IconHeartFill v-if="isFavorite" class="icon" />
+          <IconHeartStraight v-else class="icon" />
+        </button>
       </div>
 
       <div class="progress-row">

@@ -206,6 +206,26 @@ export function hasAccess(role: Role, required: AccessLevel): boolean {
   return role === "visitor" || role === "admin";
 }
 
+/* ---------- 收藏与最近播放（PS-05）：与歌单条目同一套引用口径 ---------- */
+
+/** 最近播放里的一条：就是一条曲目引用，多一个“最近一次播放时间” */
+export interface RecentEntry extends PlaylistItem {
+  playedAt: string;
+}
+
+/** 听歌数据（PS-05）：收藏与最近播放放一个文件，一次原子写入就都落盘 */
+export interface ListeningData {
+  /** 收藏（最新收藏的在前） */
+  favorites: PlaylistItem[];
+  /** 最近播放（最新的在前，最多 RECENT_LIMIT 条） */
+  recent: RecentEntry[];
+}
+
+/** 最近播放的条数上限（PS-05：“自动记录最近播放 100 条”） */
+export const RECENT_LIMIT = 100;
+
+export const EMPTY_LISTENING: ListeningData = { favorites: [], recent: [] };
+
 /* ---------- 手动编辑元信息（AD-02）：前后端共用校验 ---------- */
 
 /** 可手动编辑的字段 */

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, type Component } from "vue";
+import { toPlaylistItem } from "@qingting/shared";
 import IconArrowRight from "~icons/ph/arrow-right";
+import IconHeartFill from "~icons/ph/heart-fill";
+import IconHeartStraight from "~icons/ph/heart-straight";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
 import IconQueue from "~icons/ph/queue";
@@ -10,6 +13,7 @@ import IconShuffle from "~icons/ph/shuffle";
 import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import { usePlayerStore } from "@/stores/player";
+import { useListeningStore } from "@/stores/listening";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
@@ -24,6 +28,22 @@ import type { PlayMode } from "@/utils/player";
  * 等 PL-06 播放队列弹层落地（第三个消费者）时一起抽成 PlaybackControls，见开发约定。
  */
 const player = usePlayerStore();
+
+/** 收藏（PS-05）：算的是“正在播的那一首”的引用（与歌单/历史同一套身份键） */
+const listening = useListeningStore();
+const currentItem = computed(() =>
+  player.currentTrack ? toPlaylistItem(player.currentTrack) : null,
+);
+const canFavorite = computed(() => currentItem.value !== null);
+const isFavorite = computed(() => {
+  const item = currentItem.value;
+  return item !== null && listening.isFavorite(item);
+});
+
+function toggleFavorite(): void {
+  const item = currentItem.value;
+  if (item) void listening.toggleFavorite(item);
+}
 
 const MODE_ICONS: Record<PlayMode, Component> = {
   seq: IconArrowRight,
@@ -118,6 +138,20 @@ function onPointerUp(event: PointerEvent): void {
              两边不再各写一套，否则一定会走偏（这里原来是一条横条）。
              手机整枚收起（样式在下面），音量由系统音量键接管。 -->
         <VolumeControl />
+
+        <!-- 收藏（PS-05）：播放条那枚在手机上收起了（迷你条只留两枚键），
+             所以这里是手机端收下当前这首歌的地方（与播放条那枚共用同一个 store） -->
+        <button
+          class="ctl im-fav"
+          :class="{ 'is-on': isFavorite }"
+          :title="isFavorite ? '取消收藏' : '收藏'"
+          :disabled="!canFavorite"
+          :aria-pressed="isFavorite"
+          @click="toggleFavorite"
+        >
+          <IconHeartFill v-if="isFavorite" class="icon" />
+          <IconHeartStraight v-else class="icon" />
+        </button>
       </div>
     </div>
 

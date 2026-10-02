@@ -1,6 +1,7 @@
 import type { Component } from "vue";
 import { computed, type ComputedRef } from "vue";
 import IconGlobe from "~icons/ph/globe";
+import IconHeartStraight from "~icons/ph/heart-straight";
 import IconHouse from "~icons/ph/house";
 import IconMusicNotes from "~icons/ph/music-notes";
 import { useAuthStore } from "@/stores/auth";
@@ -23,6 +24,8 @@ export function pickNavItems(opts: { canUseServer: boolean; onlineEnabled: boole
   // AC-01：未登录只留本地播放；ON-04：音源未配置时连入口都不出现
   if (opts.canUseServer) {
     items.push({ name: "library", label: "音乐库", icon: IconMusicNotes });
+    // 收藏与最近播放（PS-05）：和音乐库一样是服务器功能，未登录（本地模式）不出现
+    items.push({ name: "collection", label: "我的音乐", icon: IconHeartStraight });
     if (opts.onlineEnabled) items.push({ name: "online", label: "在线搜索", icon: IconGlobe });
   }
   return items;

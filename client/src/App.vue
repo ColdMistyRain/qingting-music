@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useMediaSession } from "@/composables/useMediaSession";
+import { usePlayHistory } from "@/composables/usePlayHistory";
 
 // 应用根：只承载路由出口（登录页与播放器/控制台外壳由路由决定）
 const route = useRoute();
@@ -11,6 +12,8 @@ const router = useRouter();
 /** RT-04：锁屏 / 通知栏 / 耳机按键。挂在根组件而不是 PlayerLayout ——
  *  播放器是单例，控制台页面里音乐也在播，挂在布局里会一进控制台就解绑。 */
 useMediaSession();
+// 收藏与最近播放（PS-05）：同样是“全站跟着播放器走”的事，挂在 App 上
+usePlayHistory();
 
 /** 顶层「层」标识：取首个匹配记录的 path。
  *  主壳内部换页（库 ⇄ 设置 …）在同一层内，`:key` 不变 —— 侧栏与播放条不会被重挂。 */

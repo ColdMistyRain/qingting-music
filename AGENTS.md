@@ -73,6 +73,7 @@ client/src/styles/        tokens.css（令牌 + OKLCH 取色核心）、global.c
 client/src/layouts/       PlayerLayout（侧栏+内容+播放条，含空格键快捷键）、ConsoleLayout（控制台独立布局）
 client/src/router/        路由表 + 守卫（身份决定可达页面）
 client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、
+                          listening（收藏与最近播放：数据在服务端 data/listening.json - PS-05）、
                           library、transfer（本地列表→上传页的 File 交接 - LC-07）
 client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息 / 排序下标）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
@@ -84,8 +85,9 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           confirm（二次确认的唯一入口：队列 + 发答案 - v5.53）、topLayer（“Esc 只关最上面那层”登记处 - v5.53）、
                           themeColor（`<meta name=theme-color>`：状态栏颜色跟主题走 - RT-07）、
                           pointer（触摸点击判定：手机上“点一下就是播这首” - v5.32）、
-client/src/views/         login/local/library/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
-client/src/composables/   useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
+client/src/views/         login/local/library/collection/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
+client/src/composables/   usePlayHistory（切歌时记一条最近播放 - PS-05）、
+                          useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
                           useMediaQuery（响应式断点：只在“同一处要显示不同内容”时用 - v5.33）、
                           useNavDrawer（手机抽屉开合状态：按钮在页头、面板在外壳，两处共享 - v5.35）
                           useNavItems（一级导航项：侧栏与手机底栏共用一份 - RT-02）、
@@ -115,7 +117,9 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **PWA（v5.65，RT-07）**：`vite-plugin-pwa`（选型表指定）—— manifest（standalone、192/512/maskable 图标、`theme_color` 与页面底色一致）+ Service Worker **只预缓存应用外壳与构建产物**（93 项，音频不缓存）；`/api`、`/audio`、`/covers` 进 `navigateFallbackDenylist`（否则离线时被 SPA 兜底成一份 index.html）。图标由 `client/public/` 下的四张 PNG 提供，**用应用自己的 `logo-mark.png` 在真实浏览器里合成**（alpha 涂白 + 主题色圆角底），与界面里的 `.brand-mark` 同源；`theme-color` 跟手动主题走（`utils/themeColor.ts`）；iOS 另补 `apple-touch-icon` 与三个 `apple-mobile-web-app-*` meta。实测：断网重载外壳照旧打开，`/audio` 不被兜底。
 
-**下一步**（建议顺序）：P2 的收藏/最近播放（PS-05）、均衡器（PL-13）可插空做 → **在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
+**收藏与最近播放（v5.67，PS-05）**：数据在服务端 `data/listening.json`（手机上收藏的、电脑上看得见；清一次浏览器数据不会把它清掉）。接口 `GET /api/listening` + `POST/DELETE /api/listening/favorites` + `POST/DELETE /api/listening/recent`（均访客级，引用口径与歌单同一套身份键）——收藏幂等、最近播放去重置顶并截到 100 条。前端：`stores/listening`（不做乐观更新，一律用服务端返回的那一份回填）+ `composables/usePlayHistory`（挂在 App.vue，切歌时记一条）+ `views/CollectionView`（/collection，「我的音乐」：收藏 / 最近播放两个页签，行复用 `TrackRow` 的收藏键）+ 播放条与沉浸页各一枚收藏键（手机上播放条那枚收起，入口在沉浸页控制栏）。**未做**：均衡器（PL-13）。
+
+**下一步**（建议顺序）：均衡器（PL-13）可插空做 → **在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 
@@ -153,6 +157,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 20. **删文件类命令先 dry-run，别把 `storedName` 当曲目 id（v5.60 血的教训）**：曲库索引里 `id` 与 `storedName` 是**各自独立生成的 nanoid**（`services/storage.ts` 里写明了“id 给前端引用、落盘名另外生成”），两者长度与字符集一样，肉眼分不出。我曾用“文件名 basename 不在 id 列表里”当孤儿判定去清 `uploads/`，结果把 **14 个音频全删了**（索引还在、文件没了，界面上就是一排点不动的鬼影）。两条：① 任何批量删除先只**打印**要删的清单，确认无误再执行；② “这个文件属于哪条曲目”必须用 `storedName` 字段对齐，不要拿 `id` 或 basename 猜。恢复办法（本项目特有）：索引里记着 `originalName` + `size`，可以从原始曲库目录按“名字 + 体积”精确拷回 `uploads/<storedName>`（实测 14/14 恢复，206 流式播放与封面全部正常）。
 
 21. **给 Reka 浮层做 `force-mount` 时，要连它的包装层一起关掉命中区（v5.62 实测）**：我们只给自己的面板写了 `visibility: hidden` + `pointer-events: none`，但带定位的浮层（Popover / Tooltip）外面还有 Reka 自己的一层包装元素（`[data-reka-popper-content-wrapper]`）—— 它 `pointer-events: auto`、盒子就是面板大小（**`visibility: hidden` 的子树照样占位**），于是收起状态下仍有一块隐形矩形**吞掉那块区域的点击**（实测：音乐库列表下部的「播放」按钮点不动，Playwright 直接报该元素 `intercepts pointer events`；量出来是一块 390×116 的隐形区盖在播放条右下）。包装层没有我们的类名，只能从里面反着关：`[data-reka-popper-content-wrapper]:has(> .q-pop[data-state="closed"]) { pointer-events: none }`。判据：**“浮层收起了”不能只看 transform / opacity / visibility，要拿 `document.elementFromPoint()` 量那块地方到底能点到谁**。（Dialog 类浮层不在带定位的包装层里 —— 内容自己 `visibility: hidden` 即不可点，故确认框/元信息弹窗无此问题。）
+
+22. **开发期偶尔某个 `~icons/*` 模块 504（v5.67 实测）**：Vite 重启或依赖集变化后会重新优化依赖，此期间首访页面可能报一串 `Loading failed for the module .../@id/~icons/ph/xxx` + 路由报错，**重载即好**，不是代码问题；生产构建不受影响（图标在构建期已内联）。判断技巧：报错模块随机、多次刷新位置不一样，就是优化器在重排。
 
 ## 文档索引
 

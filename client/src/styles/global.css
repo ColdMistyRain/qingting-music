@@ -803,6 +803,11 @@ select {
   gap: 18px;
 }
 
+/* 收藏（PS-05）：收藏中是**状态**，用主题色说出来（简约优先：颜色只表达状态）。 */
+.pb-fav.is-on {
+  color: var(--accent);
+}
+
 .ctl {
   color: var(--text-2);
   display: grid;
@@ -1392,6 +1397,7 @@ kbd {
      所以这里必须写到 (0,3,0)：用 .playerbar 前缀，别省。 */
   .playerbar .pb-ctrls .ctl.mode,
   .playerbar .pb-ctrls .ctl.prev,
+  .playerbar .pb-ctrls .ctl.pb-fav,
   .playerbar .pb-ctrls .vctl,
   .pb-right {
     display: none;

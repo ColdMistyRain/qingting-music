@@ -7,14 +7,14 @@ describe("pickNavItems", () => {
     expect(names).toEqual(["local"]);
   });
 
-  it("登录但未配置音源：本地播放 + 音乐库", () => {
+  it("登录但未配置音源：本地播放 + 音乐库 + 我的音乐", () => {
     const names = pickNavItems({ canUseServer: true, onlineEnabled: false }).map((i) => i.name);
-    expect(names).toEqual(["local", "library"]);
+    expect(names).toEqual(["local", "library", "collection"]);
   });
 
   it("登录且配置了音源：多出在线搜索", () => {
     const names = pickNavItems({ canUseServer: true, onlineEnabled: true }).map((i) => i.name);
-    expect(names).toEqual(["local", "library", "online"]);
+    expect(names).toEqual(["local", "library", "collection", "online"]);
   });
 
   it("每项都有路由名、标签与图标（缺哪个都会渲染成空白）", () => {
@@ -29,7 +29,7 @@ describe("pickNavItems", () => {
     const a = pickNavItems({ canUseServer: true, onlineEnabled: true });
     a.length = 0;
     const b = pickNavItems({ canUseServer: true, onlineEnabled: true });
-    expect(b.map((i) => i.name)).toEqual(["local", "library", "online"]);
+    expect(b.map((i) => i.name)).toEqual(["local", "library", "collection", "online"]);
   });
 
   it("图标是同一份模块级组件（不会每次新建组件导致反复重挂）", () => {

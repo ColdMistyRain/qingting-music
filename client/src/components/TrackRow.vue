@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Track } from "@qingting/shared";
+import IconHeartFill from "~icons/ph/heart-fill";
+import IconHeartStraight from "~icons/ph/heart-straight";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
@@ -20,13 +22,18 @@ const props = withDefaults(
     playing: boolean;
     /** 纯浏览场景（如音乐库）不给移除按钮，删除入口统一在控制台（LB-05 / AD-02） */
     removable?: boolean;
+    /** 收藏键（PS-05）：只有需要它的页面打开（收藏页、音乐库），默认不渲染 */
+    showFavorite?: boolean;
+    /** 当前是否已收藏（由父组件传，行本身不碰 store） */
+    favorite?: boolean;
   }>(),
-  { removable: true },
+  { removable: true, showFavorite: false, favorite: false },
 );
 
 const emit = defineEmits<{
   play: [index: number];
   remove: [index: number];
+  toggleFavorite: [index: number];
 }>();
 
 const SOURCE_LABELS: Record<Track["source"], string> = {
@@ -69,6 +76,17 @@ function onRowClick(event: MouseEvent): void {
     <div class="row__time">{{ formatTime(track.duration) }}</div>
 
     <div class="row__actions">
+      <button
+        v-if="showFavorite"
+        class="ctl row__fav"
+        :class="{ 'is-on': favorite }"
+        :title="favorite ? '取消收藏' : '收藏'"
+        :aria-pressed="favorite"
+        @click.stop="emit('toggleFavorite', index)"
+      >
+        <IconHeartFill v-if="favorite" class="icon" />
+        <IconHeartStraight v-else class="icon" />
+      </button>
       <button class="ctl" :title="isPlaying ? '暂停' : '播放'" @click.stop="emit('play', index)">
         <IconPause v-if="isPlaying" class="icon" />
         <IconPlay v-else class="icon" />
@@ -222,5 +240,12 @@ function onRowClick(event: MouseEvent): void {
 .row:hover .row__actions .ctl,
 .row--active .row__actions .ctl {
   opacity: 1;
+}
+
+/* 收藏键（PS-05）：收藏中是**状态**，用主题色说出来（简约优先：颜色只表达状态）。
+   已收藏的那一枚常显 —— 否则列表看起来像“这一首没有收藏”，得把鼠标移上去才知道。 */
+.row__actions .row__fav.is-on {
+  opacity: 1;
+  color: var(--accent);
 }
 </style>

@@ -126,6 +126,15 @@ function onRowClick(event: MouseEvent): void {
   background: var(--hover);
 }
 
+/* 当前曲目那行悬浮时**保持**主题色淡底：`.row:hover` 的特异性 (0,2,0) 高于 `.row--active`
+   (0,1,0)，不补这条就会“悬浮到正在播的那一行，它反而从主题色淡底（α .14）掉成更淡的
+   通用悬浮底（α .06）”—— 越靠近越不像当前曲目（v5.95 实测：background 由
+   `oklab(… / 0.14)` 变成 `rgba(18,24,38,0.06)`）。悬浮反馈本身不靠底色：
+   操作键显形那一下已经说明了。 */
+.row--active:hover {
+  background: var(--accent-soft);
+}
+
 .row--active {
   background: var(--accent-soft);
 }
@@ -216,8 +225,7 @@ function onRowClick(event: MouseEvent): void {
 
 /* 无悬浮能力的设备（触摸屏）：操作键**常显**。
    手机上主要的播放入口是“点整行”（见 onRowClick），这枚键是**兜底与显式入口**：
-   ① 万一某个引擎的 click 不带 pointerType（老引擎），还能靠它点；② 正在播的那行它变“暂停”，
-   需要一直看得见（那条规则还在上面：.row--active .ctl）。
+   万一某个引擎的 click 不带 pointerType（老引擎），还能靠它点。
    用能力查询（hover）而不是宽度：桌面窗口调窄仍能悬浮，没必要常显。 */
 @media (hover: none) {
   .row__actions .ctl {
@@ -232,13 +240,19 @@ function onRowClick(event: MouseEvent): void {
   gap: 4px;
 }
 
+/* 操作键默认不占位，悬浮本行才显形（减少每行的视觉噪音）。
+   v5.95 需求方：“这个播放按钮有点多此一举了，我直接看底部的播放控件就知道哪首歌正在播放了”
+   —— 原先这里还有一条 `.row--active .row__actions .ctl { opacity: 1 }`，把**正在播放那一行**
+   的播放键钉成常显当作“正在播放”标记。那个标记是重复的：① 行自己已经说了（歌名主题色
+   + 加粗 + 行底色 `--accent-soft`）；② 底部播放条一直在说（封面/歌名）。
+   删掉后它与其他行一视同仁（悬浮才显形），“哪个是当前曲目”回归行本身的强调；
+   触摸设备不受影响（上面那条 `hover: none` 已让所有键常显）。 */
 .row__actions .ctl {
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-.row:hover .row__actions .ctl,
-.row--active .row__actions .ctl {
+.row:hover .row__actions .ctl {
   opacity: 1;
 }
 

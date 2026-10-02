@@ -13,6 +13,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "reka-ui";
+import IconQueue from "~icons/ph/queue";
 import AppTooltip from "@/components/AppTooltip.vue";
 import QueuePanel from "@/components/QueuePanel.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
@@ -33,12 +34,14 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  * 行为层用 Reka（铁律 1）、样式全部自己写（Reka 是无样式行为层）；
  * **内容**（标题行 + 列表）在 QueuePanel.vue，两套壳层共用一份。
  *
- * 触发按钮由**调用方**通过 #trigger 插槽传入：它属于播放条/沉浸页那套控件（`.ctl`），
- * 样式留在各自的调用点，别在这里复制一份。
+ * 触发键由**本组件自己渲染**（`.ctl` + 队列图标），调用方只传 `label` 当提示。
+ * 为什么不把触发按钮做成插槽：那样“按钮”与“包住按钮的提示 / 触发器”就分在两个文件里，
+ * 而 `as-child` 链要求**触发器的孩子就是一个元素** —— 一旦两边版本不一致（改了一半、HMR 半新半旧），
+ * `PopoverTrigger` 就会去合并一个组件而不是按钮，表现是**点了完全没反应**（v5.71 实测踩到过）。
+ * 收进同一个文件后，这条链不可能再被外力拆开。
  *
  * 触发键的提示也在这里包（调用方只传 `label`）：**Tooltip 必须套在 Popover/Dialog 触发器的外层** ——
- * `as-child` 只能往里合并，同一个元素不能左右各包一层；把 Tooltip 写在插槽里（即套在触发器内层）
- * 会让两个行为层的 as-child 链打架（v5.71 实测：触发键彻底失灵 —— 浮层打不开、提示也不弹）。
+ * `as-child` 只能往里合并，同一个元素不能左右各包一层。
  */
 withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const open = ref(false);
@@ -100,7 +103,9 @@ onBeforeUnmount(() => {
   <PopoverRoot v-if="!isMobile" v-model:open="open">
     <AppTooltip :label="label" :disabled="!label">
       <PopoverTrigger as-child>
-        <slot name="trigger" />
+        <button class="ctl">
+          <IconQueue class="icon" />
+        </button>
       </PopoverTrigger>
     </AppTooltip>
 
@@ -116,7 +121,9 @@ onBeforeUnmount(() => {
   <DialogRoot v-else v-model:open="open">
     <AppTooltip :label="label" :disabled="!label">
       <DialogTrigger as-child>
-        <slot name="trigger" />
+        <button class="ctl">
+          <IconQueue class="icon" />
+        </button>
       </DialogTrigger>
     </AppTooltip>
 

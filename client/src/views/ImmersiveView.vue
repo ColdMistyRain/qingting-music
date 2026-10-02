@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import IconCaretDown from "~icons/ph/caret-down";
-import IconFileText from "~icons/ph/file-text";
 import IconMusicNotes from "~icons/ph/music-notes";
 import AppTooltip from "@/components/AppTooltip.vue";
 import ImControls from "@/components/immersive/ImControls.vue";
@@ -221,13 +220,7 @@ onBeforeUnmount(() => {
       </AppTooltip>
       <span class="im-top__label">正在播放</span>
       <!-- 歌词来源 / 导入 .lrc、.yrc（LR-02）：与左侧关闭按钮同尺寸，标题才真的居中 -->
-      <LyricsSourceMenu label="歌词来源 / 导入歌词">
-        <template #trigger>
-          <button class="ctl">
-            <IconFileText class="icon" />
-          </button>
-        </template>
-      </LyricsSourceMenu>
+      <LyricsSourceMenu label="歌词来源 / 导入歌词" />
     </header>
 
     <div v-if="!player.hasTrack" class="im-empty">

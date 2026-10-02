@@ -8,7 +8,6 @@ import IconHeartStraight from "~icons/ph/heart-straight";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
-import IconQueue from "~icons/ph/queue";
 import IconRepeat from "~icons/ph/repeat";
 import IconRepeatOnce from "~icons/ph/repeat-once";
 import IconShuffle from "~icons/ph/shuffle";
@@ -315,13 +314,7 @@ const marqueeActive = computed(() => player.playing || hovering.value);
       </AppTooltip>
 
       <!-- 队列弹层（PL-06）：触发按钮由这里传入，保持播放条那套控件样式 -->
-      <QueuePopover :label="`播放队列（${player.queue.length} 首）`">
-        <template #trigger>
-          <button class="ctl">
-            <IconQueue class="icon" />
-          </button>
-        </template>
-      </QueuePopover>
+      <QueuePopover :label="`播放队列（${player.queue.length} 首）`" />
     </div>
   </footer>
 </template>

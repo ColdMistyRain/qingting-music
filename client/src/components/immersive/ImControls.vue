@@ -6,7 +6,6 @@ import IconHeartFill from "~icons/ph/heart-fill";
 import IconHeartStraight from "~icons/ph/heart-straight";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
-import IconQueue from "~icons/ph/queue";
 import IconRepeat from "~icons/ph/repeat";
 import IconRepeatOnce from "~icons/ph/repeat-once";
 import IconShuffle from "~icons/ph/shuffle";
@@ -126,13 +125,7 @@ function onPointerUp(event: PointerEvent): void {
 
       <div class="im-ctrls__row">
         <!-- 队列入口只在手机上出现：迷你条把队列键收起了，这里是手机唯一入口 -->
-        <QueuePopover v-if="isMobile" :label="`播放队列（${player.queue.length} 首）`">
-          <template #trigger>
-            <button class="ctl">
-              <IconQueue class="icon" />
-            </button>
-          </template>
-        </QueuePopover>
+        <QueuePopover v-if="isMobile" :label="`播放队列（${player.queue.length} 首）`" />
 
         <!-- 音量：与播放条共用同一个控件（components/VolumeControl.vue，v4.62）——
              两边不再各写一套，否则一定会走偏（这里原来是一条横条）。

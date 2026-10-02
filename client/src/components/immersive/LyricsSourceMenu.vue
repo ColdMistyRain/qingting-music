@@ -15,8 +15,8 @@ import { decodeLyricsBytes } from "@/utils/lyricsLibrary";
  * 而用户手里那份可能是逐字版——没有入口，LR-05 的逐字效果对他们就等于不存在。
  *
  * 行为层仍然交给 Reka 的 Popover（打开/关闭、Esc、点外部、焦点归还，铁律 1）；
- * 触发按钮由调用方通过 #trigger 插槽传入（它属于页面顶栏那套控件，样式留在页面里），
- * 提示也由这里包（调用方只传 `label`）：**Tooltip 必须套在触发器的外层**（理由见 QueuePopover）。
+ * 触发键由本组件自己渲染（`.ctl` + 文件图标），调用方只传 `label` —— 理由见 QueuePopover：
+ * “按钮”与“包住按钮的提示与触发器”必须在同一个文件里，否则两边版本不一致时触发键会彻底失灵。
  */
 withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const player = usePlayerStore();
@@ -68,7 +68,9 @@ function clearImported(): void {
   <PopoverRoot v-model:open="open" @update:open="failed = false">
     <AppTooltip :label="label" :disabled="!label">
       <PopoverTrigger as-child>
-        <slot name="trigger" />
+        <button class="ctl">
+          <IconFileText class="icon" />
+        </button>
       </PopoverTrigger>
     </AppTooltip>
 

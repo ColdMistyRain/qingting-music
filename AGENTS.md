@@ -124,7 +124,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **PWA（v5.65，RT-07）**：`vite-plugin-pwa`（选型表指定）—— manifest（standalone、192/512/maskable 图标、`theme_color` 与页面底色一致）+ Service Worker **只预缓存应用外壳与构建产物**（93 项，音频不缓存）；`/api`、`/audio`、`/covers` 进 `navigateFallbackDenylist`（否则离线时被 SPA 兜底成一份 index.html）。图标由 `client/public/` 下的四张 PNG 提供，**用应用自己的 `logo-mark.png` 在真实浏览器里合成**（alpha 涂白 + 主题色圆角底），与界面里的 `.brand-mark` 同源；`theme-color` 跟手动主题走（`utils/themeColor.ts`）；iOS 另补 `apple-touch-icon` 与三个 `apple-mobile-web-app-*` meta。实测：断网重载外壳照旧打开，`/audio` 不被兜底。
 
-**提示（Tooltip，v5.71）**：Reka 的 Tooltip 落地成共用的 `components/AppTooltip.vue`，`App.vue` 挂**一个** `TooltipProvider`（400ms 延迟；连续移到下一枚键不再等；只有键盘聚焦才开；指针离开即收）。**只有图标的按钮用它**（`label` 同时就是 `aria-label` —— 图标键没有可见文字，名字不能丢），有可见文字的控件仍写原生 `title`（截断时看全文）。队列键与歌词来源键的提示**由壳层组件自己包**（开一个 `label` 属性）：组合顺序必须是 **Tooltip 在外、Popover/Dialog 触发器在内**，反过来会让触发键彻底失灵（浮层打不开、提示也不弹）。
+**提示（Tooltip，v5.71）**：Reka 的 Tooltip 落地成共用的 `components/AppTooltip.vue`，`App.vue` 挂**一个** `TooltipProvider`（400ms 延迟；连续移到下一枚键不再等；只有键盘聚焦才开；指针离开即收）。**只有图标的按钮用它**（`label` 同时就是 `aria-label` —— 图标键没有可见文字，名字不能丢），有可见文字的控件仍写原生 `title`（截断时看全文）。队列键与歌词来源键的触发键与提示都**收在壳层组件里**（`QueuePopover` / `LyricsSourceMenu`，调用方只传 `label`）——组合顺序必须是 **Tooltip 在外、Popover/Dialog 触发器在内**，而触发键本体也必须在同一个文件里，否则两边版本不一致时触发键会彻底失灵（v5.71 / v5.73 实测）。
 
 **提示条（Toast，v5.72）**：`utils/toast.ts`（唯一入口 `showToast` + 队列）+ `components/AppToast.vue`（Reka Toast，挂 App.vue）。**判据**：与当前操作无关、消失也不影响继续操作的消息走提示条（播放异常、后台任务结果）；绑在控件/表单项上的错误留在原地（表单校验、上传某一行失败、带“重试”的失败面板）。**PL-09 的播放提示已改走它**（`stores/player` 的 `notify()`，出错 `danger` + 10s），播放条里那行红字与 `notice` 状态都已移除。
 

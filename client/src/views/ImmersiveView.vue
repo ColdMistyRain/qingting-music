@@ -453,6 +453,19 @@ onBeforeUnmount(() => {
   padding: 0 20px 26px;
 }
 
+/* 手机：底栏两侧留白收窄（v5.93）。
+   需求方（窄窗口下的彩胶播放页）：“底部的进度条和按钮组能否距离两边更近一点”。
+   量出来：控制区自己被 `min(560px, 74vw)` 收成 74vw，叠上这里的 20px，
+   390px 宽的屏上两侧各空 71px（宽窗口下更多）。现在这里只留 14px，
+   控制区自己铺满（`ImControls` 的 .im-ctl 在手机档改成 `min(560px, 100%)`）——
+   “距两边多远”只由这一处决定。留 14px 而不是贴边：进度条手柄画在填充末端，
+   贴边会被裁掉半个手柄。 */
+@media (max-width: 767px) {
+  .im-bottom {
+    padding: 0 14px 26px;
+  }
+}
+
 .im-empty {
   flex: 1;
   display: flex;

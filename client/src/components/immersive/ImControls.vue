@@ -223,10 +223,39 @@ function onPointerUp(event: PointerEvent): void {
      列表在下一首右侧）—— 靠 DOM 顺序就是对的（三组依次是 模式 / 走带键 / 队列+音量），
      不用 order 去搬。图标统一 22px（不存在“次级键”了）。
      ⚠️ 音量要抬到 (0,3,0)：组件 scoped 的 .vctl 是运行时注入的，同特异性压不过。 */
+  /* 宽度交给容器（下方 .im-ctl 的 100%），这里只管“三组怎么摆”。
+     v5.93 需求方：“底部的进度条和按钮组能否距离两边更近一点” ——
+     原来那一簇只占 74vw（390px 的屏上两侧各空 51px，窄窗口下空得更多），
+     现在模式贴左、队列与收藏贴右、走带键居中，可用宽度全用上。
+     **用 grid 的 `1fr auto 1fr` 而不是 space-between**：后者中间那组会被两侧宽度差推偏
+     （左组 22px vs 右组 66px，播放键会左偏 22px），而 `1fr auto 1fr` 的中间列永远是容器正中
+     —— 播放键与进度条中心对齐这条（v5.70 定的）在手机上同样要成立。
+     桌面不改：那里鼠标够得着，聚拢的一簇比铺满更好点。 */
   .im-ctrls {
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
     gap: 0 22px;
+    /* 必须显式铺满：.im-ctl 是 `align-items: center` 的列，子项默认收成内容宽
+       —— 实测只剩 324px（容器 362），模式键落在 33 而进度条左端在 14，
+       两边对不齐；铺满后它才和进度条同一条边界。 */
+    width: 100%;
     --ctl-icon-size: 22px;
+  }
+
+  .im-ctrls__row:first-child {
+    justify-content: flex-start;
+  }
+
+  .im-ctrls__row:last-child {
+    justify-content: flex-end;
+  }
+
+  /* 手机上两侧留白收窄：宽度只认一个来源（容器），
+     “距两边多远”写在一处（.im-bottom 的 14px 侧内边距）—— 同“同源派生”那条规则的思路。
+     桌面保留 min(560px, 74vw)：大屏上控制区铺满整屏会散掉。 */
+  .im-ctl {
+    width: min(560px, 100%);
   }
 
   /* 音量整枚收起（音量由系统音量键接管）。

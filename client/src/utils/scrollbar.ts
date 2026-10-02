@@ -36,6 +36,39 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/** “这个容器现在能不能滚”要看的两件事 */
+export interface ScrollableInput {
+  /** 计算样式里的 `overflow-y`（`auto` / `scroll` / `hidden` / `visible` / `clip`） */
+  overflowY: string;
+  /** 客户区尺寸（`clientHeight`） */
+  clientSize: number;
+  /** 内容尺寸（`scrollHeight`） */
+  scrollSize: number;
+  /** 容差（px，默认 1）：布局取整会让两端恰好的容器差出 1px */
+  tolerance?: number;
+}
+
+/**
+ * 这个容器**现在真的能滚吗**。
+ *
+ * 两条件都得有：① 计算样式允许滚（`auto` / `scroll`）；② 内容确实比盒子高。
+ *
+ * ⚠️ 只看 ② 是不够的 —— 这一条踩过（v6.18 埋、v6.19 需求方发现）：`overflow: hidden`
+ * 的容器**内容也会比盒子高**（页框被挤矮时，里面的滚动区会溢出岛），只看
+ * `scrollHeight` 就会给一个**根本滚不动**的岛画上一条滚动条；而它因为滚不动，
+ * 就永远等不到“内容装得下”那一刻把自己烟掉 —— 表现是岛上**多出一条永远挂在右上角**的条
+ * （需求方：“这个进度条始终都出现右上部”）。
+ *
+ * 同一个判据也用来认“宿主是不是真的住在另一个滚动区里”（`directives/overlayScroll.ts`）。
+ */
+export function canScrollY(input: ScrollableInput): boolean {
+  const { overflowY } = input;
+  if (overflowY !== "auto" && overflowY !== "scroll") return false;
+  const clientSize = Math.max(0, Number(input.clientSize) || 0);
+  const scrollSize = Math.max(0, Number(input.scrollSize) || 0);
+  return scrollSize - clientSize > (input.tolerance ?? 1);
+}
+
 /**
  * 算出滑块的长度与位置。
  * 长度按“视口 / 内容”的比例映射到轨道上，但**不小于 `minThumb`**；

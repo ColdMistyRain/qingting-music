@@ -1,5 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { scrollOffsetFromThumb, thumbMetrics } from "./scrollbar";
+import { canScrollY, scrollOffsetFromThumb, thumbMetrics } from "./scrollbar";
+
+describe("canScrollY（这个容器现在真的能不能滚）", () => {
+  it("允许滚 + 内容更高 → 能滚", () => {
+    expect(canScrollY({ overflowY: "auto", clientSize: 300, scrollSize: 3000 })).toBe(true);
+    expect(canScrollY({ overflowY: "scroll", clientSize: 300, scrollSize: 600 })).toBe(true);
+    // `overflow: scroll` 只是“允许滚”，内容装得下时仍然不画条（只多 1px 也算装得下）
+    expect(canScrollY({ overflowY: "scroll", clientSize: 300, scrollSize: 301 })).toBe(false);
+  });
+
+  it("溢出但**不允许滚**的容器不算能滚——v6.19 那条“永远挂在右上”的条就是它造的", () => {
+    expect(canScrollY({ overflowY: "hidden", clientSize: 574, scrollSize: 726 })).toBe(false);
+    expect(canScrollY({ overflowY: "clip", clientSize: 574, scrollSize: 726 })).toBe(false);
+    expect(canScrollY({ overflowY: "visible", clientSize: 100, scrollSize: 900 })).toBe(false);
+  });
+
+  it("允许滚但内容装得下 → 不算能滚", () => {
+    expect(canScrollY({ overflowY: "auto", clientSize: 500, scrollSize: 500 })).toBe(false);
+    expect(canScrollY({ overflowY: "auto", clientSize: 500, scrollSize: 480 })).toBe(false);
+  });
+
+  it("容差：仅差 1px 不算（布局取整会让两端恰好的容器差出 1px），差 2px 才算", () => {
+    expect(canScrollY({ overflowY: "auto", clientSize: 500, scrollSize: 501 })).toBe(false);
+    expect(canScrollY({ overflowY: "auto", clientSize: 500, scrollSize: 502 })).toBe(true);
+    // 容差可覆盖（拖拽/动画期间想放宽时用）
+    expect(canScrollY({ overflowY: "auto", clientSize: 500, scrollSize: 504, tolerance: 5 })).toBe(
+      false,
+    );
+  });
+
+  it("脏数据不抛：NaN / 负数 / 未量到尺寸一律算“不能滚”", () => {
+    expect(canScrollY({ overflowY: "auto", clientSize: Number.NaN, scrollSize: 800 })).toBe(true);
+    expect(canScrollY({ overflowY: "auto", clientSize: 0, scrollSize: 0 })).toBe(false);
+    expect(canScrollY({ overflowY: "auto", clientSize: -10, scrollSize: -20 })).toBe(false);
+    expect(canScrollY({ overflowY: "", clientSize: 100, scrollSize: 900 })).toBe(false);
+  });
+});
 
 describe("thumbMetrics（自绘浮层滚动条的几何）", () => {
   it("长度按“视口 / 内容”比例，滚到顶时贴在轨道起点", () => {

@@ -1,5 +1,5 @@
 import type { Directive } from "vue";
-import { scrollOffsetFromThumb, thumbMetrics } from "@/utils/scrollbar";
+import { canScrollY, scrollOffsetFromThumb, thumbMetrics } from "@/utils/scrollbar";
 
 /**
  * 自绘**浮层滚动条**（v6.18）：`<div class="page-frame__scroll" v-overlay-scroll>`。
@@ -35,6 +35,8 @@ interface State {
   /** 第一次真的能滚时才建（否则每个页框、每个容器都留一个用不上的条） */
   bar: HTMLElement | null;
   thumb: HTMLElement | null;
+  /** 容器现在能不能滚（只在布局变化时重算，见 `update`） */
+  scrollable: boolean;
   /** 合帧：一次 rAF 里只量一次、写一次 */
   frame: number;
   /** 下一次更新时要不要重新量轨道位置（滚动时不用量，只有布局变了才量） */
@@ -136,8 +138,29 @@ function syncBarBox(state: State, el: HTMLElement): void {
   style.right = `${Math.round(hostRect.right - rect.right) + BAR_INSET_X}px`;
 }
 
+/**
+ * 拆掉条（容器不再能滚 / 卸挂载时）。
+ *
+ * 为什么不是只把 `is-on` 拿掉：`opacity: 0` **不等于不可点**（AGENTS 坑 18）——
+ * 条的轨道虽然 `pointer-events: none`，滑块却是 `auto`（那是为了“淡出后还能抓回来”），
+ * 于是一条看不见的滑块会一直守在那 7px 上呑点击。不需要时就真的拆掉。
+ */
+function destroyBar(state: State): void {
+  window.clearTimeout(state.hideTimer);
+  state.bar?.remove();
+  state.bar = null;
+  state.thumb = null;
+  state.hovering = false;
+  state.dragging = false;
+}
+
 function update(state: State, el: HTMLElement): void {
   const { clientHeight, scrollHeight, scrollTop } = el;
+  // “能不能滚”只随布局变（`overflow` 从 auto 变回 hidden、内容装不下了…），
+  // 所以跟着 needsBox 一起重新读：滚动时不必每帧读计算样式。
+  if (state.needsBox) {
+    state.scrollable = canScroll(el);
+  }
   const metrics = thumbMetrics({
     clientSize: clientHeight,
     scrollSize: scrollHeight,
@@ -145,9 +168,8 @@ function update(state: State, el: HTMLElement): void {
     minThumb: MIN_THUMB,
   });
 
-  if (metrics.hidden) {
-    // 内容装得下：藏起来即可（条本身留着，下次再滚动不用重建）
-    state.bar?.classList.remove("is-on");
+  if (metrics.hidden || !state.scrollable) {
+    destroyBar(state);
     return;
   }
 
@@ -262,15 +284,20 @@ const AUTO_TARGETS = [
 const attached = new Set<HTMLElement>();
 
 /**
- * 这个元素当下是不是真的在滚（计算样式里是 `overflow: auto|scroll`）。
+ * 这个元素**现在真的能滚吗**（判据在 `utils/scrollbar.ts`，有单测）。
  *
- * 判据刻意用**计算样式**而不是 `scrollHeight > clientHeight`：不可滚的容器
- * （例如 `overflow: hidden` 的岛）内容照样可能比盒子高，那样会把页框里那个
- * 真正的滚动区误判成“嵌在别人的滚动区里”而不给它挂条（v6.18 实测踩过）。
+ * 两处都要用它，而且两处都踩过：
+ * ① 决定画不画条：只看 `scrollHeight > clientHeight` 会给 `overflow: hidden` 的岛也画一条
+ *    （内容比盒子高但根本滚不动），而且它永远爁不掉 —— 需求方看到的是“岛上多出一条
+ *    永远挂在右上的滚动条”（v6.19）。
+ * ② 决定嵌套要不要跳：宿主住在别人的滚动区里时，条会跟着外层滚走，这种要跳。
  */
-function isScrollArea(el: Element): boolean {
-  const { overflowY } = getComputedStyle(el);
-  return overflowY === "auto" || overflowY === "scroll";
+function canScroll(el: HTMLElement): boolean {
+  return canScrollY({
+    overflowY: getComputedStyle(el).overflowY,
+    clientSize: el.clientHeight,
+    scrollSize: el.scrollHeight,
+  });
 }
 
 function mountOverlayScroll(el: HTMLElement): void {
@@ -282,7 +309,7 @@ function mountOverlayScroll(el: HTMLElement): void {
   // （它平时也多半装得下、不滚）。注意判据是“外层真的在滚”，不能只看有没有属性：
   // 岛（`.content`）在页框页面上也带属性，但它是 `overflow: hidden`。
   const outer = host.closest("[data-overlay-scroll]");
-  if (outer && isScrollArea(outer)) return;
+  if (outer && outer instanceof HTMLElement && canScroll(outer)) return;
 
   el.setAttribute("data-overlay-scroll", "");
   host.setAttribute("data-overlay-scroll-host", "");
@@ -291,6 +318,7 @@ function mountOverlayScroll(el: HTMLElement): void {
     host,
     bar: null,
     thumb: null,
+    scrollable: false,
     frame: 0,
     needsBox: true,
     hideTimer: 0,
@@ -335,7 +363,7 @@ function unmountOverlayScroll(el: HTMLElement): void {
   state.mutationObserver?.disconnect();
   window.clearTimeout(state.hideTimer);
   if (state.frame) cancelAnimationFrame(state.frame);
-  state.bar?.remove();
+  destroyBar(state);
   el.removeAttribute("data-overlay-scroll");
   // 宿主属性只在没有别的实例还挂在同一个父元素上时才撤（一个宿主可能装两个滚动区）
   const stillUsed = [...attached].some((node) => node !== el && node.parentElement === state.host);

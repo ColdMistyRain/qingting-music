@@ -445,7 +445,11 @@ async function removeSelected(): Promise<void> {
 .sg--head {
   /* 与曲目列表表头同一规则：**不吸顶、不加底色** —— 它现在在滚动区**外面**（卡里的第一个孩子，
      只有下面的行滚），所以不用不透明底去盖从下面经过的行。
-     （v5.79 之前它与行一起在滚动区里，于是跟着一起滚 —— 那是 bug，不是“跟随头部”。） */
+     （v5.79 之前它与行一起在滚动区里，于是跟着一起滚 —— 那是 bug，不是“跟随头部”。）
+     高度：**必须显式关掉 `.sg` 的 `min-height: 64px`** —— `min-height` 压得住 `height`，
+     只写 height 的话表头实际还是 64px（和数据行一样高，只是标签居中，看着就是一大块空）。
+     34px 与曲目列表的 `.list-head` 同高（说明行是同一档：11.5px 标签、不加底色）。 */
+  min-height: 0;
   height: 34px;
   border-bottom: 1px solid var(--glass-border);
   border-radius: 0;

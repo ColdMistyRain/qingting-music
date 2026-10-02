@@ -71,6 +71,8 @@ export const useEqualizerStore = defineStore("equalizer", () => {
   let filters: BiquadFilterNode[] = [];
   let master: GainNode | null = null;
   let limiter: DynamicsCompressorNode | null = null;
+  /** 节奏分析（v5.90）：挂在 source 上的**旁路死端**，不影响出声 */
+  let analyser: AnalyserNode | null = null;
 
   function build(): void {
     if (ctx) return;
@@ -94,6 +96,11 @@ export const useEqualizerStore = defineStore("equalizer", () => {
     limiter.ratio.value = 20;
     limiter.attack.value = 0.003;
     limiter.release.value = 0.25;
+    // 节奏分析（v5.90）：fftSize 2048（低频区分得细）+ 平滑调低 ——
+    // 击打是**瞬态**，用分析器默认的 0.8 平滑会把鼓点抹平（包络我们自己算）
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.2;
   }
 
   /** 接线：A/B 开启 → 依次串滤波链；关闭 → 直通输出 */
@@ -142,6 +149,17 @@ export const useEqualizerStore = defineStore("equalizer", () => {
     if (!source) source = ctx.createMediaElementSource(element);
     route();
     pushValues();
+    // 分析节点挂在 source 上（MDN：输出不接也照样出数）——
+    // 所以 A/B 关闭、直道输出时节奏分析照常工作；重复接同一对是空操作，不必去重
+    if (analyser) source.connect(analyser);
+  }
+
+  /**
+   * 节奏分析（v5.90）：拿到分析节点。**没到 `activate()` 之前图不存在，这里返回 null** ——
+   * 调用方（`composables/useBeat`）要先把图接上（`activate()` 本身就要用户手势）。
+   */
+  function getAnalyser(): AnalyserNode | null {
+    return analyser;
   }
 
   // 设置一变：存盘 + 应用到图上（没在图里就什么都不做）
@@ -240,5 +258,8 @@ export const useEqualizerStore = defineStore("equalizer", () => {
     removeCustom,
     toggle,
     reset,
+    /** v5.90：节奏分析要的两件东西（接图 + 拿分析节点） */
+    activate,
+    getAnalyser,
   };
 });

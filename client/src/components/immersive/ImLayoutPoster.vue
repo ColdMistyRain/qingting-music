@@ -2,6 +2,7 @@
 import IconMusicNotes from "~icons/ph/music-notes";
 import ImTitle from "@/components/immersive/ImTitle.vue";
 import LyricsView from "@/components/immersive/LyricsView.vue";
+import VinylBeatGlow from "@/components/immersive/VinylBeatGlow.vue";
 import type { LyricLine } from "@/utils/lyrics";
 
 /**
@@ -39,6 +40,10 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
          —— 唱臂的支点在盘外右上方，盘不完整就没地方放它。 -->
     <div class="poster__art" aria-hidden="true">
       <div class="vinyl-glow"></div>
+
+      <!-- 节奏光晕（v5.90）：只做加法的一层，压在盘**下面** —— 不遮盘面、
+           没有音频/关掉开关/减动效时自动退回纯 CSS 底光 -->
+      <VinylBeatGlow />
 
       <div class="vinyl-assembly">
         <div class="v-disc">

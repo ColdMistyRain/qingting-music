@@ -113,6 +113,17 @@ const layouts: { key: ImLayout; label: string }[] = [
   { key: "poster", label: "彩胶唱片" },
 ];
 
+/** 光晕跟随节奏（v5.90）：布尔设置也用分段控件，与上面模式 / 材质同一套交互语言 */
+const beatOptions = [
+  { value: "on", label: "开" },
+  { value: "off", label: "关" },
+] as const;
+
+const glowBeat = computed({
+  get: () => (theme.glowBeat ? "on" : "off"),
+  set: (value: string) => theme.setGlowBeat(value === "on"),
+});
+
 const roleLabel = computed(() => {
   if (!auth.authEnabled) return "门禁关闭（全功能开放）";
   if (auth.isAdmin) return "管理员";
@@ -192,7 +203,16 @@ async function signOut(): Promise<void> {
               </button>
             </div>
           </div>
-          <div class="set-note">点播放条左侧的封面即可展开，选择按设备记忆。</div>
+          <div class="set-row">
+            <span>光晕跟随节奏</span>
+            <SegmentedControl v-model="glowBeat" :options="beatOptions" />
+          </div>
+          <div class="set-note">
+            点播放条左侧的封面即可展开，选择按设备记忆。<br />
+            <b>光晕跟随节奏</b
+            >＝「彩胶唱片」布局下，外圈柔光跟着低频鼓点呼吸，每次击打再随机甩出一团光
+            （另两个布局用不上）；开了系统「减弱动效」时它也会自动关掉。
+          </div>
         </div>
       </TabsContent>
 

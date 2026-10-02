@@ -17,6 +17,7 @@ export type ImLayout = "duo" | "center" | "poster";
 const STORAGE_KEY = "qt-theme";
 const MATERIAL_KEY = "qt-material";
 const LAYOUT_KEY = "qt-im-layout";
+const BEAT_KEY = "qt-glow-beat";
 
 /** 默认跟随系统，手动切换后记忆选择（VS-08） */
 function resolveInitial(): ThemeMode {
@@ -41,10 +42,19 @@ function resolveInitialLayout(): ImLayout {
   return saved === "center" || saved === "poster" ? saved : "duo";
 }
 
+/**
+ * 光晕跟随节奏（v5.90）：默认开（要关的只需在设置里关一次，值才是 "0"）。
+ * 它只在「彩胶唱片」布局下有画面，但开关不随布局隐藏 —— 换布局时偏好不丢。
+ */
+function resolveInitialBeat(): boolean {
+  return localStorage.getItem(BEAT_KEY) !== "0";
+}
+
 export const useThemeStore = defineStore("theme", () => {
   const mode = ref<ThemeMode>("dark");
   const material = ref<MaterialMode>("islands");
   const layout = ref<ImLayout>("duo");
+  const glowBeat = ref<boolean>(true);
 
   function apply(next: ThemeMode, persist: boolean): void {
     mode.value = next;
@@ -66,11 +76,17 @@ export const useThemeStore = defineStore("theme", () => {
     if (persist) localStorage.setItem(LAYOUT_KEY, next);
   }
 
+  function setGlowBeat(next: boolean): void {
+    glowBeat.value = next;
+    localStorage.setItem(BEAT_KEY, next ? "1" : "0");
+  }
+
   /** 挂载前调用：把已记忆/系统偏好的主题与材质落到 <html data-*> */
   function init(): void {
     apply(resolveInitial(), false);
     applyMaterial(resolveInitialMaterial(), false);
     applyLayout(resolveInitialLayout(), false);
+    glowBeat.value = resolveInitialBeat();
   }
 
   function setTheme(next: ThemeMode): void {
@@ -85,5 +101,5 @@ export const useThemeStore = defineStore("theme", () => {
     applyLayout(next, true);
   }
 
-  return { mode, material, layout, init, setTheme, setMaterial, setLayout };
+  return { mode, material, layout, glowBeat, init, setTheme, setMaterial, setLayout, setGlowBeat };
 });

@@ -5,7 +5,6 @@ import {
   centerShift,
   clampManualShift,
   currentLineIndex,
-  lineProgress,
   wordFillProgress,
   type LyricLine,
 } from "@/utils/lyrics";
@@ -54,8 +53,16 @@ const depths = computed(() => props.lines.map((_, index) => depthOf(index)));
 const refSetters = computed<VNodeRef[]>(() =>
   props.lines.map((_, index) => (el) => setLineRef(el as Element | null, index)),
 );
-/** 行级进度（0~1）：仅行级数据时的整句渐亮 */
-const activeRatio = computed(() => lineProgress(props.lines, activeIndex.value, props.time));
+/**
+ * `v-memo` 的第 4 个依赖：**只让当前行**在逐字进度变化时重渲染。
+ *
+ * 为什么必须有它（v6.19 实测踩到）：`v-memo` 的依赖里原本没有任何“每帧会变”的量，于是当前行整棵
+ * 子树被原样复用 —— 逐字填充真的**一帧都不会更新**（实测：行级 `--p` 在同一句内冻在
+ * 0.0078，换句才变）。别的行这个值恒为空串，不会被打扰。
+ */
+const fillKey = computed(() =>
+  activeWords.value.length ? activeWords.value.map((v) => Math.round(v * 100)).join(",") : "",
+);
 
 /* ---------- 自动居中（LR-06）：把当前句挪到窗口垂直中线 ----------
    高量在 DOM 侧做（行高由字号 clamp 决定，写死在 CSS 里会漂），
@@ -220,6 +227,19 @@ let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 let dragStartY = 0;
 let dragStartShift = 0;
 let dragged = false;
+/**
+ * 按下的那一行（-1 = 没按在行上；`pointerup` 时用它收尾一次点击）。
+ *
+ * ⚠️ 必须在 `pointerdown` 里就把行号记下来：`setPointerCapture` 会把后续指针事件（含
+ * `pointerup`）**重定向到列表**，浏览器据此把随后的 `click` 派发给“按下与起两个目标的
+ * 最近公共祖先”—— 也就是列表本身，**行按钮上的 `@click` 永远不会触发**。
+ * （v6.19 需求方报的“点击歌词不跳转”，实测事件落点：`pointerdown: lyline` /
+ * `pointerup: ly-list` / `click: ly-list`。）所以“点一下跳过去”改由 `pointerup` 自己收尾，
+ * `@click` 只留给键盘（Enter / Space）与读屏。
+ */
+let pressedIndex = -1;
+/** 刚刚从 `pointerup` 收尾过一次点击（给 `@click` 去重；同一行 400ms 内只跳一次） */
+let lastSeek: { index: number; at: number } = { index: -1, at: 0 };
 
 /** 手动浏览时用 manualShift，否则用弹簧渲染出来的位置 */
 const displayShift = computed(() => (manual.value ? manualShift.value : renderedShift.value));
@@ -298,6 +318,7 @@ function onPointerDown(event: PointerEvent): void {
   if (event.button !== 0) return;
   dragging.value = true;
   dragged = false;
+  pressedIndex = lineIndexOf(event.target);
   dragStartY = event.clientY;
   dragStartShift = displayShift.value;
   // 捕获指针：拖到窗口外再松手也收得到 pointerup（否则会一直停在“拖动中”）
@@ -318,17 +339,38 @@ function onPointerUp(event: PointerEvent): void {
   if (!dragging.value) return;
   dragging.value = false;
   (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+  const index = pressedIndex;
+  const wasDrag = dragged;
+  pressedIndex = -1;
+  dragged = false;
+  // 没滑动 = 一次点击：**在这里收尾**（见 pressedIndex 的注释），不等那个永远等不到的 click
+  if (!wasDrag && index >= 0) seekToLine(index);
 }
 
-/** LR-06 点击跳转；但如果是滑动收尾就不当点击（滑一下歌就跳走了很难受） */
-function onLineClick(line: LyricLine): void {
-  if (dragged) {
-    dragged = false;
-    return;
-  }
+/** 事件目标落在哪一行（行下标；不在行上就 -1） */
+function lineIndexOf(target: EventTarget | null): number {
+  if (!(target instanceof Element)) return -1;
+  const raw = (target.closest(".lyline") as HTMLElement | null)?.dataset.index;
+  const index = raw === undefined ? Number.NaN : Number(raw);
+  return Number.isInteger(index) ? index : -1;
+}
+
+/** 跳到某一行的起点（LR-06） */
+function seekToLine(index: number): void {
+  const line = props.lines[index];
+  if (!line) return;
+  lastSeek = { index, at: performance.now() };
   emit("seek", line.time);
   // 手动浏览中点某一行 = “就听这里”，于是退出手动、回到自动居中（LR-07）
   if (manual.value) resume();
+}
+
+/** LR-06 点击跳转；指针那条已在 `pointerup` 收尾，这条路留给键盘（Enter / Space）与读屏 */
+function onLineClick(line: LyricLine): void {
+  const index = props.lines.indexOf(line);
+  // 有的浏览器仍然会把 click 派给按钮（此时指针那条已经跳过一次了）：同一行 400ms 内只跳一次
+  if (index === lastSeek.index && performance.now() - lastSeek.at < 400) return;
+  if (index >= 0) seekToLine(index);
 }
 
 /* ---------- 逐字"瞬时辉光爆发"（LR-05 强调，v4.86） ----------
@@ -429,10 +471,11 @@ onBeforeUnmount(() => {
         <button
           v-for="(line, i) in lines"
           :key="`${line.time}-${i}`"
-          v-memo="[i === activeIndex, i < activeIndex, depths[i]]"
+          v-memo="[i === activeIndex, i < activeIndex, depths[i], i === activeIndex ? fillKey : '']"
           :ref="refSetters[i]"
           type="button"
           class="lyline"
+          :data-index="i"
           :class="{ current: i === activeIndex, past: i < activeIndex }"
           :style="{ '--depth': depths[i] }"
           :title="`跳转到 ${line.text}`"
@@ -448,14 +491,10 @@ onBeforeUnmount(() => {
               >{{ word.text }}</span
             >
           </template>
-          <!-- 仅行级数据：整句自左向右渐亮（LR-05 降级路径） -->
-          <span
-            v-else
-            class="txt"
-            :class="{ fill: i === activeIndex }"
-            :style="i === activeIndex ? { '--p': activeRatio } : undefined"
-            >{{ line.text }}</span
-          >
+          <!-- 只有行级时间（普通 LRC）：**不做伪逐字**，整行高亮交给 `.lyline.current`（LR-04）。
+               LRC 里没有字级时间，“自左向右渐亮”只能编一个速度出来（需求方 v6.19：
+               “我们目前的歌词都是普通的 lrc 格式…参照设计应该降级到逐行高亮”）。 -->
+          <span v-else class="txt">{{ line.text }}</span>
         </button>
       </div>
     </div>
@@ -651,23 +690,8 @@ onBeforeUnmount(() => {
     0 0 6px var(--accent-soft);
 }
 
-/* 行级降级（LR-05）：自左向右渐亮。用 background-clip 才能做"半个字"的连续填充。
-   未唱部分用 --text-2 而不是 --text-3：当前句必须比相邻句更亮（LR-04），
-   用 text-3 会出现"当前句反而最暗"（自评时发现）。 */
-.lyline .txt.fill {
-  /* 填充边缘**柔化**：AMLL 有 `wordFadeWidth`（默认 0.5em，即整段渐变带宽 = 半个全角字）
-     ——渐变断点周围必须留过渡，否则填充前沿是一道硬边，扫过去像“被刀切开”。
-     这里取单边 0.25em（带宽合计 0.5em），与 AMLL 默认值一致。 */
-  background: linear-gradient(
-    to right,
-    var(--accent) calc(var(--p, 1) * 100% - 0.25em),
-    var(--accent) calc(var(--p, 1) * 100%),
-    var(--text-2) calc(var(--p, 1) * 100% + 0.25em)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+/* 行级歌词不做“自左向右渐亮”（v6.19 拆掉）：LRC 没有字级时间，那层填充只能编一个
+   速度出来（“参照设计应该降级到逐行高亮”）；整行高亮本身由 `.lyline.current` 给。 */
 
 @media (prefers-reduced-motion: reduce) {
   .ly-list,

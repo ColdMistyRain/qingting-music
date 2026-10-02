@@ -3,7 +3,6 @@ import {
   centerShift,
   clampManualShift,
   currentLineIndex,
-  lineProgress,
   parseLyrics,
   wordFillProgress,
 } from "./lyrics";
@@ -170,18 +169,29 @@ describe("currentLineIndex（LR-06 自动居中 / LR-04 景深都靠它）", () 
 });
 
 describe("wordFillProgress（LR-05 逐字填充）", () => {
+  // 本句起点 1.0s，字一律是“相对本句开头”的（解析器的约定）——
+  // 所以下面一律喂**绝对时间**（组件就是这么喂的）；早期这组用例喂的是相对时间，
+  // 正好把“绝对时间去比相对起点”这个 bug 掩盖了（v6.19 实测抓到）。
   const { lines } = parseLyrics("[1000,2000](0,500,0)你(500,500,0)好(1000,1000,0)世界");
   const line = lines[0]!;
 
   it("按字自己的时间算进度，唱完为 1", () => {
-    expect(wordFillProgress(line, 0.25)).toEqual([0.5, 0, 0]);
-    expect(wordFillProgress(line, 0.5)).toEqual([1, 0, 0]);
-    expect(wordFillProgress(line, 1.5)).toEqual([1, 1, 0.5]);
-    expect(wordFillProgress(line, 99)).toEqual([1, 1, 1]);
+    expect(wordFillProgress(line, 1.25)).toEqual([0.5, 0, 0]);
+    expect(wordFillProgress(line, 1.5)).toEqual([1, 0, 0]);
+    expect(wordFillProgress(line, 2.5)).toEqual([1, 1, 0.5]);
+    expect(wordFillProgress(line, 100)).toEqual([1, 1, 1]);
   });
 
   it("行首之前全是 0（还没轮到这句）", () => {
-    expect(wordFillProgress(line, -1)).toEqual([0, 0, 0]);
+    expect(wordFillProgress(line, 0.5)).toEqual([0, 0, 0]);
+  });
+
+  it("增强型 LRC（行内词级标签）：绝对时间也算成句内进度", () => {
+    const { lines: enhanced } = parseLyrics("[00:10.00]<00:10.00>你<00:11.00>好<00:12.00>世");
+    const target = enhanced[0]!;
+    expect(wordFillProgress(target, 10)).toEqual([0, 0, 0]);
+    expect(wordFillProgress(target, 10.5)).toEqual([0.5, 0, 0]);
+    expect(wordFillProgress(target, 11.5)).toEqual([1, 0.5, 0]);
   });
 
   it("没有逐字数据返回空数组（交给行级降级路径）", () => {
@@ -195,28 +205,6 @@ describe("wordFillProgress（LR-05 逐字填充）", () => {
   });
 });
 
-describe("lineProgress（LR-05 降级：整句渐亮）", () => {
-  const { lines } = parseLyrics("[00:10.00]一\n[00:20.00]二");
-
-  it("按到下一句开始的时长线性推进", () => {
-    expect(lineProgress(lines, 0, 10)).toBe(0);
-    expect(lineProgress(lines, 0, 15)).toBe(0.5);
-    expect(lineProgress(lines, 0, 20)).toBe(1);
-    expect(lineProgress(lines, 0, 40)).toBe(1); // 夹在 0~1
-  });
-
-  it("末句没有下一句时用兜底时长，不会瞬间满格", () => {
-    expect(lineProgress(lines, 1, 20)).toBe(0);
-    expect(lineProgress(lines, 1, 23)).toBeCloseTo(0.5, 5);
-  });
-
-  it("越界索引返回 0（不抛错）", () => {
-    expect(lineProgress(lines, 9, 100)).toBe(0);
-    expect(lineProgress([], 0, 1)).toBe(0);
-  });
-});
-
-/** LR-06 自动居中的夹取 + LR-07 手动滚动的位移夹取（正值 = 列表上移） */
 describe("centerShift（自动居中：上端夹住、往上到末句到中线为止）", () => {
   it("开头几句：还想往上挪就贴着顶部不动（不把第一行推到中线）", () => {
     expect(centerShift(-120, 1600)).toBe(0);

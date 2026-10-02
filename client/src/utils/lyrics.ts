@@ -43,6 +43,8 @@ const YRC_WORD = /\((\d+),(\d+),-?\d+\)([^()]*)/g;
 const LRC_META = /^\[([a-z]{2,8}):(.*)\]$/i;
 /** 末字拿不到时长时的兜底（秒）：宁可能亮起来，也不要它一直不亮 */
 const WORD_FALLBACK_SECONDS = 0.2;
+/** 末句（没有下一句可参照）的兜底整句时长（秒）：增强型 LRC 的尾巴补时长用它 */
+const LINE_FALLBACK_SECONDS = 6;
 
 /** 把 "ss.xx" 里的小数部分换算成秒（1 位是 0.1s，2 位 0.01s，3 位 0.001s） */
 function fractionToSeconds(fraction: string | undefined): number {
@@ -211,33 +213,23 @@ export function currentLineIndex(lines: readonly LyricLine[], time: number): num
  * 逐字填充进度（LR-05）：返回当前句每个字的进度 0~1。
  * 字自带时长时按它算（yrc）；没有时长就退化为"到下一个字就算满"——
  * 宁可早亮也不要亮不起来（真实歌词里残缺的逐字时间轴很多）。
+ *
+ * ⚠️ **`word.start` 是“相对本句开头”的**（两个解析器都这么给，见 `parseWordTags` 与 yrc 那一支），
+ * 而 `time` 是绝对秒，所以必须先把时间折成**句内进度**再比 —— 直接拿绝对时间去比的话，
+ * 任何大于半秒的时间点都会让所有字都算“已完成”：表现是当前句**一上来就整句都是高亮**。
+ * 这是 v6.19 实测拓到的（普通 LRC 那层“假填充”一度把这条掩盖了），有单测守着。
  */
 export function wordFillProgress(line: LyricLine, time: number): number[] {
   const words = line.words;
   if (!words?.length) return [];
+  const inside = time - line.time;
   return words.map((word) => {
     const span = word.duration > 0 ? word.duration : 0.001;
-    if (time >= word.start + span) return 1;
-    if (time <= word.start) return 0;
-    return (time - word.start) / span;
+    if (inside >= word.start + span) return 1;
+    if (inside <= word.start) return 0;
+    return (inside - word.start) / span;
   });
 }
-
-/**
- * 行级进度 0~1（LR-05 的降级路径："仅行级数据时整句渐亮"）。
- * 句子时长取"到下一句开始"——这是 LRC 唯一能给出的时长信息；
- * 末句没有下一句，给一个兜底秒数免得整句瞬间满格（太小）或永远不满（太大）。
- */
-export function lineProgress(lines: readonly LyricLine[], index: number, time: number): number {
-  const line = lines[index];
-  if (!line) return 0;
-  const next = lines[index + 1];
-  const span = Math.max((next ? next.time : line.time + LINE_FALLBACK_SECONDS) - line.time, 0.3);
-  return Math.min(1, Math.max(0, (time - line.time) / span));
-}
-
-/** 末句时长兜底（秒）：没有下一句可参照时的默认整句时长 */
-const LINE_FALLBACK_SECONDS = 6;
 
 /**
  * 自动居中的位移（LR-06）：把当前句挪到窗口垂直中线。

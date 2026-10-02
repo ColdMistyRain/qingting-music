@@ -110,7 +110,7 @@ const themeMaterial = computed({
 const layouts: { key: ImLayout; label: string }[] = [
   { key: "duo", label: "经典双栏" },
   { key: "center", label: "沉浸歌词" },
-  { key: "poster", label: "黑胶唱片" },
+  { key: "poster", label: "彩胶唱片" },
 ];
 
 const roleLabel = computed(() => {

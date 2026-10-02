@@ -490,7 +490,8 @@ select {
   z-index: 1;
   display: grid;
   grid-template-columns: 224px 1fr;
-  grid-template-rows: 1fr 84px;
+  /* 播放条那一行的高度读令牌：提示条（Teleport 到 body）也要按它往上让（v5.72） */
+  grid-template-rows: 1fr var(--playerbar-h);
   gap: 14px;
   height: 100vh;
   padding: 14px;
@@ -783,12 +784,8 @@ select {
   text-overflow: ellipsis;
 }
 
-/* 播放异常提示（PL-09）：加载失败、自动播放被拦截等 */
-.pb-notice {
-  font-size: 11px;
-  color: var(--danger);
-  margin-top: 3px;
-}
+/* 播放异常提示（PL-09）已经不在这里了：v5.72 起走应用内的提示条（components/AppToast.vue），
+   不再在播放条信息区里挤一行红字 */
 
 .pb-center {
   display: flex;
@@ -1334,6 +1331,11 @@ kbd {
        平时完全不占高度，这比底栏多出 52px 给封面与列表。 */
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
+  }
+
+  /* 迷你条高度（与 .playerbar 的 min-height 同一个值）：提示条要落在它上方（v5.72） */
+  :root {
+    --playerbar-h: 56px;
   }
 
   /* 侧栏收起，导航交给左侧抽屉（RT-02）。

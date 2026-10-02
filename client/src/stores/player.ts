@@ -21,6 +21,13 @@ import {
   type ImportedLyrics,
 } from "@/utils/lyricsLibrary";
 import { parseSnapshot, sanitizeSnapshot } from "@/utils/playerState";
+import {
+  TOAST_DURATION_MS,
+  TOAST_STICKY_DURATION_MS,
+  dismissToast,
+  showToast,
+  type ToastTone,
+} from "@/utils/toast";
 
 const STORAGE_KEY = "qt-player";
 /** 手动歌词库单独一份：它是偏好类数据，不该混进播放存档（存档要保持“小”） */
@@ -29,8 +36,6 @@ const IMPORTED_LYRICS_KEY = "qt-lyrics";
 const PROGRESS_PERSIST_INTERVAL_MS = 5000;
 /** PL-02：播放超过该秒数后按"上一首"回到本曲开头 */
 const RESTART_THRESHOLD_SECONDS = 3;
-/** 播放条提示的存活时间：瞬时信息（自动播放被拦、加载失败）不该长期占用位置 */
-export const NOTICE_TTL_MS = 8000;
 /**
  * 从 0 音量取消静音时的兜底音量。
  * 正常情况下会恢复到“上次能听见的音量”（lastAudibleVolume），
@@ -57,8 +62,6 @@ export const usePlayerStore = defineStore("player", () => {
   const lastAudibleVolume = ref(DEFAULT_AUDIBLE_VOLUME);
   const progress = ref(0);
   const duration = ref(0);
-  /** 面向用户的即时提示（加载失败、自动播放被拦截等，PL-09） */
-  const notice = ref("");
   const seeking = ref(false);
   const seekTarget = ref(0);
   /**
@@ -73,34 +76,39 @@ export const usePlayerStore = defineStore("player", () => {
   const importedLyrics = ref<ImportedLyrics>({});
 
   let audio: HTMLAudioElement | null = null;
-  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
-  /** 粘性提示（如"加载失败已跳到下一首"）不会被"播放成功"清掉，但仍受超时限制 */
-  let noticeSticky = false;
+  /** 最近一条**瞬时**提示的 id：播放真的起来了就把它收掉（粘性提示不受影响） */
+  let transientToastId: number | null = null;
   /** 从存档恢复出来的进度：等元数据加载完才能 seek（设太早会被忽略） */
   let pendingSeconds = 0;
 
   /**
-   * 设置播放条提示；传空串即清除，非空则在 NOTICE_TTL_MS 后自动消失。
-   * sticky 用于跨事件的提示：加载失败的提示必须在自动跳到下一首后仍然看得见。
+   * 播放异常 / 状态提示（PL-09）—— 走应用内的**提示条**（v5.72，`utils/toast`）。
+   *
+   * 以前它是长在播放条信息区里的一行红字：位置局促、手机上把两行信息挤成三行，而且没有关闭入口。
+   * 换成提示条之后，时长 / 悬停暂停 / 点关闭 / 滑动 / Esc 都由 `AppToast` 那套给，播放条一行都不用改。
+   *
+   * `sticky`：跨事件的提示（“这首歌加载失败，已自动跳到下一首”）给更长的停留时间 ——
+   * 它不能被“播放真的起来了”那句清掉。
+   * `tone`：只有**出错**用 `danger`。颜色只表达状态，提示类一律中性色。
    */
-  function notify(text: string, sticky = false): void {
-    notice.value = text;
-    noticeSticky = sticky && text !== "";
-    if (noticeTimer !== null) {
-      clearTimeout(noticeTimer);
-      noticeTimer = null;
+  function notify(text: string, sticky = false, tone: ToastTone = "info"): void {
+    if (!text) {
+      clearTransientNotice();
+      return;
     }
-    if (!text) return;
-    noticeTimer = setTimeout(() => {
-      notice.value = "";
-      noticeSticky = false;
-      noticeTimer = null;
-    }, NOTICE_TTL_MS);
+    const id = showToast({
+      title: text,
+      tone,
+      duration: sticky ? TOAST_STICKY_DURATION_MS : TOAST_DURATION_MS,
+    });
+    transientToastId = sticky ? null : id;
   }
 
-  /** 播放真的起来了：清掉"点一下即可"这类瞬时提示，粘性提示保留 */
+  /** 播放真的起来了：收掉“点一下即可”这类瞬时提示，粘性提示保留 */
   function clearTransientNotice(): void {
-    if (!noticeSticky) notify("");
+    if (transientToastId === null) return;
+    dismissToast(transientToastId);
+    transientToastId = null;
   }
 
   const currentTrack = computed<Track | null>(() => queue.value[currentIndex.value] ?? null);
@@ -271,7 +279,7 @@ export const usePlayerStore = defineStore("player", () => {
     // 先跳转再提示——playAt 会重置提示，反过来的话这条提示会被立刻清掉。
     audio.addEventListener("error", () => {
       next();
-      notify("这首歌加载失败，已自动跳到下一首", true);
+      notify("这首歌加载失败，已自动跳到下一首", true, "danger");
     });
     return audio;
   }
@@ -573,7 +581,7 @@ export const usePlayerStore = defineStore("player", () => {
     }
 
     if (dropped > 0) {
-      notify(`本地曲目刷新后无法自动恢复，已去掉 ${dropped} 首，需要时重新选文件`, true);
+      notify(`本地曲目刷新后无法自动恢复，已去掉 ${dropped} 首，需要时重新选文件`, true, "danger");
     }
   }
 
@@ -588,7 +596,6 @@ export const usePlayerStore = defineStore("player", () => {
     lastAudibleVolume,
     progress,
     duration,
-    notice,
     seeking,
     // 派生
     currentTrack,

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { TooltipProvider } from "reka-ui";
+import AppToast from "@/components/AppToast.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useMediaSession } from "@/composables/useMediaSession";
 import { usePlayHistory } from "@/composables/usePlayHistory";
@@ -97,5 +98,8 @@ router.afterEach(() => {
 
     <!-- 破坏性 / 批量动作的二次确认（v5.53）：全站唯一一份，只改 utils/confirm.ts 那一个入口 -->
     <ConfirmDialog />
+
+    <!-- 提示条（v5.72）：全站唯一一份，任何地方 showToast(...) 都排到这里（utils/toast.ts） -->
+    <AppToast />
   </TooltipProvider>
 </template>

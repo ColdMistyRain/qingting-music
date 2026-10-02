@@ -67,6 +67,10 @@
   --radius-control: 10px;
   --radius-cover: 9px;
 
+  /* 播放条高度（v5.72）：外壳的栅格行与“提示条要落在播放条上方”共用这一个值。
+     提示条被 Teleport 到 body，所以必须挂在 :root 上（挂在 .app 上它读不到）。 */
+  --playerbar-h: 84px;
+
   /* iOS 同款减速曲线：弹层入场、歌词位移、沉浸页进出场共用一条，避免各写各的 */
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
 

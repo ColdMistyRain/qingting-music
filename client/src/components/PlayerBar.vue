@@ -230,7 +230,6 @@ const marqueeActive = computed(() => player.playing || hovering.value);
             :active="marqueeActive"
           />
           <div v-else class="pb-artist pb-lyric" :title="miniSubtitle">{{ miniSubtitle }}</div>
-          <div v-if="player.notice" class="pb-notice">{{ player.notice }}</div>
         </div>
       </div>
     </AppTooltip>

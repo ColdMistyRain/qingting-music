@@ -3,7 +3,8 @@ import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Track } from "@qingting/shared";
 import { fetchLyrics } from "@/api/songs";
-import { NOTICE_TTL_MS, usePlayerStore } from "./player";
+import { TOAST_DURATION_MS, TOAST_STICKY_DURATION_MS, resetToasts, toasts } from "@/utils/toast";
+import { usePlayerStore } from "./player";
 
 // 云端歌词是开播时向 /api/songs/:id/lyrics 拉的（LR-02）：单测里只关心"拉没拉、什么时候拉"
 vi.mock("@/api/songs", () => ({
@@ -28,6 +29,7 @@ function track(id: string, duration: number | null = null): Track {
 
 beforeEach(() => {
   setActivePinia(createPinia());
+  resetToasts();
 });
 
 describe("队列操作（PL-06）", () => {
@@ -266,53 +268,40 @@ describe("进度与音量（PL-03/04）", () => {
   });
 });
 
-describe("播放条提示（PL-09）", () => {
-  it("设置提示后到点自动消失（瞬时信息不长期占用位置）", () => {
-    vi.useFakeTimers();
-    try {
-      const player = usePlayerStore();
-      player.notify("浏览器阻止了自动播放，点一下播放按钮即可");
-      expect(player.notice).not.toBe("");
+/** 最近一条提示（PL-09 的断言就落在这里：文案 / 色号 / 停留时长） */
+const latestToast = () => toasts.value.at(-1);
 
-      vi.advanceTimersByTime(NOTICE_TTL_MS - 100);
-      expect(player.notice).not.toBe("");
-
-      vi.advanceTimersByTime(200);
-      expect(player.notice).toBe("");
-    } finally {
-      vi.useRealTimers();
-    }
+describe("播放提示（PL-09，v5.72 起走提示条）", () => {
+  it("提示类走中性色，且带有限的停留时长（不会长期占着屏幕）", () => {
+    const player = usePlayerStore();
+    player.notify("浏览器阻止了自动播放，点一下播放按钮即可");
+    expect(latestToast()?.title).toContain("自动播放");
+    expect(latestToast()?.tone).toBe("info");
+    expect(latestToast()?.duration).toBe(TOAST_DURATION_MS);
   });
 
-  it("新提示会覆盖旧提示并重新计时", () => {
-    vi.useFakeTimers();
-    try {
-      const player = usePlayerStore();
-      player.notify("第一条");
-      vi.advanceTimersByTime(NOTICE_TTL_MS - 200);
-      player.notify("第二条");
-
-      vi.advanceTimersByTime(500);
-      expect(player.notice).toBe("第二条");
-
-      vi.advanceTimersByTime(NOTICE_TTL_MS);
-      expect(player.notice).toBe("");
-    } finally {
-      vi.useRealTimers();
-    }
+  it("出错用状态色，而且停留更久（跟跳下一首这种事不能转瞬即逝）", () => {
+    const player = usePlayerStore();
+    player.notify("这首歌加载失败", true, "danger");
+    expect(latestToast()?.tone).toBe("danger");
+    expect(latestToast()?.duration).toBe(TOAST_STICKY_DURATION_MS);
   });
 
-  it("传空串立即清除且不再有计时器回调", () => {
-    vi.useFakeTimers();
-    try {
-      const player = usePlayerStore();
-      player.notify("出错了");
-      player.notify("");
-      expect(player.notice).toBe("");
-      expect(() => vi.advanceTimersByTime(NOTICE_TTL_MS * 2)).not.toThrow();
-    } finally {
-      vi.useRealTimers();
-    }
+  it("两条不同的提示并排排着（不再像以前那样互相顶掉）", () => {
+    const player = usePlayerStore();
+    player.notify("第一条");
+    player.notify("第二条");
+    expect(toasts.value.map((item) => item.title)).toEqual(["第一条", "第二条"]);
+  });
+
+  it("传空串只收掉瞬时提示，粘性提示留着", () => {
+    const player = usePlayerStore();
+    player.notify("粘性的", true);
+    player.notify("瞬时的");
+    expect(toasts.value).toHaveLength(2);
+
+    player.notify("");
+    expect(toasts.value.map((item) => item.title)).toEqual(["粘性的"]);
   });
 });
 
@@ -488,14 +477,14 @@ describe("与 audio 元素的接线", () => {
     player.toggle();
     await flush();
     expect(player.playing).toBe(false);
-    expect(player.notice).toContain("自动播放");
+    expect(latestToast()?.title).toContain("自动播放");
 
     // 用户再点一次（此时已放行）→ 播放成功，提示应立刻消失
     FakeAudio.instances[0]!.blockPlay = false;
     player.toggle();
     await flush();
     expect(player.playing).toBe(true);
-    expect(player.notice).toBe("");
+    expect(toasts.value).toHaveLength(0);
   });
 
   it("音频加载失败：提示并自动跳下一首，且这条提示不会被自动跳转清掉（PL-09）", async () => {
@@ -507,7 +496,8 @@ describe("与 audio 元素的接线", () => {
     FakeAudio.instances[0]!.emit("error");
     await flush();
     expect(player.currentTrack?.id).toBe("b");
-    expect(player.notice).toContain("加载失败");
+    expect(latestToast()?.title).toContain("加载失败");
+    expect(latestToast()?.tone).toBe("danger");
     expect(player.playing).toBe(true);
   });
 

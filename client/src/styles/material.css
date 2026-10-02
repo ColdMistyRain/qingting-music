@@ -136,7 +136,36 @@
   --panel-bg: var(--plane-2);
   --panel-blur: none;
 }
+/* ---------- flat：把“光效”整套撤掉（v6.2 需求方定稿的**两套语言**） ----------
+   需求方：“我们现在有两套风格 —— 实心面板：实心、阴影；玻璃浮岛：透明、光效”。
+   于是材质模式的差别不只是“透不透”，而是**层级靠什么说**：
+     · islands：透明（半透玻璃）+ 光效（主题色光晕、悬浮光、播放键那圈描边）；
+     · flat   ：实心 + 阴影（--shadow / --card-shadow / --panel-shadow / --tray-shadow /
+                --chrome-shadow，v5.92 已把最上面那层 chrome 也收进阴影）。
+   做法照旧只换令牌、组件一行不动（它们读的就是这几个变量）：
+   · --glow-halo 透明 —— 所有 drop-shadow 光（悬浮光、播放键那四层）自然消失；
+   · --soft-btn-glow: none —— 软底按钮（主按钮 / 音效药丸）不再带那层光晕；
+   · --glow-ring 透明 —— 播放键那圈 1px 主题色描边也撤（它属于光效那一套）。
+   **保留**软底 `--accent-soft` 与 30% 淡边：它们表达状态（选中/开着），不是光效；
+   也保留 @property 的过渡与颜色派生 —— 换封面照样平滑。 */
+:root[data-material="flat"] {
+  --glow-halo: transparent;
+  --glow-ring: transparent;
+  --soft-btn-glow: none;
+}
 
+/* 播放键的阴影是**写死的那一层**（`0 3px 14px -7px accent 45%`，不是令牌），
+   所以单独覆盖一次：flat 下不带光晕，只留软底。
+   悬浮反馈改用工整的中性投影（`--card-shadow` 那套语言）——
+   否则实心面板下主按钮会“悬停毫无反应”（它的悬浮反馈本来只有光，v4.98）。 */
+:root[data-material="flat"] .ctl.play {
+  box-shadow: none;
+}
+
+:root[data-material="flat"] .ctl.play:hover:not(:disabled) {
+  filter: none;
+  box-shadow: var(--card-shadow);
+}
 /* ---------- flat：chrome（播放条 / 沉浸页的“回到当前句”）也退回实心 ----------
    v5.81 曾把播放条单独留在玻璃档，理由是“玻璃只留在真正浮在滚动内容之上的 chrome”。
    需求方 v5.92 对着实心浅色截图指出：**播放条那一块几乎与页面融为一体**

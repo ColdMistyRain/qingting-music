@@ -3,7 +3,6 @@ import { computed } from "vue";
 import { HoverCardContent, HoverCardPortal, HoverCardRoot, HoverCardTrigger } from "reka-ui";
 import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
-import AppTooltip from "@/components/AppTooltip.vue";
 import Slider from "@/components/Slider.vue";
 import { usePlayerStore } from "@/stores/player";
 
@@ -23,6 +22,12 @@ const player = usePlayerStore();
 
 const silent = computed(() => player.muted || player.volume === 0);
 const icon = computed(() => (silent.value ? IconSpeakerSlash : IconSpeakerHigh));
+/** 触发键的无障碍名字（只有图标，名字不能丢）—— **不是**提示文字：
+    这个键**故意不给提示**（v6.6 需求方：“音量按钮的 tooltip 可以去掉了”）：
+    悬浮它的那一刻就已经弹出音量面板，提示再跟一条就是同一件事说两遍，
+    而且面板底边离按钮只有 6px，提示正好压在面板上（实拍就是挡住滑杆下段）。
+    库里的其余图标键没有这种“悬浮自带面板”的行为，提示照旧。 */
+const label = computed(() => (silent.value ? "取消静音" : "静音"));
 const sliderValue = computed(() => (silent.value ? 0 : player.volume));
 const levelPercent = computed(() => (silent.value ? "0%" : `${Math.round(player.volume * 100)}%`));
 
@@ -36,12 +41,18 @@ function setVolume(ratio: number): void {
 
 <template>
   <HoverCardRoot :open-delay="120" :close-delay="140">
+    <!-- ⚠️ `HoverCardTrigger as-child` 的**孩子必须是一个元素**，中间不能夹组件（v6.6 修）。
+        v5.71 把提示写成了 `<HoverCardTrigger as-child><AppTooltip><button/></AppTooltip></HoverCardTrigger>`
+        —— 触发器合并到的就是一个组件而不是按钮，提示的 Root 又把两边的 `pointerenter` 挤在一起：
+        结果**提示正常、悬浮面板却永远不出现**（`*.vol-pop` 压根没进 DOM），
+        这就是需求方说的“之前列表按钮那个问题”的同族（AGENTS 坑 25）。
+        正确写法与 `QueuePopover` / `LyricsSourceMenu` 一致：触发器直接包按钮。
+        本键**不挂提示**（悬浮就出面板，见上面 label 的注释）—— 但“孩子必须是元素”这条对
+        将来给它加别的行为层同样成立。 -->
     <HoverCardTrigger as-child>
-      <AppTooltip :label="silent ? '取消静音' : '静音'">
-        <button class="vctl" @click="player.toggleMute()">
-          <component :is="icon" class="icon" />
-        </button>
-      </AppTooltip>
+      <button class="vctl" :aria-label="label" @click="player.toggleMute()">
+        <component :is="icon" class="icon" />
+      </button>
     </HoverCardTrigger>
 
     <HoverCardPortal>
@@ -120,6 +131,14 @@ function setVolume(ratio: number): void {
   border: 1px solid var(--glass-border);
   box-shadow: var(--panel-sheen), var(--panel-shadow);
   transform-origin: bottom center;
+}
+
+/* ⚠️ 进场动画必须挂在 `[data-state="open"]` 上，**不能写在基础类里**（v6.6 修，同 AGENTS 坑 24）：
+   Reka 的 Presence 靠 `animationName` 判断“要不要等退场动画放完”—— 基础类上永远挂着一个
+   `vol-in` 时，关闭那一刻它会去等一个**永远不来的 `animationend`**，于是节点不卸载：
+   面板已经 `data-state="closed"` 却继续留在 DOM 里（实测离开 1.5s 后仍在）。
+   收进 `[data-state="open"]` 之后，关闭态 `animationName` 为空 → 立刻卸载。 */
+.vol-pop[data-state="open"] {
   animation: vol-in 0.18s var(--ease-ios);
 }
 

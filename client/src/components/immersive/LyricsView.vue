@@ -321,8 +321,24 @@ function onPointerDown(event: PointerEvent): void {
   pressedIndex = lineIndexOf(event.target);
   dragStartY = event.clientY;
   dragStartShift = displayShift.value;
-  // 捕获指针：拖到窗口外再松手也收得到 pointerup（否则会一直停在“拖动中”）
-  (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  // 捕获/释放都会动到指针，而它们**可能抛**（指针已经不在了 / 被系统收走）：
+  // 不能让它把后半段逻辑带走 —— `onPointerUp` 里释放排在“跳转”前面，一抛就白点一下。
+  togglePointerCapture(handleEl(event), event.pointerId, true);
+}
+
+/** 指针捕获 / 释放的统一入口（两个方向都会抛，吞掉即可，理由见调用处） */
+function togglePointerCapture(target: HTMLElement, pointerId: number, on: boolean): void {
+  try {
+    if (on) target.setPointerCapture?.(pointerId);
+    else target.releasePointerCapture?.(pointerId);
+  } catch {
+    // 拿不到 / 放不掉捕获都能继续：只是指针移出元素后可能丢事件
+  }
+}
+
+/** 正在处理这个事件的元素（`currentTarget` 只在处理期间有效，取出来存住再传） */
+function handleEl(event: PointerEvent): HTMLElement {
+  return event.currentTarget as HTMLElement;
 }
 
 function onPointerMove(event: PointerEvent): void {
@@ -338,13 +354,28 @@ function onPointerMove(event: PointerEvent): void {
 function onPointerUp(event: PointerEvent): void {
   if (!dragging.value) return;
   dragging.value = false;
-  (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+  togglePointerCapture(handleEl(event), event.pointerId, false);
   const index = pressedIndex;
   const wasDrag = dragged;
   pressedIndex = -1;
   dragged = false;
   // 没滑动 = 一次点击：**在这里收尾**（见 pressedIndex 的注释），不等那个永远等不到的 click
   if (!wasDrag && index >= 0) seekToLine(index);
+}
+
+/**
+ * 浏览器把这次触摸收走（判成了滚动/手势）时只结束拖动，**不当成点击**。
+ *
+ * 这条很重要（v6.22）：真机上手指一动，浏览器就可能发 `pointercancel`（而我们的
+ * `pointermove` 一次都没收到），此时 `dragged` 还是 false —— 如果沿用 `onPointerUp`，
+ * “想滑歌词”就变成“跳到手指下那一句”，比滑不动更难受。
+ */
+function onPointerCancel(event: PointerEvent): void {
+  if (!dragging.value) return;
+  dragging.value = false;
+  pressedIndex = -1;
+  dragged = false;
+  togglePointerCapture(handleEl(event), event.pointerId, false);
 }
 
 /** 事件目标落在哪一行（行下标；不在行上就 -1） */
@@ -466,7 +497,7 @@ onBeforeUnmount(() => {
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
-        @pointercancel="onPointerUp"
+        @pointercancel="onPointerCancel"
       >
         <button
           v-for="(line, i) in lines"
@@ -529,6 +560,13 @@ onBeforeUnmount(() => {
 .ly-view {
   position: relative;
   height: 100%;
+  /* 自己处理拖动，所以必须声明 `touch-action`（v6.22 修“手机上滑不动歌词”）：
+     歌词列表不是原生滚动容器（位移由弹簧写 transform），不写这条时真机上的纵向拖拽
+     会被浏览器判成“它自己要滚动页面”而接管 —— 后果是**我们一个 `pointermove` 都收不到**
+     （直接收到 `pointercancel`），列表就怎么拽都不动；桌面用鼠标没这回事，所以只在手机上显。
+     仓内同一先例：播放条的 `.pb-left`（滑动切歌手势区）写着 `touch-action: pan-y`。
+     这里两轴都归我们：横向在歌词区本来就没有手势（页面级滑切歌把手势区排除在外）。 */
+  touch-action: none;
   /* 裁剪框**左右各外扩一截**（负外边距 + 等量内边距，内容位置分毫不动）：
      行有景深模糊（blur 1.1~3.3px），模糊出来的灰边本来是软的；裁剪边界正好压在文字左端时
      那圈软边会被齐着切掉。实测这点差别只有 ~2px（A/B 探针截图对比过），肉眼几乎看不出，

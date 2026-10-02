@@ -183,6 +183,12 @@
   /* 柔光浓度要能**看出是主题色**：38% 在浅色底上会被洗成淡紫灰（需求方：“光效颜色
      应该是主题色”），提到 55%；光圈保持 16%——它只是 1px 的边界，再亮就抢画面。 */
   --glow-halo: color-mix(in srgb, var(--accent) 55%, transparent);
+  /* 软底按钮（主按钮 `.btn-primary`、音效药丸 `.fx__pill.is-on`）共用的一层光晕（v6.0）。
+     与播放键同一语言、按尺寸缩：播放键是 42/48px 的圆盘，用 `0 3px 14px -7px accent 45%`；
+     这两个是 30~34px 的扁按钮，半径减半、负 spread 收一半 —— 只当“坐得稳一点”的一层，
+     不抢旁边的文字（需求方 v4.52：“阴影收敛点”）。
+     为什么共用一条：两处尺寸同级、又是同一类控件，分开写迟早会被改歪一处。 */
+  --soft-btn-glow: 0 2px 9px -4px color-mix(in srgb, var(--accent) 45%, transparent);
 
   transition:
     --cover-src 0.5s ease,
@@ -222,8 +228,11 @@ input[type="checkbox"]::after {
   content: "";
   width: 8px;
   height: 4px;
-  border-left: 2px solid #fff;
-  border-bottom: 2px solid #fff;
+  /* 对勾用 --on-accent（不是写死的白）：主题色由封面决定，深色主题下它是浅色（L≈0.67），
+     白勾压在它上面只有约 2.5:1，而图形要 3:1 起（v5.99 顺手修，顺带让这个令牌不再空着）。
+     浅色主题的 --on-accent 仍是 #fff、深色主题是近黑底色。 */
+  border-left: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
   transform: rotate(-45deg) scale(0);
   transition: transform 0.15s;
   margin-top: -2px;

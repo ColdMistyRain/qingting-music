@@ -199,7 +199,9 @@ function removeCustom(name: string): void {
 }
 
 /* A/B 开关：整枚是一个按钮（不是 checkbox）—— 它表达的是“现在生效吗”，
-   所以用状态色说：开启时主题色底 + 白字，关闭时是普通面（与原型同一个形态） */
+   所以用状态色说：开启时**主题色软底 + 主题色文字**（v5.99 与设置页那些分段开关
+   改成同一套；原先这里是实心主题色底 + 白字，与全局唯一一档实心按钮一起下掉了），
+   关闭时是普通面（与原型同一个形态） */
 .fx__pill {
   flex: none;
   padding: 8px 18px;
@@ -212,9 +214,14 @@ function removeCustom(name: string): void {
     color 0.2s;
 }
 
+/* 选中的预设药丸 / 开启的 A/B 开关：软底 + 主题色文字 + 一圈淡边
+   （v5.99，与主按钮 / 分段控件选中底板同一套配方） */
 .fx__pill.is-on {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+  /* 与主按钮共用同一层光晕（v6.0）——两处尺寸同级、又是同一类控件 */
+  box-shadow: var(--soft-btn-glow);
 }
 
 .fx__row {

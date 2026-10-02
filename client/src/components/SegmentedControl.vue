@@ -91,10 +91,10 @@ function onUpdate(value: unknown): void {
   color: var(--text-1);
 }
 
-/* 选中态由 Reka 的 data-state 驱动（不再用 .active 类）：文字用底色对比色，
-   底板本身由 .seg__pill 画 */
+/* 选中态由 Reka 的 data-state 驱动（不再用 .active 类）：文字用主题色（软底之上，
+   v5.99 与选中曲目行的做法一致），底板由 .seg__pill 画 */
 .seg__opt[data-state="checked"] {
-  color: var(--on-accent);
+  color: var(--accent);
 }
 
 .seg__pill {
@@ -104,7 +104,10 @@ function onUpdate(value: unknown): void {
   width: var(--pill-w, 0);
   height: var(--pill-h, 0);
   border-radius: 8px;
-  background: var(--accent);
+  /* 选中的底板同样是**软底**（v5.99，与主按钮 / 选中曲目行 / 播放键一致）：
+     实心主题色块只留给状态标记（复选框打勾那种），选项本身就是个可点控件。 */
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   transform: translateX(var(--pill-x, 0));
   /* 未量到之前（is-ready 未加）不显示也不过渡，否则开页时会从 0 滑到第一格 */
   opacity: 0;

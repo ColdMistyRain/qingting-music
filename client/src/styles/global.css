@@ -667,15 +667,29 @@ select {
   height: 16px;
 }
 
+/* 主按钮：**软底**，不是实心主题色填充（v5.99）。需求方对着「播放全部」截图：
+   “这播放按钮能不搞成实心的吗，看来有点丑”。
+   本应用里主题色一直是“点睛”用法（沉浸页播放键的软底、选中曲目行的淡底、进度条填充），
+   实心块只留给**状态标记**（复选框打勾）—— 主按钮原来是个例外，也是全局唯一一档实心按钮。
+   改成与 `.btn-danger` 同一套配方（`--*-soft` 底 + `--*-border` 边 + 色相文字），
+   也就与沉浸页播放键的软底、选中曲目行的淡底统一了（一处改、处处一致）。
+   对比度：`--accent` 已经按封面取色夹过对比度（VS-02），而且本来就当文本用过
+   （选中曲目的歌名），所以当按钮文字同样成立。 */
 .btn-primary {
-  background: var(--accent);
-  border-color: transparent;
-  color: var(--on-accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+  /* 再加一层主题色光晕（v6.0 需求方：“还可以加上光效”）——与播放键同一语言：
+     光晕只当“这里能点、坐得稳一点”的一层，参数按 30~34px 的扁按钮缩（共用令牌）。 */
+  box-shadow: var(--soft-btn-glow);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent);
-  filter: brightness(1.1);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  /* 悬浮再亮一档：只有光，不换颜色（v4.98 对播放键定的同一条）。
+     两层就够 —— 按钮是矩形、还带 1px 描边，轮廓像素比 14% 不透明度的圆盘多得多，
+     照搬播放键那四层反而糊边。 */
+  filter: drop-shadow(0 0 6px var(--glow-halo)) drop-shadow(0 0 14px var(--glow-halo));
 }
 
 .btn-danger {

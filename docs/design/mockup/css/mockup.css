@@ -453,15 +453,18 @@ input {
   height: 16px;
 }
 
+/* 主按钮＝**软底**（v5.99 与实现对齐）。实现侧 `global.css` 才是事实来源：
+   这条规则 v4.52 就定过（“主操作按钮不铺不透明主题色块”），但当时只落到播放键，
+   `.btn` 那一族漏了 —— 需求方 v5.99 对着「播放全部」：“能不搞成实心的吗，看来有点丑”。 */
 .btn-primary {
-  background: var(--accent);
-  border-color: transparent;
-  color: #fff;
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+  box-shadow: 0 2px 9px -4px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .btn-primary:hover {
-  background: var(--accent);
-  filter: brightness(1.1);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .btn-danger {
@@ -946,13 +949,8 @@ body.paused .eq i {
   margin-top: 16px;
 }
 
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
-}
-
-.btn-primary:hover { filter: brightness(1.08); }
+/* 这里曾又重复写了一份实心 `.btn-primary`（与上面那份同名）—— v5.99 连同实心写法一起删掉，
+   免得下一个人只改到其中一份。 */
 
 .adminrow {
   display: grid;

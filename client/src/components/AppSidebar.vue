@@ -5,6 +5,7 @@ import IconCaretDoubleLeft from "~icons/ph/caret-double-left";
 import IconGearSix from "~icons/ph/gear-six";
 import IconListPlus from "~icons/ph/list-plus";
 import IconPlaylist from "~icons/ph/playlist";
+import AppTooltip from "@/components/AppTooltip.vue";
 import InlineNameInput from "@/components/InlineNameInput.vue";
 import { useNavItems } from "@/composables/useNavItems";
 import { playlistErrorMessage } from "@/api/playlists";
@@ -63,17 +64,19 @@ function dismissPlaylistError(): void {
              不加间距时，悬浮/选中的圆角底色会上下贴成一块（需求方：“又挤在一起了”）。
              4px 是 shadcn 的 sidebar 里 `SidebarMenu` 的 `gap-1`，页脚那两枚也用同一个值（v5.11）。 -->
         <nav class="sb-nav">
-          <RouterLink
+          <AppTooltip
             v-for="item in navItems"
             :key="item.name"
-            class="nav-item"
-            active-class="active"
-            :title="item.label"
-            :to="{ name: item.name }"
+            :label="item.label"
+            :disabled="!props.collapsed"
+            side="right"
+            :side-offset="10"
           >
-            <component :is="item.icon" class="icon" />
-            <span class="lbl">{{ item.label }}</span>
-          </RouterLink>
+            <RouterLink class="nav-item" active-class="active" :to="{ name: item.name }">
+              <component :is="item.icon" class="icon" />
+              <span class="lbl">{{ item.label }}</span>
+            </RouterLink>
+          </AppTooltip>
         </nav>
 
         <!-- 歌单分区（PRD 3.6 / PS-01）：侧栏只放「列表 + 新建」，详情在内容区 -->
@@ -81,14 +84,15 @@ function dismissPlaylistError(): void {
         <div class="sb-section">
           <div class="sb-section-head">
             <span class="lbl">歌 单</span>
-            <button
-              class="sb-add"
-              :disabled="!canUsePlaylists"
-              :title="canUsePlaylists ? '新建歌单' : '登录后可用'"
-              @click="creating = true"
+            <AppTooltip
+              :label="canUsePlaylists ? '新建歌单' : '登录后可用'"
+              side="right"
+              :side-offset="10"
             >
-              <IconListPlus class="icon" />
-            </button>
+              <button class="sb-add" :disabled="!canUsePlaylists" @click="creating = true">
+                <IconListPlus class="icon" />
+              </button>
+            </AppTooltip>
           </div>
 
           <InlineNameInput

@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { HoverCardContent, HoverCardPortal, HoverCardRoot, HoverCardTrigger } from "reka-ui";
 import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
+import AppTooltip from "@/components/AppTooltip.vue";
 import Slider from "@/components/Slider.vue";
 import { usePlayerStore } from "@/stores/player";
 
@@ -36,14 +37,11 @@ function setVolume(ratio: number): void {
 <template>
   <HoverCardRoot :open-delay="120" :close-delay="140">
     <HoverCardTrigger as-child>
-      <button
-        class="vctl"
-        :title="silent ? '取消静音' : '静音'"
-        :aria-label="silent ? '取消静音' : '静音'"
-        @click="player.toggleMute()"
-      >
-        <component :is="icon" class="icon" />
-      </button>
+      <AppTooltip :label="silent ? '取消静音' : '静音'">
+        <button class="vctl" @click="player.toggleMute()">
+          <component :is="icon" class="icon" />
+        </button>
+      </AppTooltip>
     </HoverCardTrigger>
 
     <HoverCardPortal>

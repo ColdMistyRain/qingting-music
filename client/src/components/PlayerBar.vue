@@ -16,6 +16,7 @@ import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import { usePlayerStore } from "@/stores/player";
 import { useListeningStore } from "@/stores/listening";
+import AppTooltip from "@/components/AppTooltip.vue";
 import ScrollingText from "@/components/ScrollingText.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
@@ -180,86 +181,90 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
 <template>
   <footer class="playerbar glass" :class="{ 'is-idle': isIdle, 'is-playing': player.playing }">
-    <div
-      class="pb-left"
-      role="button"
-      :tabindex="player.hasTrack ? 0 : -1"
-      :title="player.hasTrack ? '展开沉浸式播放页' : undefined"
-      @click="onLeftClick"
-      @keydown.enter="openImmersive"
-      @pointerdown="onLeftPointerDown"
-      @pointerup="onLeftPointerUp"
-      @pointercancel="onLeftPointerUp"
-      @mouseenter="hovering = true"
-      @mouseleave="hovering = false"
-    >
-      <div class="cover-wrap">
-        <div class="cover">
-          <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
-          <IconMusicNotes v-else class="icon" />
-        </div>
-        <!-- 手机：进度绕着封面走（QQ 音乐那个样式）。形状必须**跟着封面的轮廓**：
+    <AppTooltip label="展开沉浸式播放页" :disabled="!player.hasTrack">
+      <div
+        class="pb-left"
+        role="button"
+        :tabindex="player.hasTrack ? 0 : -1"
+        @click="onLeftClick"
+        @keydown.enter="openImmersive"
+        @pointerdown="onLeftPointerDown"
+        @pointerup="onLeftPointerUp"
+        @pointercancel="onLeftPointerUp"
+        @mouseenter="hovering = true"
+        @mouseleave="hovering = false"
+      >
+        <div class="cover-wrap">
+          <div class="cover">
+            <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" alt="" />
+            <IconMusicNotes v-else class="icon" />
+          </div>
+          <!-- 手机：进度绕着封面走（QQ 音乐那个样式）。形状必须**跟着封面的轮廓**：
              封面是 40×40 的**圆角矩形**，所以用 <rect> 而不是 <circle> ——
              圆环会切在封面的四个角上（角上离中心最远），看着像套错了。
              环画在封面外扩 3px 的圆角矩形上，圆角半径也跟着 +3px，四边与四角间距才均匀。
              pathLength="100" 把路径长度归一化：进度只跟比例有关，与周长、圆角半径都无关
              （否则圆角一改周长就得重算，而 π 在 CSS 里算不了）。
              JS 只写原始比例（--p），怎么用留在 CSS。 -->
-        <svg v-if="isMobile" class="cover-ring" viewBox="0 0 46 46" aria-hidden="true">
-          <rect class="cover-ring__track" x="1" y="1" width="44" height="44" pathLength="100" />
-          <rect
-            class="cover-ring__fill"
-            x="1"
-            y="1"
-            width="44"
-            height="44"
-            pathLength="100"
-            :style="{ '--p': player.displayRatio }"
-          />
-        </svg>
-      </div>
-      <div class="pb-info">
-        <ScrollingText class="pb-title" :text="titleText" :active="marqueeActive" />
-        <!-- 第二行按断点换内容：桌面是 歌手 · 专辑，手机是当前歌词（内容不同，只能换文本，
+          <svg v-if="isMobile" class="cover-ring" viewBox="0 0 46 46" aria-hidden="true">
+            <rect class="cover-ring__track" x="1" y="1" width="44" height="44" pathLength="100" />
+            <rect
+              class="cover-ring__fill"
+              x="1"
+              y="1"
+              width="44"
+              height="44"
+              pathLength="100"
+              :style="{ '--p': player.displayRatio }"
+            />
+          </svg>
+        </div>
+        <div class="pb-info">
+          <ScrollingText class="pb-title" :text="titleText" :active="marqueeActive" />
+          <!-- 第二行按断点换内容：桌面是 歌手 · 专辑，手机是当前歌词（内容不同，只能换文本，
              不能用 CSS 显隐 —— 两个 ScrollingText 都在树上会各跑一份测量） -->
-        <ScrollingText
-          v-if="!isMobile"
-          class="pb-artist"
-          :text="subtitleText"
-          :active="marqueeActive"
-        />
-        <div v-else class="pb-artist pb-lyric" :title="miniSubtitle">{{ miniSubtitle }}</div>
-        <div v-if="player.notice" class="pb-notice">{{ player.notice }}</div>
+          <ScrollingText
+            v-if="!isMobile"
+            class="pb-artist"
+            :text="subtitleText"
+            :active="marqueeActive"
+          />
+          <div v-else class="pb-artist pb-lyric" :title="miniSubtitle">{{ miniSubtitle }}</div>
+          <div v-if="player.notice" class="pb-notice">{{ player.notice }}</div>
+        </div>
       </div>
-    </div>
+    </AppTooltip>
 
     <div class="pb-center">
       <div class="pb-ctrls">
-        <button
-          class="ctl mode"
-          :title="`播放模式：${player.modeLabel}`"
-          @click="player.cycleMode()"
-        >
-          <component :is="modeIcon" class="icon" />
-        </button>
-        <button class="ctl prev" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
-          <IconSkipBack class="icon" />
-        </button>
-        <button
-          class="ctl play"
-          :title="player.playing ? '暂停（空格）' : '播放（空格）'"
-          :disabled="!player.hasTrack"
-          @pointerdown="onPlayPointerDown"
-          @pointerup="clearPressTimer"
-          @pointerleave="clearPressTimer"
-          @pointercancel="clearPressTimer"
-          @click="onPlayClick"
-        >
-          <component :is="playIcon" class="icon" />
-        </button>
-        <button class="ctl" title="下一首" :disabled="!player.hasTrack" @click="player.next()">
-          <IconSkipForward class="icon" />
-        </button>
+        <AppTooltip :label="`播放模式：${player.modeLabel}`">
+          <button class="ctl mode" @click="player.cycleMode()">
+            <component :is="modeIcon" class="icon" />
+          </button>
+        </AppTooltip>
+        <AppTooltip label="上一首">
+          <button class="ctl prev" :disabled="!player.hasTrack" @click="player.prev()">
+            <IconSkipBack class="icon" />
+          </button>
+        </AppTooltip>
+        <AppTooltip :label="player.playing ? '暂停（空格）' : '播放（空格）'">
+          <button
+            class="ctl play"
+            :disabled="!player.hasTrack"
+            @pointerdown="onPlayPointerDown"
+            @pointerup="clearPressTimer"
+            @pointerleave="clearPressTimer"
+            @pointercancel="clearPressTimer"
+            @click="onPlayClick"
+          >
+            <component :is="playIcon" class="icon" />
+          </button>
+        </AppTooltip>
+        <AppTooltip label="下一首">
+          <button class="ctl" :disabled="!player.hasTrack" @click="player.next()">
+            <IconSkipForward class="icon" />
+          </button>
+        </AppTooltip>
 
         <!-- 音量：与沉浸页共用同一个控件（components/VolumeControl.vue，v4.62） -->
         <VolumeControl />
@@ -297,22 +302,23 @@ const marqueeActive = computed(() => player.playing || hovering.value);
            因此对进度条左右对称，播放键正落在进度条中线上（带这枚键时是 6 枚，
            播放键会偏左一档，实测偏 19px）。
            手机整组收起（迷你条只留播放/下一首），手机上的收藏入口在沉浸页控制栏。 -->
-      <button
-        class="ctl pb-fav"
-        :class="{ 'is-on': isFavorite }"
-        :title="isFavorite ? '取消收藏' : '收藏'"
-        :disabled="!canFavorite"
-        :aria-pressed="isFavorite"
-        @click="toggleFavorite"
-      >
-        <IconHeartFill v-if="isFavorite" class="icon" />
-        <IconHeartStraight v-else class="icon" />
-      </button>
+      <AppTooltip :label="isFavorite ? '取消收藏' : '收藏'">
+        <button
+          class="ctl pb-fav"
+          :class="{ 'is-on': isFavorite }"
+          :disabled="!canFavorite"
+          :aria-pressed="isFavorite"
+          @click="toggleFavorite"
+        >
+          <IconHeartFill v-if="isFavorite" class="icon" />
+          <IconHeartStraight v-else class="icon" />
+        </button>
+      </AppTooltip>
 
       <!-- 队列弹层（PL-06）：触发按钮由这里传入，保持播放条那套控件样式 -->
-      <QueuePopover>
+      <QueuePopover :label="`播放队列（${player.queue.length} 首）`">
         <template #trigger>
-          <button class="ctl" :title="`播放队列（${player.queue.length} 首）`">
+          <button class="ctl">
             <IconQueue class="icon" />
           </button>
         </template>

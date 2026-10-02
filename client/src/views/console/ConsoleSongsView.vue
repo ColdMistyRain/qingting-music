@@ -9,6 +9,7 @@ import IconSortAscending from "~icons/ph/sort-ascending";
 import IconSortDescending from "~icons/ph/sort-descending";
 import IconTrash from "~icons/ph/trash";
 import IconWarningCircle from "~icons/ph/warning-circle";
+import AppTooltip from "@/components/AppTooltip.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import SongMetaDialog from "@/components/SongMetaDialog.vue";
 import { useLibraryStore } from "@/stores/library";
@@ -274,23 +275,16 @@ async function removeSelected(): Promise<void> {
           <div class="sg__num">{{ formatDateTime(song.uploadedAt) }}</div>
 
           <div class="sg__actions">
-            <button
-              class="ctl"
-              :disabled="busy"
-              title="编辑曲目信息"
-              aria-label="编辑曲目信息"
-              @click="startEdit(song)"
-            >
-              <IconPencilSimple class="icon" />
-            </button>
-            <button
-              class="ctl"
-              :disabled="busy"
-              title="删除这首歌"
-              @click="askRemoveOne(song.id, song.title)"
-            >
-              <IconTrash class="icon" />
-            </button>
+            <AppTooltip label="编辑曲目信息">
+              <button class="ctl" :disabled="busy" @click="startEdit(song)">
+                <IconPencilSimple class="icon" />
+              </button>
+            </AppTooltip>
+            <AppTooltip label="删除这首歌">
+              <button class="ctl" :disabled="busy" @click="askRemoveOne(song.id, song.title)">
+                <IconTrash class="icon" />
+              </button>
+            </AppTooltip>
           </div>
         </div>
       </div>

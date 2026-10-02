@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
+import AppTooltip from "@/components/AppTooltip.vue";
 import IconArrowCounterClockwise from "~icons/ph/arrow-counter-clockwise";
 import IconFileText from "~icons/ph/file-text";
 import { usePlayerStore } from "@/stores/player";
@@ -14,8 +15,10 @@ import { decodeLyricsBytes } from "@/utils/lyricsLibrary";
  * 而用户手里那份可能是逐字版——没有入口，LR-05 的逐字效果对他们就等于不存在。
  *
  * 行为层仍然交给 Reka 的 Popover（打开/关闭、Esc、点外部、焦点归还，铁律 1）；
- * 触发按钮由调用方通过 #trigger 插槽传入（它属于页面顶栏那套控件，样式留在页面里）。
+ * 触发按钮由调用方通过 #trigger 插槽传入（它属于页面顶栏那套控件，样式留在页面里），
+ * 提示也由这里包（调用方只传 `label`）：**Tooltip 必须套在触发器的外层**（理由见 QueuePopover）。
  */
+withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const player = usePlayerStore();
 const open = ref(false);
 /** 导入失败（文件里没有时间标签 / 读不出来）时的就地提示，比弹一条全局提示更贴近操作 */
@@ -63,9 +66,11 @@ function clearImported(): void {
 
 <template>
   <PopoverRoot v-model:open="open" @update:open="failed = false">
-    <PopoverTrigger as-child>
-      <slot name="trigger" />
-    </PopoverTrigger>
+    <AppTooltip :label="label" :disabled="!label">
+      <PopoverTrigger as-child>
+        <slot name="trigger" />
+      </PopoverTrigger>
+    </AppTooltip>
 
     <PopoverPortal>
       <PopoverContent class="lsm" side="bottom" align="end" :side-offset="10">

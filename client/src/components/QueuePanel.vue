@@ -3,6 +3,7 @@ import IconBroom from "~icons/ph/broom";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
 import IconX from "~icons/ph/x";
+import AppTooltip from "@/components/AppTooltip.vue";
 import { usePlayerStore } from "@/stores/player";
 import { confirmAction } from "@/utils/confirm";
 import { formatTime } from "@/utils/format";
@@ -71,9 +72,11 @@ async function askClear(): Promise<void> {
           </span>
           <span class="q-dur">{{ formatTime(track.duration ?? 0) }}</span>
         </button>
-        <button class="q-del" :title="`从队列移除 ${track.title}`" @click="player.removeAt(index)">
-          <IconX class="icon" />
-        </button>
+        <AppTooltip :label="`从队列移除 ${track.title}`">
+          <button class="q-del" @click="player.removeAt(index)">
+            <IconX class="icon" />
+          </button>
+        </AppTooltip>
       </li>
     </ul>
   </div>

@@ -14,6 +14,7 @@ import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
 } from "reka-ui";
+import AppTooltip from "@/components/AppTooltip.vue";
 import IconDotsSixVertical from "~icons/ph/dots-six-vertical";
 import IconDownloadSimple from "~icons/ph/download-simple";
 import IconFileCode from "~icons/ph/file-code";
@@ -407,22 +408,23 @@ function exportJson(): void {
         >
           <!-- 序号格就是拖拽把手（不另占一列，也不和行里的播放按钮抢点击）：
                hover / 键盘聚焦时数字换成把手图标，触屏直接显示把手 -->
-          <button
-            class="pl-grip"
-            :class="{ 'is-active': dragFrom === index }"
-            :disabled="entries.length < 2"
-            :title="`拖动排序：${entry.title}（也可用 ↑ ↓）`"
-            :aria-label="`拖动排序 ${entry.title}，共 ${entries.length} 首，当前第 ${index + 1} 首`"
-            @pointerdown="startDrag(index, $event)"
-            @pointermove="moveDrag"
-            @pointerup="endDrag"
-            @pointercancel="resetDrag"
-            @keydown.up.prevent="nudge(index, -1)"
-            @keydown.down.prevent="nudge(index, 1)"
-          >
-            <span class="pl-grip__num">{{ index + 1 }}</span>
-            <IconDotsSixVertical class="icon pl-grip__icon" />
-          </button>
+          <AppTooltip :label="`拖动排序：${entry.title}（也可用 ↑ ↓）`">
+            <button
+              class="pl-grip"
+              :class="{ 'is-active': dragFrom === index }"
+              :disabled="entries.length < 2"
+              :aria-label="`拖动排序 ${entry.title}，共 ${entries.length} 首，当前第 ${index + 1} 首`"
+              @pointerdown="startDrag(index, $event)"
+              @pointermove="moveDrag"
+              @pointerup="endDrag"
+              @pointercancel="resetDrag"
+              @keydown.up.prevent="nudge(index, -1)"
+              @keydown.down.prevent="nudge(index, 1)"
+            >
+              <span class="pl-grip__num">{{ index + 1 }}</span>
+              <IconDotsSixVertical class="icon pl-grip__icon" />
+            </button>
+          </AppTooltip>
 
           <button
             class="pl-main"
@@ -441,14 +443,11 @@ function exportJson(): void {
             <span class="pl-time">{{ formatTime(entry.item.duration ?? null) }}</span>
           </button>
 
-          <button
-            class="pl-remove"
-            :disabled="busy"
-            :title="`把《${entry.title}》移出歌单`"
-            @click="removeEntry(entry)"
-          >
-            <IconX class="icon" />
-          </button>
+          <AppTooltip :label="`把《${entry.title}》移出歌单`">
+            <button class="pl-remove" :disabled="busy" @click="removeEntry(entry)">
+              <IconX class="icon" />
+            </button>
+          </AppTooltip>
         </li>
       </ol>
     </template>

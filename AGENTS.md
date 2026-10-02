@@ -100,6 +100,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           QueuePanel（队列内容：标题行 + 清空 + 列表，两壳共用一份 - v5.40）、
                           ConfirmDialog（应用内二次确认：Reka Dialog + 自绘玻璃，挂 App.vue 全站一份 - v5.53）、
                           Slider（自绘滑杆：竖=音量条与均衡器十根竖杆、横=整体增益；几何在 utils/slider.ts - PL-13）、
+                          AppTooltip（自绘玻璃提示：只有图标的键共用一份，label 同时是 aria-label - v5.71）、
                           EqualizerPanel（均衡器面板：设置页「音效」Tab - PL-13）、
                           SongMetaDialog（元信息编辑弹窗：上传页与曲库管理共用一份 - AD-02 / v5.61）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
@@ -120,6 +121,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 **歌单（v5.58，PS-01~06）**：歌单存在服务器端（`data/playlists.json`，与曲库索引同一套原子写法）；接口 `GET / POST / PUT / DELETE /api/playlists` + `PUT /api/playlists/:id/items`（**整表替换**，添加/移除/排序都是一件事），权限按 AC-03 归**访客级**。前端：侧栏「歌 单」分区接上真数据（＋行内输入新建、曲目数徽标）+ 歌单详情页（头部/播放全部/重命名/删除/添加曲目选择器/移除单曲/**拖拽排序**）；“这条能不能播”收在 `utils/playlistEntries` 一处（云端被删 / 本地缺失 / 在线未接入三种情况各自有话说）。**排序（v5.63 / PS-04）**：序号格兼把手（平时是序号，hover / 聚焦 / 触屏是把手图标），指针事件跟手拖拽（落点线 + 边缘自滚 + `touch-action: none`），也支持键盘 ↑ ↓ 且挪完焦点归位；下标运算在 `movePlaylistItem`（纯函数、有单测），仍走整表替换。**导出（v5.64 / PS-06）**：「导出」下拉菜单（Reka DropdownMenu）两种格式 —— **M3U8** 给能播的写绝对地址、本地/在线/已删的写成注释行（不假装能播），**JSON** 带 `format`+`version` 可还原；整个导出在浏览器里生成文件，不走服务端（`utils/playlistExport`，纯函数 + 10 例单测）。**未做**：收藏/最近播放（PS-05），P2。
 
 **PWA（v5.65，RT-07）**：`vite-plugin-pwa`（选型表指定）—— manifest（standalone、192/512/maskable 图标、`theme_color` 与页面底色一致）+ Service Worker **只预缓存应用外壳与构建产物**（93 项，音频不缓存）；`/api`、`/audio`、`/covers` 进 `navigateFallbackDenylist`（否则离线时被 SPA 兜底成一份 index.html）。图标由 `client/public/` 下的四张 PNG 提供，**用应用自己的 `logo-mark.png` 在真实浏览器里合成**（alpha 涂白 + 主题色圆角底），与界面里的 `.brand-mark` 同源；`theme-color` 跟手动主题走（`utils/themeColor.ts`）；iOS 另补 `apple-touch-icon` 与三个 `apple-mobile-web-app-*` meta。实测：断网重载外壳照旧打开，`/audio` 不被兜底。
+
+**提示（Tooltip，v5.71）**：Reka 的 Tooltip 落地成共用的 `components/AppTooltip.vue`，`App.vue` 挂**一个** `TooltipProvider`（400ms 延迟；连续移到下一枚键不再等；只有键盘聚焦才开；指针离开即收）。**只有图标的按钮用它**（`label` 同时就是 `aria-label` —— 图标键没有可见文字，名字不能丢），有可见文字的控件仍写原生 `title`（截断时看全文）。队列键与歌词来源键的提示**由壳层组件自己包**（开一个 `label` 属性）：组合顺序必须是 **Tooltip 在外、Popover/Dialog 触发器在内**，反过来会让触发键彻底失灵（浮层打不开、提示也不弹）。
 
 **收藏与最近播放（v5.67，PS-05）**：数据在服务端 `data/listening.json`（手机上收藏的、电脑上看得见；清一次浏览器数据不会把它清掉）。接口 `GET /api/listening` + `POST/DELETE /api/listening/favorites` + `POST/DELETE /api/listening/recent`（均访客级，引用口径与歌单同一套身份键）——收藏幂等、最近播放去重置顶并截到 100 条。前端：`stores/listening`（不做乐观更新，一律用服务端返回的那一份回填）+ `composables/usePlayHistory`（挂在 App.vue，切歌时记一条）+ `views/CollectionView`（/collection，「我的音乐」：收藏 / 最近播放两个页签，行复用 `TrackRow` 的收藏键）+ 播放条与沉浸页各一枚收藏键（播放条那枚在**队列键左侧**、与队列并列在最右 —— 中间那组键因此对进度条左右对称，实测播放键中心与进度条中心重合；状态色由 `.ctl.is-on` 一条规则给三处共用，v5.70）；手机上播放条那两枚一起收起（最右那组整组 `display: none`），入口在沉浸页控制栏。**未做**：均衡器（PL-13）。
 
@@ -167,6 +170,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 22. **开发期偶尔某个 `~icons/*` 模块 504（v5.67 实测）**：Vite 重启或依赖集变化后会重新优化依赖，此期间首访页面可能报一串 `Loading failed for the module .../@id/~icons/ph/xxx` + 路由报错，**重载即好**，不是代码问题；生产构建不受影响（图标在构建期已内联）。判断技巧：报错模块随机、多次刷新位置不一样，就是优化器在重排。
 
 23. **双极（±）控件别用原生 `input[type=range]`（v5.69 实测）**：原生 range 的填充是**从 min 端起算**的（`-10~+10` 在 0 处就填满一半），而 Chromium 会画这条填充、Firefox 干脆不画 —— 同一根控件两个引擎两种观感；「从中线往两侧长」原生压根没有。更阴的是本仓 `tokens.css` 里那段 range 配方要求**时时维护渐变断点 `--p`**（原型里真有那段 JS，我们当初只搬了 CSS）—— 于是填充永远停在默认 50%：实测整体增益 `+10dB` 时条子仍只填到中线、手柄已到最右。现在竖横两种滑杆都是自绘的 `components/Slider.vue`（几何在 `utils/slider.ts`），要用滑杆就用它。判据：改完滑杆**量填充的起止百分比**（`fillGeometry` 的 `start` / `size`），别只量手柄位置 —— 手柄是对的、填充是错的，这种「半对」最容易被放过去。
+
+24. **`force-mount` 的弹层要当心两件“库内部判别”的事（v5.71 实测）**：① Reka 的 DismissableLayer 靠 `index === layers.size - 1`（“我得是最上面那层”）决定吃不吃 Esc；常驻 DOM 的层会一直登记在 `layers` 里 —— 所以**凡是我们自己 `force-mount` 的层，Esc 都自己接**（走 `utils/topLayer` 的捕获监听，别留给行为层的默认实现）；判断“某层的 Esc 好不好使”不能只看代码，得在真浏览器里按一下。② **进场动画必须挂在 `[data-state]` 上，不能写在内容的基础类里**：Reka 的 Presence 靠 `animationName` 判断“要不要等退场动画放完”，基础类上永远挂着一个动画名时，关闭时它会去等一个**永远不来的 `animationend`** —— 节点不卸载（表现是提示“赖着不走”，还一直占着 ① 里那个名额），修法：`.tip[data-state="delayed-open"], .tip[data-state="instant-open"] { animation: … }`。
 
 ## 文档索引
 

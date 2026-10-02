@@ -14,6 +14,7 @@ import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import { usePlayerStore } from "@/stores/player";
 import { useListeningStore } from "@/stores/listening";
+import AppTooltip from "@/components/AppTooltip.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
@@ -98,37 +99,36 @@ function onPointerUp(event: PointerEvent): void {
            —— 需求方指定（模式在上一曲左侧、列表在下一首右侧），音量交给系统音量键，整枚收起。
            所以队列与音量放同一组、顺序相邻：桌面显音量（队列 v-if 不渲染）。 -->
       <div class="im-ctrls__row">
-        <button
-          class="ctl mode"
-          :title="`播放模式：${player.modeLabel}`"
-          @click="player.cycleMode()"
-        >
-          <component :is="modeIcon" class="icon" />
-        </button>
+        <AppTooltip :label="`播放模式：${player.modeLabel}`">
+          <button class="ctl mode" @click="player.cycleMode()">
+            <component :is="modeIcon" class="icon" />
+          </button>
+        </AppTooltip>
       </div>
 
       <div class="im-ctrls__row im-ctrls__row--primary">
-        <button class="ctl prev" title="上一首" :disabled="!player.hasTrack" @click="player.prev()">
-          <IconSkipBack class="icon" />
-        </button>
-        <button
-          class="ctl play"
-          :title="player.playing ? '暂停（空格）' : '播放（空格）'"
-          :disabled="!player.hasTrack"
-          @click="player.toggle()"
-        >
-          <component :is="playIcon" class="icon" />
-        </button>
-        <button class="ctl next" title="下一首" :disabled="!player.hasTrack" @click="player.next()">
-          <IconSkipForward class="icon" />
-        </button>
+        <AppTooltip label="上一首">
+          <button class="ctl prev" :disabled="!player.hasTrack" @click="player.prev()">
+            <IconSkipBack class="icon" />
+          </button>
+        </AppTooltip>
+        <AppTooltip :label="player.playing ? '暂停（空格）' : '播放（空格）'">
+          <button class="ctl play" :disabled="!player.hasTrack" @click="player.toggle()">
+            <component :is="playIcon" class="icon" />
+          </button>
+        </AppTooltip>
+        <AppTooltip label="下一首">
+          <button class="ctl next" :disabled="!player.hasTrack" @click="player.next()">
+            <IconSkipForward class="icon" />
+          </button>
+        </AppTooltip>
       </div>
 
       <div class="im-ctrls__row">
         <!-- 队列入口只在手机上出现：迷你条把队列键收起了，这里是手机唯一入口 -->
-        <QueuePopover v-if="isMobile">
+        <QueuePopover v-if="isMobile" :label="`播放队列（${player.queue.length} 首）`">
           <template #trigger>
-            <button class="ctl" :title="`播放队列（${player.queue.length} 首）`">
+            <button class="ctl">
               <IconQueue class="icon" />
             </button>
           </template>
@@ -141,17 +141,18 @@ function onPointerUp(event: PointerEvent): void {
 
         <!-- 收藏（PS-05）：播放条那枚在手机上收起了（迷你条只留两枚键），
              所以这里是手机端收下当前这首歌的地方（与播放条那枚共用同一个 store） -->
-        <button
-          class="ctl im-fav"
-          :class="{ 'is-on': isFavorite }"
-          :title="isFavorite ? '取消收藏' : '收藏'"
-          :disabled="!canFavorite"
-          :aria-pressed="isFavorite"
-          @click="toggleFavorite"
-        >
-          <IconHeartFill v-if="isFavorite" class="icon" />
-          <IconHeartStraight v-else class="icon" />
-        </button>
+        <AppTooltip :label="isFavorite ? '取消收藏' : '收藏'">
+          <button
+            class="ctl im-fav"
+            :class="{ 'is-on': isFavorite }"
+            :disabled="!canFavorite"
+            :aria-pressed="isFavorite"
+            @click="toggleFavorite"
+          >
+            <IconHeartFill v-if="isFavorite" class="icon" />
+            <IconHeartStraight v-else class="icon" />
+          </button>
+        </AppTooltip>
       </div>
     </div>
 

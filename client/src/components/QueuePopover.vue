@@ -13,6 +13,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "reka-ui";
+import AppTooltip from "@/components/AppTooltip.vue";
 import QueuePanel from "@/components/QueuePanel.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { isTouchTap } from "@/utils/pointer";
@@ -34,7 +35,12 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  *
  * 触发按钮由**调用方**通过 #trigger 插槽传入：它属于播放条/沉浸页那套控件（`.ctl`），
  * 样式留在各自的调用点，别在这里复制一份。
+ *
+ * 触发键的提示也在这里包（调用方只传 `label`）：**Tooltip 必须套在 Popover/Dialog 触发器的外层** ——
+ * `as-child` 只能往里合并，同一个元素不能左右各包一层；把 Tooltip 写在插槽里（即套在触发器内层）
+ * 会让两个行为层的 as-child 链打架（v5.71 实测：触发键彻底失灵 —— 浮层打不开、提示也不弹）。
  */
+withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const open = ref(false);
 const isMobile = useMediaQuery(MOBILE_QUERY);
 
@@ -54,12 +60,17 @@ function onGripUp(event: PointerEvent): void {
 }
 
 /**
- * Esc：抽屉只关自己这一层。
+ * Esc：两套壳层都**自己**吃掉这一下（不靠行为层的默认实现）。
  *
  * 沉浸页在 `window` 上听 Esc（收起整页）、确认对话框也在 `window` 上听（关对话框）——
- * 三个监听同在 `window`，按注册顺序跑不可控。所以这里：开抽屉时在 `utils/topLayer` 登记，
+ * 几个监听同在 `window`，按注册顺序跑不可控。所以这里：打开时在 `utils/topLayer` 登记，
  * 处理按键前先问“我是不是最上面那层”—— 不是就放行（让上面的对话框去关）。
  * 是最上面那层时挂**捕获阶段**监听并 `stopPropagation()`，下面的沉浸页就收不到（v5.40）。
+ *
+ * ⚠️ 桌面浮层也走这条，不能留给 Reka（v5.71 实测）：v5.56 给它加了 `force-mount` 做退场动画，
+ * 而常驻 DOM 的层会**永久占着** `data-dismissable-layer` 名额 —— Reka 自己那条
+ * `index === layers.size - 1`（“我得是最上面那层”）就再也不成立，Esc 静默失效（不报错）。
+ * 同一原因也会让别的常驻层失效，所以凡是我们自己 `force-mount` 的层，都自己接 Esc。
  */
 const layerId = ref<number | null>(null);
 watch(open, (isOpen) => {
@@ -71,7 +82,7 @@ watch(open, (isOpen) => {
 });
 
 function onKeydown(event: KeyboardEvent): void {
-  if (!isMobile.value || !open.value || event.key !== "Escape") return;
+  if (!open.value || event.key !== "Escape") return;
   if (layerId.value === null || !isTopLayer(layerId.value)) return;
   event.stopPropagation();
   open.value = false;
@@ -87,9 +98,11 @@ onBeforeUnmount(() => {
 <template>
   <!-- 桌面：贴着触发器弹出的浮层 -->
   <PopoverRoot v-if="!isMobile" v-model:open="open">
-    <PopoverTrigger as-child>
-      <slot name="trigger" />
-    </PopoverTrigger>
+    <AppTooltip :label="label" :disabled="!label">
+      <PopoverTrigger as-child>
+        <slot name="trigger" />
+      </PopoverTrigger>
+    </AppTooltip>
 
     <PopoverPortal>
       <PopoverContent class="q-pop" side="top" align="end" :side-offset="10" force-mount>
@@ -101,9 +114,11 @@ onBeforeUnmount(() => {
   <!-- 手机：半屏底部抽屉。用 v-else 而不是再加一个断点判断：两套壳层共用一个开关，
        断点变化时只是换壳，不会出现“两个都开”。 -->
   <DialogRoot v-else v-model:open="open">
-    <DialogTrigger as-child>
-      <slot name="trigger" />
-    </DialogTrigger>
+    <AppTooltip :label="label" :disabled="!label">
+      <DialogTrigger as-child>
+        <slot name="trigger" />
+      </DialogTrigger>
+    </AppTooltip>
 
     <DialogPortal>
       <!-- force-mount 两个（v5.50）：Reka 的 Dialog 默认“一关就卸载”，于是只有进场动画、

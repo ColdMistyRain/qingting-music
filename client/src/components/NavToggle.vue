@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import IconList from "~icons/ph/list";
+import AppTooltip from "@/components/AppTooltip.vue";
 import { useNavDrawer } from "@/composables/useNavDrawer";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 
@@ -15,16 +16,11 @@ const { open, toggle } = useNavDrawer();
 </script>
 
 <template>
-  <button
-    v-if="isMobile"
-    class="nav-toggle"
-    :title="open ? '收起侧栏' : '展开侧栏'"
-    aria-controls="nav-drawer"
-    :aria-expanded="open"
-    @click="toggle"
-  >
-    <IconList class="icon" />
-  </button>
+  <AppTooltip v-if="isMobile" :label="open ? '收起侧栏' : '展开侧栏'">
+    <button class="nav-toggle" aria-controls="nav-drawer" :aria-expanded="open" @click="toggle">
+      <IconList class="icon" />
+    </button>
+  </AppTooltip>
 </template>
 
 <style scoped>

@@ -7,6 +7,7 @@ import IconMusicNotes from "~icons/ph/music-notes";
 import IconPause from "~icons/ph/pause";
 import IconPlay from "~icons/ph/play";
 import IconX from "~icons/ph/x";
+import AppTooltip from "@/components/AppTooltip.vue";
 import { formatTime } from "@/utils/format";
 import { isTouchTap } from "@/utils/pointer";
 
@@ -76,29 +77,28 @@ function onRowClick(event: MouseEvent): void {
     <div class="row__time">{{ formatTime(track.duration) }}</div>
 
     <div class="row__actions">
-      <button
-        v-if="showFavorite"
-        class="ctl row__fav"
-        :class="{ 'is-on': favorite }"
-        :title="favorite ? '取消收藏' : '收藏'"
-        :aria-pressed="favorite"
-        @click.stop="emit('toggleFavorite', index)"
-      >
-        <IconHeartFill v-if="favorite" class="icon" />
-        <IconHeartStraight v-else class="icon" />
-      </button>
-      <button class="ctl" :title="isPlaying ? '暂停' : '播放'" @click.stop="emit('play', index)">
-        <IconPause v-if="isPlaying" class="icon" />
-        <IconPlay v-else class="icon" />
-      </button>
-      <button
-        v-if="removable"
-        class="ctl row__remove"
-        title="从列表移除"
-        @click.stop="emit('remove', index)"
-      >
-        <IconX class="icon" />
-      </button>
+      <AppTooltip v-if="showFavorite" :label="favorite ? '取消收藏' : '收藏'">
+        <button
+          class="ctl row__fav"
+          :class="{ 'is-on': favorite }"
+          :aria-pressed="favorite"
+          @click.stop="emit('toggleFavorite', index)"
+        >
+          <IconHeartFill v-if="favorite" class="icon" />
+          <IconHeartStraight v-else class="icon" />
+        </button>
+      </AppTooltip>
+      <AppTooltip :label="isPlaying ? '暂停' : '播放'">
+        <button class="ctl" @click.stop="emit('play', index)">
+          <IconPause v-if="isPlaying" class="icon" />
+          <IconPlay v-else class="icon" />
+        </button>
+      </AppTooltip>
+      <AppTooltip v-if="removable" label="从列表移除">
+        <button class="ctl row__remove" @click.stop="emit('remove', index)">
+          <IconX class="icon" />
+        </button>
+      </AppTooltip>
     </div>
   </div>
 </template>

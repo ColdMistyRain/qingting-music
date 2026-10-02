@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { TooltipProvider } from "reka-ui";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useMediaSession } from "@/composables/useMediaSession";
 import { usePlayHistory } from "@/composables/usePlayHistory";
@@ -67,17 +68,34 @@ router.afterEach(() => {
 </script>
 
 <template>
-  <RouterView v-slot="{ Component }">
-    <Transition
-      :name="transitionName"
-      :css="allowTransition"
-      @after-enter="onAfterEnter"
-      @after-leave="clearPair"
-    >
-      <component :is="Component" :key="layer" />
-    </Transition>
-  </RouterView>
+  <!-- 提示（Tooltip）的全局约定都放在这一个 Provider 上（v5.71）：
+       - delay-duration 400ms：比系统 title 的 1s 跟手，又不会一划而过就弹一片；
+       - skip-delay-duration 300ms：**连续移到下一枚键不再等延迟**（播放条那一排按键全靠它）——
+         这正是必须用一个 Provider 全站包起来、而不能每处各包一个的原因；
+       - ignore-non-keyboard-focus：只有键盘聚焦才开提示 —— 否则关掉对话框、焦点落回触发键时，
+         提示会自己冒出来；
+       - disable-hoverable-content：**指针离开触发器就收**。默认（false）是"指针可以移进提示里，
+         靠一条 grace-area 多边形判定什么时候算离开"—— 那是给长文本提示准备的；我们的提示只有
+         几个字，没有需要把指针移进去读的内容，少一条多边形判定就少一个出错面。
+       它只提供 context、不渲染任何元素（Reka 的 Provider 就是 renderSlot），所以不影响布局。 -->
+  <TooltipProvider
+    :delay-duration="400"
+    :skip-delay-duration="300"
+    ignore-non-keyboard-focus
+    disable-hoverable-content
+  >
+    <RouterView v-slot="{ Component }">
+      <Transition
+        :name="transitionName"
+        :css="allowTransition"
+        @after-enter="onAfterEnter"
+        @after-leave="clearPair"
+      >
+        <component :is="Component" :key="layer" />
+      </Transition>
+    </RouterView>
 
-  <!-- 破坏性 / 批量动作的二次确认（v5.53）：全站唯一一份，只改 utils/confirm.ts 那一个入口 -->
-  <ConfirmDialog />
+    <!-- 破坏性 / 批量动作的二次确认（v5.53）：全站唯一一份，只改 utils/confirm.ts 那一个入口 -->
+    <ConfirmDialog />
+  </TooltipProvider>
 </template>

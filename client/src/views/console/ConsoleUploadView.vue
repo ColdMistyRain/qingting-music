@@ -14,6 +14,7 @@ import {
   isAudioFileName,
   type Song,
 } from "@qingting/shared";
+import AppTooltip from "@/components/AppTooltip.vue";
 import { ApiError } from "@/api/http";
 import { isRetryableUploadError, uploadSong } from "@/api/upload";
 import SongMetaDialog from "@/components/SongMetaDialog.vue";
@@ -398,17 +399,16 @@ function clearFinished(): void {
                 <IconArrowsClockwise class="icon" />
                 重试
               </button>
-              <button
-                v-if="item.status === 'uploading'"
-                class="ctl"
-                title="取消上传"
-                @click="cancel(item)"
-              >
-                <IconX class="icon" />
-              </button>
-              <button v-else class="ctl" title="从队列移除" @click="removeItem(item)">
-                <IconX class="icon" />
-              </button>
+              <AppTooltip v-if="item.status === 'uploading'" label="取消上传">
+                <button class="ctl" @click="cancel(item)">
+                  <IconX class="icon" />
+                </button>
+              </AppTooltip>
+              <AppTooltip v-else label="从队列移除">
+                <button class="ctl" @click="removeItem(item)">
+                  <IconX class="icon" />
+                </button>
+              </AppTooltip>
             </div>
           </div>
         </div>

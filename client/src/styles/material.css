@@ -12,8 +12,10 @@
    本文件只做一件事：把"材质"抽成一个可切换的维度（<html data-material>），
    两种模式共用同一套令牌**名字**，组件不判断模式、不写死颜色（遵守铁律 3 与 5.6.5）。
    - islands（默认，现状）：半透明玻璃浮岛 + 封面光晕 + 描边 + 投影。
-   - flat（对比用）      ：中性底色 + 实心面板，分隔只靠留白与细线；
-     "玻璃"退回它真正成立的位置 —— 浮在内容之上的 chrome（播放条等）。
+   - flat（实心面板）      ：中性底色 + **全实心**，一层玻璃都不留（v5.92 定调：
+     原先给播放条留的 chrome 玻璃在浅色下与页面只差 3/255，看着就是融为一体）；
+     层级改由投影说 —— 常驻的 chrome（播放条）读 `--chrome-shadow`，
+     浮层读 `--panel-shadow` / `--tray-shadow`，岛内卡片读 `--card-shadow`。
    Apple Music Web 实测值（浅 / 深）：
      底色 #ffffff / #1f1f1f；导航玻璃 saturate(2.2) blur(16px) + rgba(245,245,247,.55)
      / rgba(38,38,40,.6)；悬浮件 blur(60px) saturate(2) + rgba(246,246,246,.48~.6)；
@@ -135,6 +137,28 @@
   --panel-blur: none;
 }
 
+/* ---------- flat：chrome（播放条 / 沉浸页的“回到当前句”）也退回实心 ----------
+   v5.81 曾把播放条单独留在玻璃档，理由是“玻璃只留在真正浮在滚动内容之上的 chrome”。
+   需求方 v5.92 对着实心浅色截图指出：**播放条那一块几乎与页面融为一体**
+   —— 量出来确实如此：--chrome-bg 是 rgba(245,245,247,.55)，叠在 flat 浅色的页底
+   #f0f0f2 上只差 3/255（同一页上岛面却是纯白，色差 15/255，所以只有播放条糊掉）。
+   定调：**flat 就是全实心，一层玻璃都不留，层级用投影说**（“既然是实心面板干脆都变成实心的，
+   用阴影表示层级”）。于是：面色取 --plane-2（与岛内卡片同档）、模糊全撤、
+   再加一条**朝上**的投影 —— 播放条贴在页面下沿，而本仓的投影全是朝下的偏移，
+   朝下的影它一个都吃不到（见开发约定“几何事实”那条），所以这条影是它专属的。
+   深色下色差本身就够（页底 #191919 vs 面板 #2b2b2f），影只做一点收边。 */
+:root[data-material="flat"] {
+  --chrome-bg: var(--plane-2);
+  --chrome-blur: none;
+  --chrome-shadow: 0 -14px 34px -20px rgba(20, 28, 60, 0.32);
+}
+
+:root[data-material="flat"][data-theme="dark"] {
+  --chrome-bg: var(--plane-2);
+  --chrome-blur: none;
+  --chrome-shadow: 0 -14px 34px -20px rgba(0, 0, 0, 0.6);
+}
+
 /* ---------- flat：组件层 ---------- */
 
 /* 岛＝实心面板。描边 + 投影一起撤掉：它们是"卡片模板"的语言，
@@ -163,12 +187,20 @@
   box-shadow: var(--card-shadow);
 }
 
-/* 播放条是唯一常驻"浮在内容之上"的层 → 换成真正的 chrome 玻璃（无边无影），
-   这也是玻璃唯一成立的位置：内容从它下面滚过时才有东西可模糊。 */
+/* 播放条在 flat 下也是实心面板（v5.92）——与岛同档的面色 + 一条朝上的投影：
+   它是“浮在页面下沿”的那一层，与页面的区分交给影，而不是靠“比页面白一点”
+   （浅色下两者只差 3/255，就是需求方看到的“融为一体”）。
+   仍然不留描边：实心面板的边界由面色差 + 影负责，线是卡片模板的语言。 */
 :root[data-material="flat"] .playerbar {
   background: var(--chrome-bg);
-  backdrop-filter: var(--chrome-blur);
-  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: none;
-  box-shadow: none;
+  box-shadow: var(--chrome-shadow);
+}
+
+/* 拖拽提示浮层（.drag-veil）：同样不留模糊 —— flat 就是“一层玻璃都不留”。 */
+:root[data-material="flat"] .drag-veil {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }

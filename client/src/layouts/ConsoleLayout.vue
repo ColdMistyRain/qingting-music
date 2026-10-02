@@ -102,17 +102,14 @@ const navItems: ConsoleNavItem[] = [
   gap: 4px;
 }
 
-/* 中段滚动区：**滚动条槽常留**（`scrollbar-gutter: stable`）+ 负的右外边距把槽挪进内边距里，
-   于是“要不要滚动”永远不改变项的宽度（展开时 200），滚动条也不会压住项与高亮。
-   配方与 .sb-scroll 完全一致（v5.15，改动同步两处）。 */
+/* 中段滚动区：滚动条浮在内容上（v6.18），所以“要不要滚动”永远不改变项的宽度
+   （展开 200 / 折叠 44），也不需要“保留槽 + 负外边距把槽挪进内边距”的补偿。 */
 .cs-nav {
   flex: 1 1 auto;
   min-height: 0;
-  margin-right: calc(var(--scrollbar-size, 0px) * -1);
   padding-bottom: 6px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 
 .cs-main {

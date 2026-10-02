@@ -178,21 +178,17 @@ function dismissPlaylistError(): void {
     padding 0.25s ease;
 }
 
-/* 中段滚动区（导航 + 歌单）。两个要点：
-   ① **滚动条槽常留**（`scrollbar-gutter: stable`）：列表长到需要滚动、或窗口变矮时，
-      滚动条的出现/消失不再把项与高亮挤窄 10px（这正是需求方说的“侧栏的滚动条问题”）。
-   ② 负的右外边距把这条槽**挪进 .sb-inner 的内边距里**：滚动区的内容盒宽度因此
-      与不滚动时**完全一致**（展开 200 / 折叠 44），滚动条落在面板边缘 2px 处、
-      永远不压住项，也不改变 12px 的左右对称（与 .page-frame 的“负边距铺到岛边”同源）。
-   没有这条负边距，稳定槽会把内容永久缩窄 10px，右边距变成 22px、左 12px，一眼就歪。 */
+/* 中段滚动区（导航 + 歌单）。
+   滚动条是**浮在内容上**的（v6.18，`v-overlay-scroll` 自动挂）：滚动条的出现/消失
+   不再把项与高亮挤窄，也不需要任何“保留槽 + 负外边距挪进内边距”的补偿
+   （那一套是 v5.15~v6.17 的做法：`scrollbar-gutter: stable` + `margin-right: -10px`，
+   还要求启动时实测滚动条宽度 —— 现在全拆了）。 */
 .sb-scroll {
   flex: 1 1 auto;
   min-height: 0;
-  margin-right: calc(var(--scrollbar-size, 0px) * -1);
   padding-bottom: 6px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 
 /* 折叠态：**只改宽度**（+ 藏标签、折叠箭头转 180°）。

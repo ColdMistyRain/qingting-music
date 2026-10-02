@@ -1,39 +1,85 @@
 /**
- * 滚动条宽度（VS-* 布局口径）。
+ * 自绘浮层滚动条的几何（纯函数，`directives/overlayScroll.ts` 与单测共用）。
  *
- * 为什么不能写死：`--scrollbar-size` 的旧值是 **10px** —— 那是 Chromium `::-webkit-scrollbar`
- * 的宽度。Firefox 不认这个伪元素，只认 `scrollbar-width: thin`，而 thin 的实际宽度由引擎与
- * 平台给（Windows 上不是 10px）。而侧栏、页框（`.page-frame`）、控制台都用
- * `scrollbar-gutter: stable` + `margin-right: calc(var(--scrollbar-size) * -1)` 把滚动条槽
- * **挪进内边距** —— 令牌一旦与实际宽度不等，内容盒宽度就差几个像素：Firefox 下折叠侧栏的
- * 导航项与高亮被挤歪（需求方拿 Chromium / Firefox 并排截图指出：“侧边栏这里会有 bug”）。
+ * 为什么要有它：原生滚动条**占位**，于是我们得靠 `scrollbar-gutter: stable` + 到处补偿
+ * 那一条宽度（表头与行各留一份、侧栏与控制台把槽挪进内边距、`--scrollbar-size` 还要在
+ * 启动时实测一次），只为让同一岛上的两块对齐。换成**浮在内容上**的自绘条之后，
+ * 这一整套补偿都可以拆掉 —— 代价是几何得自己算，所以规则收在这里、按“数 → 位置”的口径写。
  *
- * 与 `--dpr` 同一个原则：JS 只写一个**原始值**，怎么用留在 CSS。
+ * 与 `utils/slider.ts` 同族：只做纯计算，不碰 DOM（PRD 11.2 要求基础函数配单测）。
  */
 
-/** 从「外框宽 − 内容盒宽」得出滚动条宽度；量不到 / 值明显不合理时返回 0。
- *  **0 也是有效结果**（“本引擎不占滚动条位”），调用方要照写进令牌 —— 不能当“没量到”跳过，
- *  否则 CSS 兑底值会给一个根本不需要补偿的引擎多减一道（v5.31 修）。 */
-export function scrollbarSizeFrom(offsetWidth: number, clientWidth: number): number {
-  const size = offsetWidth - clientWidth;
-  if (!Number.isFinite(size) || size < 0 || size > 40) return 0;
-  return Math.round(size);
+/** 滚动条要用的四个数（都是 px） */
+export interface ThumbInput {
+  /** 视口尺寸（客户区高度） */
+  clientSize: number;
+  /** 内容尺寸（scrollHeight） */
+  scrollSize: number;
+  /** 当前滚动位置（scrollTop） */
+  scrollPos: number;
+  /** 滑块的最小长度：列表再长也不能细成一根线（点不着、看着也像条缝） */
+  minThumb?: number;
+}
+
+export interface ThumbMetrics {
+  /** 滑块长度（px） */
+  length: number;
+  /** 滑块在轨道内的偏移（px，从轨道顶端算） */
+  offset: number;
+  /** 压根不需要滚动条（内容装得下）时 true，调用方直接把整条藏掉 */
+  hidden: boolean;
+}
+
+const DEFAULT_MIN_THUMB = 28;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 /**
- * 实测一次并写进 `--scrollbar-size`（返回量到的值）。
- * 探针放视口外、`overflow: scroll` 保证一定有滚动条可量；量完立即移除。
- * ⚠️ **0 也要写**：0 = “本引擎不占滚动条位”，侧栏/页框的
- * `margin-right: calc(var(--scrollbar-size, 0px) * -1)` 就该归零 —— 不写就会退回 CSS 兑底值。
+ * 算出滑块的长度与位置。
+ * 长度按“视口 / 内容”的比例映射到轨道上，但**不小于 `minThumb`**；
+ * 长度被抬起来的那些情况下，位置区间也跟着缩小，否则滚到底时滑块会冲出轨道。
  */
-export function syncScrollbarSize(host: HTMLElement = document.documentElement): number {
-  const probe = document.createElement("div");
-  probe.setAttribute("aria-hidden", "true");
-  probe.style.cssText =
-    "position:absolute;top:-9999px;left:-9999px;width:100px;height:100px;overflow:scroll;scrollbar-gutter:stable";
-  host.appendChild(probe);
-  const size = scrollbarSizeFrom(probe.offsetWidth, probe.clientWidth);
-  probe.remove();
-  host.style.setProperty("--scrollbar-size", `${size}px`);
-  return size;
+export function thumbMetrics(input: ThumbInput): ThumbMetrics {
+  const clientSize = Math.max(0, Number(input.clientSize) || 0);
+  const scrollSize = Math.max(0, Number(input.scrollSize) || 0);
+
+  // 装得下（或量不到）：没有可滚的行程
+  if (clientSize <= 0 || scrollSize <= clientSize) {
+    return { length: clientSize, offset: 0, hidden: true };
+  }
+
+  const minThumb = Math.max(1, input.minThumb ?? DEFAULT_MIN_THUMB);
+  const length = clamp(
+    (clientSize / scrollSize) * clientSize,
+    Math.min(minThumb, clientSize),
+    clientSize,
+  );
+  const maxOffset = clientSize - length;
+  const maxScroll = scrollSize - clientSize;
+  const ratio = maxScroll > 0 ? clamp((Number(input.scrollPos) || 0) / maxScroll, 0, 1) : 0;
+
+  return { length, offset: maxOffset * ratio, hidden: false };
+}
+
+/**
+ * 拖滑块时的反算：由“滑块偏移”得到 `scrollTop`。
+ * 与上面互逆（拖到某处 → 内容滚到对应比例），同样按**可用的偏移区间**归一，
+ * 所以滑块长度被 `minThumb` 抬起时也不会出现“拖到底却没滚到底”。
+ */
+export function scrollOffsetFromThumb(
+  thumbOffset: number,
+  input: Omit<ThumbInput, "scrollPos">,
+): number {
+  const clientSize = Math.max(0, Number(input.clientSize) || 0);
+  const scrollSize = Math.max(0, Number(input.scrollSize) || 0);
+  const maxScroll = scrollSize - clientSize;
+  if (clientSize <= 0 || maxScroll <= 0) return 0;
+
+  const { length } = thumbMetrics({ ...input, scrollPos: 0 });
+  const maxOffset = clientSize - length;
+  if (maxOffset <= 0) return 0;
+
+  return clamp((Number(thumbOffset) || 0) / maxOffset, 0, 1) * maxScroll;
 }

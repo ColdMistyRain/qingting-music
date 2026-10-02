@@ -40,7 +40,7 @@
 | ------------------------------------- | ------------------------------------------------------------------------- |
 | `npm.cmd install`                     | 装齐三个包（workspace）                                                   |
 | `npm.cmd run dev`                     | 前端 5173 + 后端 3000 同时启动                                            |
-| `npm.cmd run test`                    | 全量单测（server 223 例 + client 400 例）                                 |
+| `npm.cmd run test`                    | 全量单测（server 245 例 + client 419 例）                                 |
 | `npm.cmd run typecheck`               | `tsc --noEmit` + `vue-tsc --noEmit`                                       |
 | `npm.cmd run build`                   | 后端 tsup → `server/dist`，前端 vite → `client/dist`                      |
 | `npm.cmd start`                       | **生产形态**：后端一并托管 `client/dist`（一个域名同时服务前端与 `/api`） |
@@ -72,7 +72,7 @@ server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负
 client/src/assets/        logo-mark.png（品牌标记：透明底单色，供 `.brand-mark` 遮罩上色；水印已裁掉）
 client/public/            PWA 图标四张（192 / 512 / maskable 512 / apple-touch-icon）—— 由 logo-mark.png
                           在真实浏览器里合成（alpha 涂白 + 主题色圆角底），构建时原样拷进 dist（RT-07）
-client/src/styles/        tokens.css（令牌 + OKLCH 取色核心）、global.css（外壳与共用类）、
+client/src/styles/        tokens.css（令牌 + OKLCH 取色核心；浮层滚动条的 --scroll-thumb / --scroll-thumb-hover - v6.18）、global.css（外壳与共用类 + 浮层滚动条配方 [data-overlay-scroll] / .os-bar）、
                           material.css（材质双模式：islands 玻璃浮岛 / flat **全实心**（无玻璃、层级靠投影）- v4.55/v5.92，含 Apple 实测配方）。
                           投影的层级感＝**模糊半径 + 偏移**（贴得近 = 紧），不是浓度：常驻面（岛内卡片 / 播放条）同一族几何、
                           播放条只把方向翻上来；大柔影只给真浮层（v6.7）
@@ -97,6 +97,7 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           themeColor（`<meta name=theme-color>`：状态栏颜色跟主题走 - RT-07）、
                           pointer（触摸手势判定：`isTouchTap`，供迷你条/沉浸页滑动、长按进沉浸、抽屉用 - v5.32）、
                           seek（进度条键盘跳转：±5 秒是**相对位移**，别用 `slider.stepValue`（它会对齐到步长整数倍）- v6.12）、
+                          scrollbar（浮层滚动条几何：滑块长度 / 偏移与它的反函数，12 例单测 - v6.18）、
 client/src/views/         login/local/library/listening(favorites+recent)/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
 client/src/composables/   usePlayHistory（切歌时记一条最近播放 - PS-05）、
                           useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
@@ -122,11 +123,13 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           immersive/{LyricsView,ImTitle,ImControls,LyricsSourceMenu}（沉浸页三布局共享件：歌词壳层（自研）/ 标题＋收藏键 / 控制栏 / 歌词来源菜单）
                           + ImLayoutDuo / ImLayoutCenter / ImLayoutPoster（布局只管自己的版式与专属视觉层 - VS-09）
 client/src/utils/format.ts  formatTime/formatSize/formatDateTime
+client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overlay-scroll 指令 + 按类名自动安装；条挂在滚动容器的**父元素**上、
+                          位置量出来写内联；只藏原生条，滚动仍走原生；触摸设备不画 - v6.18）
 ```
 
 ## 当前进度
 
-**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.86：按公式自行实现 `utils/spring.ts`，只参考思路不搬代码）** + **歌词来源打开与滚动键盘化（v4.87：支持增强型 LRC、可手动导入 `.lrc`/`.yrc`（按曲目记忆、GBK 回退）、歌词区键盘滚动；顺带修好开发环境封面一直没加载出来的代理缺陷）**；前后端类型检查、生产构建、**632 个单测**（server 223 + client 409）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
+**已完成**：M1 工程骨架 + 双密码三档访问门禁（含登录页与路由守卫）+ **播放器核心（PL-01~05）与本地播放（LC-01~06）**（含 ID3 标签与内嵌封面）+ **云端曲库前后端（LB-01~06/10/11、AD-01~04）**（上传后服务端解析标签与内嵌封面、去重/覆盖、按 Range 流式播放 206/416、删除连同文件、索引重建、存储统计）+ **沉浸式播放页与歌词（3.7 / VS-03/09，三个布局全落地：经典双栏 / 沉浸歌词 / 海报彩胶；LR-04~06 + LR-07 手动滚动）** + **播放队列弹层（PL-06）** + **封面取色（VS-02：主题色 / 页面环境光 / 彩胶盘体 / 逐字发光全部跟着封面变，深浅主题分别夹取对比度）** + **曲目级持久化（PL-07：刷新后恢复队列与进度）** + **快捷转存到音乐库（LC-07）** + **播放快捷键（PL-08）** + **歌词弹簧（v4.86：按公式自行实现 `utils/spring.ts`，只参考思路不搬代码）** + **歌词来源打开与滚动键盘化（v4.87：支持增强型 LRC、可手动导入 `.lrc`/`.yrc`（按曲目记忆、GBK 回退）、歌词区键盘滚动；顺带修好开发环境封面一直没加载出来的代理缺陷）**；前后端类型检查、生产构建、**664 个单测**（server 245 + client 419）全绿；已用真实曲库（D:\Music，369 MP3 + 4 FLAC）与真实云端曲库浏览器实测播放、上传、歌词、彩胶、取色、刷新恢复、转存与快捷键。
 
 **手机端（v5.32/5.33/5.34/5.35，RT-01/02/03/05/06）**：`<768px` 导航收进**左侧抽屉**（`NavDrawer` 面板 + 页头里的 `NavToggle` 按钮：与标题同一行、可从屏幕左缘右滑拉出，遮罩/左滑/选完自动收起）—— 桌面侧栏不变（收起 = 68px 图标条）；播放条变迷你条（**只剩 播放/暂停 + 下一首**，进度是**封面外圈的圆角矩形环** —— QQ 音乐那种，第二行显示**当前歌词**）；列表收起「专辑/来源」两列、删除键隐藏；管理台只给「请使用电脑访问」提示。手势：**行单击即播**（v5.96 起桌面与触摸同一套，行里不再有播放键）、迷你条与沉浸页左右滑切歌、沉浸页下滑收起 / 上滑歌词铺满、**长按播放键进沉浸**；滑动与长按类手势均只认真实触摸。**队列（v5.40/5.41）**：手机上是**从底部升起的抽屉**（点沉浸页底部的列表键弹出，把手下滑 ≥40px 或点遮罩/Esc 收起；**最多半屏**：行多时正好盖住走带键那片——背后的东西不能透出来看，行少时贴着底部收短；点某首换曲后不自动收起）。**移动端参考对象＝Salt Player（椒盐音乐）**：无推荐流的简易首页、左侧抽屉、迷你条歌词、长按进沉浸、封面取色、横竖屏与平板、通知栏控制。**按住控件不会再把按钮文字选成蓝色（v6.16 / v6.17）**：交互件统一 `user-select: none`（表单控件显式写回 `text`），并关掉浏览器自带的点按高亮（`html { -webkit-tap-highlight-color: transparent }`）。**沉浸页底栏在手机上铺满**（v5.93）：宽度只由容器决定（`.im-bottom` 侧内边距 14px + 控制区 `min(560px, 100%)`），三组键用 grid `1fr auto 1fr` 分列 —— 模式贴左、走带键居中、队列贴右；不用 `space-between`（左组 22px vs 右组 66px，中间那组会被推偏 22px）。桌面保持“居中一簇”（`min(560px, 74vw)`）不动。**时间放到轨道两端下方**（v5.94，参照 QQ 手机版）：手机档 `.im-progress` 改成两行 grid（`"bar bar" / "elapsed total"`），轨道因此**独占整行**（390×844 实测 270 → 362px），时间贴两端与轨道对齐；桌面仍是一行 flex。落地时踩到源码顺序坑：基础规则写在媒体查询**之后**时，同特异性会把它覆盖回来（且只压回一半，见 `开发约定`）。**锁屏/通知栏（RT-04）**：锁屏显示封面+歌名+歌手+专辑，六个动作全接上（`utils/mediaSession.ts` + `useMediaSession`，挂在 `App.vue`）。
 
@@ -146,6 +149,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 **均衡器（v5.68，PL-13）**：设置 › 音效。音频路径 `<audio>` → MediaElementSource → 10 段 BiquadFilter 链（31Hz~16kHz）→ 整体增益 → 限幅器（防爆音）→ 输出；**懒建图、拿到用户手势才接线**（`AudioContext` 没手势时 suspended，接进挂起的图里就是静音 —— 所以建图 / `resume()` / 接线分三步），**A/B 关闭时真直通**（source 直接连输出），设置存 `localStorage`（每设备一份）。界面的十根竖杆与整体增益用共用的 `components/Slider.vue`（竖/横同一个实现，几何在 `utils/slider.ts` —— 原生 range 旋转拖不动、填充语义也不对，坑 7 / 23），预设用 Reka Select。**未做**：频谱可视化（VS-05，选型表里与 EQ 共用同一张图）。
 
 **节奏起伏（v5.91，VS-09 彩胶唱片布局；v5.90 曾用 canvas 加法光）**：外圈柔光从“一张图当遮罩”改成纯 CSS 三团渐变（v5.89），再让它在鼓点上**吞吐**一下 —— 需求方：“我的想法光晕会随着音乐的节奏起伏就好了”（对比过 Houdini Paint Worklet：Firefox / Safari 不支持，不能用）。分析走 `AnalyserNode` 旁路挂在**均衡器那份**音频图上（`createMediaElementSource` 一个元素只能建一次，所以必须复用；`stores/equalizer` 导出 `getAnalyser()`）；算法全在 `utils/audioReactive.ts`（低频峰值 → 快起慢落包络 → 相对常态归一，纯函数 + 20 例单测）；循环只有一份（`composables/useBeat`）—— 它每帧**只写一个 CSS 变量 `--beat`**，缩放与亮度交给 CSS 的 `calc()`（`.glow-pulse` 那层包装元素就是为此加的：里面的 transform / opacity 被自转与呼吸动画占着），**没有音频 / 关开关 / 减动效时 `--beat` 恒为 0 = 纯底光，不需要降级分支**。v5.91 撤掉了 v5.90 那层 canvas（随机甩光斑）：“其他不用做那么多”；也记下第一版的坑：**只把原始强度缩放上去等于没动**（实测 `--beat` 挤在 0.70~0.89、缩放只差 1.3%），所以指标改峰值 + 加一层“相对常态”归一（细节见 PRD v5.91 行）。开关在 设置 › 外观「光晕跟随节奏」（默认开，`qt-glow-beat`）。
+
+**浮层滚动条（v6.18）**：需求方：“我们写的每个容器基本都避让了滚动条的宽度，能不能自定义滚动条让它可以浮内容上这样就不用避让它了”。做完调研把选型交回需求方，定**自研**：几何在 `utils/scrollbar.ts`（纯函数 + 12 例单测），DOM / 事件在 `directives/overlayScroll.ts`（`v-overlay-scroll` + 按类名自动安装，弹层里的容器也能挂上）；只藏原生条，滚动仍走原生；条挂在滚动容器的**父元素**上、位置量出来写内联；触摸设备不画。**三套“避让滚动条”的补偿全删了**（页框与表头的 `scrollbar-gutter: stable`、侧栏/控制台把槽挪进内边距的负外边距、启动时实测 `--scrollbar-size`），实测 `reserved` 10 → **0**、表头与行 1122/1122。参考 OverlayScrollbars（MIT）源码后补上窗口级 `pointerup`/`pointercancel` + `lostpointercapture` 兜底。
 
 **下一步**（建议顺序）：**在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 
@@ -199,6 +204,8 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 26. **别用管道 / 重定向去“安静地”跑 npm 脚本（v5.82 又踩一次）**：`npm.cmd run test *> $null`（以及 `2>&1 | Select-String …`）会让 `$LASTEXITCODE` **假报非 0**，而单测其实全绿 —— npm 的 `notice` 走 stderr，被 PowerShell 当成原生命令错误。判据：**只读 vitest 自己那两行**（`Test Files 16 passed` / `Tests 185 passed`），或让命令原样输出再单独取 `$LASTEXITCODE`。同理，`Get-Content … | Select-String` 处理中文还会输出乱码，看构建结果别加选择器。
 
 27. **全屏页/弹层里的高度只能用“剩余空间”算，别用固定 `vh`（v6.15 实测）**：需求方在 iPhone SE（375×667）上圈出“歌词卡到进度条下面”。量出来是歌词窗口底 **597** vs 容器底 **549**（**溢出 48px**）—— 三布局窄屏给歌词写的是 `38vh / 30vh / 40vh`，它们只知道屏多高、不知道上面已经被封面与标题占掉多少；而 `overflow: hidden` **只管窗口内部**（列表不会溢出窗口），管不住**窗口本身**越过容器，于是下半截画在进度条背后（`.im-bottom` 在 DOM 后面，正好盖住它）。写法：① 高度先拆干净（`grid-template-rows: auto minmax(0, 1fr)` / `flex: 1; min-height: 0`）；② 要伸缩的那层 `flex: 1 1 auto; height: auto; min-height: 0`；③ 真要上限就用 `max-height`（它不会顶破容器）。**同一个坑里挖到的第二半**：`align-items: center` 的栅格里**栅格项默认不拉伸**、高度仍是内容高，里面的 `flex: 1` 就没有“剩余空间”可分 —— 海报布局的歌词窗口因此撑成 **8502px**（要在栅格项上显式给 `height: 100%`）。判据：量**要伸缩那一层的盒子**，别只看它的子元素；改完在**多个尺寸 × 三个布局**上都量一遍“窗口底 − 容器底”，桌面尺寸要能对出“与改前逐像素一致”。
+
+28. **浮层滚动条：条不能住在滚动区里，`AUTO_TARGETS` 也不能加祖先类名（v6.18）**：① 自绘条要挂在滚动容器的**父元素**上 —— 绝对定位的子元素属于**被滚动的内容**，挂里面会跟着列表一起滚走；位置也别写 CSS（滚动区常靠负边距溢出页框），得 `getBoundingClientRect` 量出来写内联。② 自动安装按类名认容器时，**别把会包住滚动区的祖先类名写进清单**：实测 `/library` 上 `.content`（页框的祖先）先被挂上，里面的 `.page-frame__scroll` 就被“嵌套”判据跳过 —— 整页退回原生条（`reserved` 又是 10px）。嵌套判据要用**外层是不是真的在滚**（计算样式 `overflow: auto|scroll`），不能用 `scrollHeight > clientHeight`（`overflow: hidden` 的岛内容也可能更高）。③ **松手要挂窗口级兜底**：指针捕获会被系统收走（触控笔 / 系统手势 / 元素被重渲染），只在自己元素上听 `pointerup` 会让“拖拽中”永远挂着（滑块继续跟指针、条再也不淡出）—— 加 `window` 的 `pointerup`/`pointercancel` + `lostpointercapture`（OverlayScrollbars 为触控笔专门修过，MIT 可拄）。④ **`document.visibilityState` 是 `hidden` 的页面里 rAF 不触发**（坑 10）：`schedule()` 里要留同步退路，否则首帧与后续更新都不来；量滚动要 `el.dispatchEvent(new Event("scroll"))` 自己推。⑤ 本文内置浏览器里 **`setViewportSize` 会被窗口尺寸顶回去**（实测 1440 用完就变回 372），要么“设完立刻量”，要么别指望大视口 —— 截图更不可信（坑 15、坑 8 那类过期帧）。
 
 ## 文档索引
 

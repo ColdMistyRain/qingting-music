@@ -54,6 +54,11 @@
      与 `--glow-ring`（16%）的区别：那条属于**光效**（flat 下会被撤成透明），
      这条属于**轮廓**（两种材质都保留 —— 需求方指着的「播放全部」在实心面板下也带这圈边）。 */
   --accent-line: color-mix(in srgb, var(--accent) 30%, transparent);
+  /* 自绘浮层滚动条的滑块色（v6.18）：**不取主题色** —— 滚动条是系统级的东西，
+     跟着封面变色会变成装饰；用它需要能被“看出来”的中性色（深浅主题各自有效）。
+     `--text-1` 在深色下近白、浅色下近黑，两头都够对比。 */
+  --scroll-thumb: color-mix(in srgb, var(--text-1) 22%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--text-1) 38%, transparent);
   /* 填在主题色**底**上的文字颜色：不能写 white ——取色管道接上后主题色由封面决定，
      白字压在亮色主题色上对比度实测只有 2.1:1（需求方实拍：暖色封面下主按钮发糊）。
      用 --bg-base 就自动对了：它永远在主题色的另一端（深色主题近黑、浅色主题近白），
@@ -84,11 +89,12 @@
   /* 内容岛水平内边距：滚动区要用它做负边距补偿，让滚动条贴在岛边 */
   --island-pad-x: 26px;
 
-  /* 滚动条宽度：固定层用它把“滚动区内外的宽度”对齐，所以必须是个确定的数。
-     ⚠️ 这里的 10px 只是**首帧兑底值**：Chromium 的 `::-webkit-scrollbar` 确实是 10px，
-     但 Firefox 只认 `scrollbar-width: thin`（宽度由引擎/平台给，Windows 上不是 10px）——
-     启动时 `main.ts` 会实测真实宽度并覆盖这个变量（见 `utils/scrollbar.ts`）。
-     写死不改的话，Firefox 下折叠侧栏的导航项与高亮会被挤歪几个像素（v5.30 修）。 */
+  /* 原生滚动条的宽度（v6.18 起**只**用于没挂浮层滚动条的那些容器）：
+     页框、侧栏、控制台、队列浮层、曲目信息弹窗都换成了自绘浮层条
+     （`v-overlay-scroll`，不占位、也不用补偿），下面这段 `::-webkit-scrollbar`
+     留着给剩下原生滚动的地方（比如歌词窗口、长代码块这类滚动区）。
+     与 `--scrollbar-size` 的旧含义区别：那时它是**布局补偿值**（得靠 JS 实测），
+     现在只是个视觉尺寸，写死 10px 就好。 */
   --scrollbar-size: 10px;
 }
 
@@ -137,6 +143,10 @@
   --danger: #e11d48;
   --danger-bg: rgba(244, 63, 94, 0.1);
   --danger-border: rgba(244, 63, 94, 0.28);
+
+  /* 滚动条滑块：浅色下 `--text-1` 是近黑，所以这档不透明度要更低才不显脏 */
+  --scroll-thumb: color-mix(in srgb, var(--text-1) 20%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--text-1) 34%, transparent);
 }
 
 /* ---------- 感知调校核心：OKLCH 相对颜色（VS-02，v3.8 定稿） ----------
@@ -274,11 +284,13 @@ input[type="checkbox"]:checked::after {
   outline-offset: 2px;
 }
 
-/* ---------- 滚动条（令牌化） ----------
+/* ---------- 原生滚动条（只给没挂浮层条的滚动区） ----------
+   页框/侧栏/控制台/队列/弹窗都换成自绘浮层条了（v6.18）；这段留给剩下原生滚动的地方，
+   让它们也跟着主题走（而不是各引擎默认的粗白条）。
    **两个引擎不能同时给**：Chromium 里只要设了 scrollbar-color，它就会改用原生滚动条，
-   并忽略 ::-webkit-scrollbar 的宽高（实测宽度变成平台默认的 16px，而不是令牌的 10px），
-   而固定层要靠这个宽度把“滚动区内外的宽度”对齐。所以：Chromium 只走 webkit 伪元素，
-   Firefox 走 scrollbar-width/color。 */
+   并忽略 ::-webkit-scrollbar 的宽高，所以：Chromium 只走 webkit 伪元素，Firefox 走标准属性。
+   ⚠️ 挂浮层的容器（`[data-overlay-scroll]`）在这之上另有 `scrollbar-width: none` ——
+   它是一条属性选择器（特异性 0,1,0），压得住下面这条 `*`（0,0,0），两个引擎都奏效。 */
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;

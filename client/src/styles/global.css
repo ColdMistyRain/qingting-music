@@ -195,6 +195,78 @@ select {
   min-height: 0;
 }
 
+/* ---------- 自绘浮层滚动条（v6.18，`v-overlay-scroll` 指令） ----------
+   为什么不再用原生的：原生滚动条**占位**，于是得靠 `scrollbar-gutter: stable` 到处补偿
+   那一条宽度（表头与行各留一份、侧栏与控制台还要用负外边距把槽挪进内边距、
+   `--scrollbar-size` 启动时实测一次，引擎不同宽度还不同）。现在这条浮在内容上，
+   既不占位、也不需要任何补偿，观感还归我们自己（细、圆、跟主题的中性色）。
+   两层结构：`.os-bar`（命中区，不吃事件）> `.os-thumb`（滑块，可拖）。
+   宿主元素由指令挂 `data-overlay-scroll-host`（只为 `position: relative`）；
+   滚动容器自己带 `data-overlay-scroll`（隐藏原生条）。 */
+[data-overlay-scroll] {
+  /* 藏掉原生滚动条：Firefox / 老 Edge 走标准属性，WebKit 走伪元素 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+[data-overlay-scroll]::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+[data-overlay-scroll-host] {
+  position: relative;
+}
+
+.os-bar {
+  position: absolute;
+  /* top / right / bottom 由指令量出滚动容器的盒子后写成内联值（滚动区常常靠负边距
+     溢出它的页框，写在 CSS 里会落到内容中间）；这三条只是首帧的兑底位置。 */
+  top: 3px;
+  right: 2px;
+  bottom: 3px;
+  width: 11px;
+  z-index: 4;
+  /* 轨道不吃事件：只有滑块可点/可拖，其余地方照旧穿到下面的行上 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.os-bar.is-on {
+  opacity: 1;
+}
+
+.os-thumb {
+  position: absolute;
+  right: 0;
+  width: 7px;
+  border-radius: 99px;
+  background: var(--scroll-thumb);
+  pointer-events: auto;
+  /* 拖它的时候不要让手指/指针去滚页面或选中文字 */
+  touch-action: none;
+  transition: background-color 0.15s;
+}
+
+.os-thumb:hover,
+.os-thumb.is-dragging {
+  background: var(--scroll-thumb-hover);
+}
+
+/* 触摸设备用系统自带的浮层滚动条：iOS / Android 本来就不占位，叠一条自己的只会变成两条 */
+@media (pointer: coarse) {
+  .os-bar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .os-bar {
+    transition: none;
+  }
+}
+
 .page-frame {
   position: relative; /* 拖拽浮层的定位基准 */
   display: flex;
@@ -203,24 +275,14 @@ select {
   min-height: 0;
 }
 
-/* 滚动条宽度的**唯一补偿处**：滚动区里的内容总是窄一条滚动条（且 `scrollbar-gutter:
-   stable` 让它“不滚也窄”），所以固定帧里的其他块也得按同一宽度收窄，否则同一岛上
-   两块宽度就不一致（用户实拍：“两个宽度不一致”——投放卡比队列卡片宽一条滚动条）。
-   必须用 margin：padding 只收窄内容盒，块自己的底色/描边仍然满宽，卡片还是对不齐。
-   表头也吃这条规则，所以它的列与滚动区里的行天然对齐（两边各写一份就会漂）。 */
-.page-frame > *:not(.page-frame__scroll) {
-  margin-right: var(--scrollbar-size, 0px);
-}
-
-/* 只有这一层滚动；负边距让它铺到岛边（滚动条贴岛），内边距再把内容缩回来 */
+/* 滚动区里的内容**不再需要**为滚动条让位：滚动条是浮在内容上的（v6.18）。
+   这一条以前是「补偿滚动条宽度」的唯一处（`margin-right: var(--scrollbar-size)` +
+   各容器 `scrollbar-gutter: stable` + 启动时实测宽度）——那一整套随浮层滚动条一起拆了。 */
 .page-frame__scroll {
   flex: 1;
   /* 保底高度：窗口极矮时宁可让岛自己出现兼底滚动，也不要把列表压成 0 高 */
   min-height: 180px;
   overflow-y: auto;
-  /* 滚动条槽**始终**预留：列表短到不需滚动时也如此，
-     否则表头（在滚动区外面）与行的宽度会随“要不要滚动”跳一下（v4.41） */
-  scrollbar-gutter: stable;
   margin-inline: calc(var(--island-pad-x) * -1);
   padding-inline: var(--island-pad-x);
 }
@@ -472,7 +534,8 @@ select {
    不吸顶就不需要不透明底，也就不会在玻璃岛上露成一条色带
    （用户：“是不是有个背景色”、“不然看着很突兀”）。
    列含义看几行就记住了，页头（固定帧）已经把“这是哪一页、多少首”一直留在屏上。
-   宽度上要跟滚动区内的行对齐：两边各留同一条 scrollbar-gutter（不写滚动条宽度的魔数）。 */
+   宽度上要跟滚动区内的行对齐：滚动条现在是**浮层**（v6.18），不占位，
+   所以表头与行天然同宽，不必再两边各留一份 `scrollbar-gutter`。 */
 .list-head {
   flex: none;
   display: grid;

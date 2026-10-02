@@ -4,7 +4,7 @@ import path from "node:path";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { staticCacheControl } from "../src/static.js";
+import { hasStaticSite, staticCacheControl } from "../src/static.js";
 import { tempDirs, testConfig } from "./helpers.js";
 
 /** 造一个像 vite 构建产物那样的临时目录（含入口、哈希资源、SW 与图标） */
@@ -88,6 +88,22 @@ describe("前端静态托管（生产形态：一个域名同时服务前端与 
       expect(res.status).toBe(200);
       expect(res.headers["cache-control"]).toBe("no-cache");
     }
+  });
+});
+
+describe("hasStaticSite（目录里到底有没有可托管的前端产物）", () => {
+  it("没配目录 / 目录里没有 index.html 都算没有", async () => {
+    expect(hasStaticSite(null)).toBe(false);
+    expect(hasStaticSite(path.join(tmpdir(), "qingting-不存在的目录"))).toBe(false);
+
+    const empty = await mkdtemp(path.join(tmpdir(), "qingting-empty-"));
+    expect(hasStaticSite(empty)).toBe(false);
+  });
+
+  it("有 index.html 才算有（构建过一次就是这条路径）", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "qingting-dist-"));
+    await writeFile(path.join(dir, "index.html"), "<!doctype html>", "utf8");
+    expect(hasStaticSite(dir)).toBe(true);
   });
 });
 

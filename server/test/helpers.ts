@@ -21,6 +21,8 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     authSecret: "test-secret",
     authTtlMs: 60 * 60 * 1000,
     authEnabled: false,
+    // 默认不信任任何代理：要测“按 X-Forwarded-For 取 IP”的用例自己传 1
+    trustProxy: 0,
     neteaseApiBase: null,
     onlineEnabled: false,
     // 默认 null：不让集成测试去发真实的 client/dist（要测托管就显式给一个临时目录）

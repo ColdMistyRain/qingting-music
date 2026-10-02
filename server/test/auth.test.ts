@@ -10,9 +10,30 @@ import {
   signToken,
   verifyToken,
 } from "../src/services/auth.js";
+import { configuredPasswords } from "../src/routes/auth.js";
+import { testConfig } from "./helpers.js";
 
 const SECRET = "unit-test-secret";
 const HOUR = 60 * 60 * 1000;
+
+describe("configuredPasswords（AC-02：访客在前、管理员在后）", () => {
+  it("两把密码都在时，顺序是 visitor → admin", () => {
+    const candidates = configuredPasswords(
+      testConfig({ userPassword: "guest-pass", adminPassword: "root-pass" }),
+    );
+    expect(candidates).toEqual([
+      { role: "visitor", password: "guest-pass" },
+      { role: "admin", password: "root-pass" },
+    ]);
+  });
+
+  it("只有管理员密码 / 都没有时，候选里不多不少", () => {
+    expect(configuredPasswords(testConfig({ adminPassword: "root-pass" }))).toEqual([
+      { role: "admin", password: "root-pass" },
+    ]);
+    expect(configuredPasswords(testConfig())).toEqual([]);
+  });
+});
 
 describe("matchPassword", () => {
   const candidates = [

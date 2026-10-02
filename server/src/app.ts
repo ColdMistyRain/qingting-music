@@ -26,8 +26,10 @@ export interface HealthInfo {
 export function createApp(config: AppConfig): Express {
   const app = express();
   app.disable("x-powered-by");
-  // 反向代理（Nginx）场景下 req.protocol 才能反映真实 HTTPS
-  app.set("trust proxy", 1);
+  // 反向代理（Nginx）场景下 req.protocol / req.ip 才能反映真实来源。
+  // ⚠️ 默认 **0 = 不信任**（v6.8）：直连部署时 `X-Forwarded-For` 谁都能伪造，
+  // 打开后登录限速（AC-06）会被“每次换一个 IP”绕过。确实在代理后面时用 `TRUST_PROXY` 明说。
+  app.set("trust proxy", config.trustProxy);
 
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());

@@ -14,6 +14,7 @@ import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail, sendOk } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
 import { parseAudioFile, decodeUploadFileName } from "../services/metadata.js";
+import { pruneCovers, removeCoverVariants } from "../services/covers.js";
 import { pruneLyrics, readLyrics, removeLyrics, saveLyrics } from "../services/lyrics.js";
 import {
   createSongId,
@@ -266,6 +267,12 @@ export function createSongsRouter(config: AppConfig): Router {
         config.dataDir,
         songs.map((song) => song.id),
       );
+      // 封面同样收尾（v6.8）：封面名带曲目 id，覆盖上传与重建都会换 id，
+      // 不清理的话孤儿封面只增不减（歌词早就有这一手了）
+      await pruneCovers(
+        config,
+        songs.flatMap((song) => (song.coverUrl ? [path.basename(song.coverUrl)] : [])),
+      );
 
       sendOk(res, {
         scanned: audioNames.length,
@@ -310,6 +317,9 @@ async function saveCover(
   if (!cover) return null;
   const name = `${id}.${cover.extension}`;
   mkdirSync(config.uploadDir, { recursive: true });
+  // 先清掉这首歌名下**其它扩展名**的旧封面（v6.8）：索引只指向/新写下的那个，
+  // 不先清的话 jpg 与 png 会同时留着、没人再引用，只会在 uploads 里慢慢堆
+  await removeCoverVariants(config, id);
   await writeFile(path.join(config.uploadDir, name), cover.data);
   return name;
 }

@@ -5,6 +5,7 @@ import { fileExtension } from "@qingting/shared";
 import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
+import { COVER_MIME_BY_EXTENSION } from "../services/covers.js";
 import { pipeFile } from "../services/fileStream.js";
 import { parseRangeHeader } from "../services/range.js";
 
@@ -26,13 +27,6 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   m4a: "audio/mp4",
   aac: "audio/aac",
   opus: "audio/ogg",
-};
-
-const COVER_MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
 };
 
 /** 只允许“随机名 + 扩展名”这种形状的文件名，杜绝路径穿越 */

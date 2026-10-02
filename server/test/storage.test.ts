@@ -1,13 +1,15 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import type { Song } from "@qingting/shared";
+import { UNKNOWN_ALBUM, UNKNOWN_ARTIST, type Song } from "@qingting/shared";
 import {
   createSongId,
   createStoredName,
   loadSongs,
   saveSongs,
+  songEditedFields,
   songsFilePath,
   toSongListResult,
+  withSongMeta,
 } from "../src/services/storage.js";
 import { tempDirs } from "./helpers.js";
 
@@ -96,6 +98,35 @@ describe("createSongId / createStoredName", () => {
   it("落盘名带扩展名；没有扩展名也不拼出多余的点", () => {
     expect(createStoredName("mp3")).toMatch(/^[A-Za-z0-9_-]+\.mp3$/);
     expect(createStoredName("")).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+});
+
+describe("songEditedFields / withSongMeta（AD-02）", () => {
+  it("editedFields 一律过清单清洗：字符串、乱值、重复都不算", () => {
+    // 手改坏的 json 里它可能是字符串，而 `"title".includes(...)` 恰好为真 ——
+    // 不拦一下就会算出 ["t","i","t","l","e"] 这种脏值
+    expect(songEditedFields(song({ editedFields: "title" as never }))).toEqual([]);
+    expect(songEditedFields(song({ editedFields: ["artist", "nope"] as never }))).toEqual([
+      "artist",
+    ]);
+    expect(songEditedFields(song({ editedFields: ["title", "title"] }))).toEqual(["title"]);
+    expect(songEditedFields(song())).toEqual([]);
+  });
+
+  it("改过的字段按固定顺序记账，没改过的不动；上传时间不变", () => {
+    const edited = withSongMeta(song(), { title: "新歌名" });
+    expect(edited.title).toBe("新歌名");
+    expect(edited.artist).toBe("周杰伦");
+    expect(edited.editedFields).toEqual(["title"]);
+    // 编辑不是重新上传： uploadedAt 不能动（否则“按上传时间”排序里会跳位置）
+    expect(edited.uploadedAt).toBe("2026-10-01T00:00:00.000Z");
+  });
+
+  it("歌手 / 专辑清空后退到“未知”，且原有记账不丢", () => {
+    const edited = withSongMeta(song({ editedFields: ["title"] }), { artist: "", album: "" });
+    expect(edited.artist).toBe(UNKNOWN_ARTIST);
+    expect(edited.album).toBe(UNKNOWN_ALBUM);
+    expect(edited.editedFields).toEqual(["title", "artist", "album"]);
   });
 });
 

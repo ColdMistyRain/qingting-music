@@ -1,27 +1,8 @@
 import request, { type Response as SuperTestResponse } from "supertest";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import type { AppConfig } from "../src/config.js";
 import { LOGIN_MAX_FAILURES } from "../src/config.js";
-
-/** 测试用配置：默认门禁关闭（AC-05 的最小运行形态）、不托管前端产物 */
-function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
-  return {
-    port: 0,
-    dataDir: "./data",
-    uploadDir: "./uploads",
-    maxUploadSize: 1024,
-    userPassword: null,
-    adminPassword: null,
-    authSecret: "test-secret",
-    authTtlMs: 60 * 60 * 1000,
-    authEnabled: false,
-    neteaseApiBase: null,
-    onlineEnabled: false,
-    staticDir: null,
-    ...overrides,
-  };
-}
+import { testConfig } from "./helpers.js";
 
 /** 取响应里的第一条 Cookie（去掉属性部分，便于回传） */
 function firstCookie(res: SuperTestResponse): string {
@@ -43,17 +24,23 @@ describe("GET /api/health", () => {
 
 describe("GET /api/config", () => {
   it("未配置音源时 onlineEnabled = false（ON-04），并给出上传上限（LB-02）", async () => {
-    const res = await request(createApp(testConfig())).get("/api/config");
+    const res = await request(createApp(testConfig({ maxUploadSize: 1024 }))).get("/api/config");
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual({ onlineEnabled: false, maxUploadSize: 1024 });
   });
 
   it("配置音源后 onlineEnabled = true", async () => {
+    // 上传上限显式给一个值：原先靠的是那份“重复的 testConfig 默认 1024”，
+    // 两份默认值不一致，换个来源就会静默变化（报告第 14 条）
     const app = createApp(
-      testConfig({ neteaseApiBase: "http://localhost:4000", onlineEnabled: true }),
+      testConfig({
+        neteaseApiBase: "http://localhost:4000",
+        onlineEnabled: true,
+        maxUploadSize: 2048,
+      }),
     );
     const res = await request(app).get("/api/config");
-    expect(res.body.data).toEqual({ onlineEnabled: true, maxUploadSize: 1024 });
+    expect(res.body.data).toEqual({ onlineEnabled: true, maxUploadSize: 2048 });
   });
 });
 
@@ -129,6 +116,34 @@ describe("POST /api/auth/login", () => {
       last = res.status;
     }
     expect(last).toBe(429);
+  });
+
+  /* 限速按 req.ip 计数，而 req.ip 受 `trust proxy` 影响（v6.8）。默认 **不信任**：
+     直连部署时客户端自己塞 X-Forwarded-For 也换不来新名额 —— 否则“每次换一个 IP”就绕过了 AC-06。 */
+  it("默认不信任 X-Forwarded-For：换着伪造也照样被限速", async () => {
+    const app = createApp(testConfig(LOCKED));
+    let last = 0;
+    for (let i = 0; i < LOGIN_MAX_FAILURES + 1; i += 1) {
+      const res = await request(app)
+        .post("/api/auth/login")
+        .set("X-Forwarded-For", `10.0.0.${i}`)
+        .send({ password: "wrong" });
+      last = res.status;
+    }
+    expect(last).toBe(429);
+  });
+
+  it("显式打开 TRUST_PROXY 后按代理给的 IP 计数（部署方自己负责别直连暴露）", async () => {
+    const app = createApp(testConfig({ ...LOCKED, trustProxy: 1 }));
+    let last = 0;
+    for (let i = 0; i < LOGIN_MAX_FAILURES + 1; i += 1) {
+      const res = await request(app)
+        .post("/api/auth/login")
+        .set("X-Forwarded-For", `10.0.0.${i}`)
+        .send({ password: "wrong" });
+      last = res.status;
+    }
+    expect(last).toBe(401); // 没被限速：每个伪造 IP 都算一个新来源
   });
 });
 

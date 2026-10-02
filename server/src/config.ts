@@ -43,6 +43,13 @@ export interface AppConfig {
   authTtlMs: number;
   /** 门禁是否启用：两把密码都未配置时为 false（AC-05） */
   authEnabled: boolean;
+  /**
+   * 信任的反向代理跳数（`TRUST_PROXY`，默认 **0 = 不信任**）。
+   * 为什么默认不信任（v6.8）：打开后 `req.ip` 取的是 `X-Forwarded-For` 里的值，
+   * 而直连部署时这个头**谁都能伪造** —— 登录限速（AC-06）逐请求换一个 IP 就失效了。
+   * 确实放在 Nginx 后面时，把跳数设成真实代理层数（常见 1）。
+   */
+  trustProxy: number;
   /** 网易云 API 服务地址；未配置为 null */
   neteaseApiBase: string | null;
   /** 在线音源功能开关（ON-04） */
@@ -91,6 +98,15 @@ function readString(input: string | undefined): string | null {
 }
 
 /**
+ * 解析信任的反向代理跳数（`TRUST_PROXY`）：仅接受非负整数，其余（含未配、空、乱填）一律 0。
+ * 不提供 `true` 这种“信任一切”的写法 —— 那等于把 `req.ip` 完全交给客户端。
+ */
+export function parseTrustProxy(input: string | undefined): number {
+  const value = Number(readString(input) ?? 0);
+  return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+/**
  * 前端产物的默认位置：仓库里 `client/dist`，与后端产物 `server/dist/index.js` 同级。
  * 用 `import.meta.url` 而不是 `process.cwd()`：从哪个目录启动都能找对；
  * 开发期（tsx 跑 `server/src/index.ts`）与生产期（跑 `server/dist/index.js`）
@@ -130,6 +146,7 @@ export function loadConfig(env: EnvSource): AppConfig {
     adminPassword,
     authSecret: readString(env.AUTH_SECRET) ?? "",
     authTtlMs: parseTtl(env.AUTH_TTL, DEFAULT_AUTH_TTL_MS),
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
     authEnabled: describeAuthMode(userPassword, adminPassword) !== "closed",
     neteaseApiBase,
     onlineEnabled: neteaseApiBase !== null,

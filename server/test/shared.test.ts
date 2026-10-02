@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PLAYLIST_NAME_MAX_LENGTH,
+  SONG_FIELD_MAX_LENGTH,
   dedupePlaylistItems,
   fileExtension,
   hasAccess,
@@ -10,6 +11,7 @@ import {
   playlistItemKey,
   toPlaylistItem,
   validatePlaylistName,
+  validateSongMeta,
   type PlaylistItem,
   type Track,
 } from "@qingting/shared";
@@ -141,6 +143,37 @@ describe("pickEmbeddedLyrics（LR-02：前后端共用一份抽取规则）", ()
 
   it("旧版本直接给字符串数组也认", () => {
     expect(pickEmbeddedLyrics(["", "[00:03.00]老格式"])).toBe("[00:03.00]老格式");
+  });
+});
+
+describe("validateSongMeta（AD-02：只收真改过的字段）", () => {
+  it("只返回请求里出现过的字段，并去掉首尾空白", () => {
+    const result = validateSongMeta({ title: "  海阔天空  ", artist: "BEYOND" });
+    expect(result).toEqual({ ok: true, value: { title: "海阔天空", artist: "BEYOND" } });
+  });
+
+  it("歌手 / 专辑允许清空（服务端退到“未知”），歌名不允许", () => {
+    expect(validateSongMeta({ artist: "" })).toEqual({ ok: true, value: { artist: "" } });
+    expect(validateSongMeta({ title: "   " })).toEqual({ ok: false, message: "歌名不能为空" });
+  });
+
+  it("超长、非文本、空对象、非对象都拒绝", () => {
+    const tooLong = "字".repeat(SONG_FIELD_MAX_LENGTH + 1);
+    expect(validateSongMeta({ title: tooLong })).toEqual({
+      ok: false,
+      message: `歌名最多 ${SONG_FIELD_MAX_LENGTH} 个字`,
+    });
+    expect(validateSongMeta({ title: 42 })).toEqual({ ok: false, message: "歌名必须是文本" });
+    expect(validateSongMeta({ album: null })).toEqual({ ok: false, message: "专辑必须是文本" });
+    expect(validateSongMeta({})).toEqual({ ok: false, message: "没有要改的字段" });
+    expect(validateSongMeta(null)).toEqual({ ok: false, message: "没有要改的字段" });
+  });
+
+  it("没在清单里的字段一律忽略（不把别的东西写进索引）", () => {
+    expect(validateSongMeta({ title: "对", duration: 999, id: "hack" })).toEqual({
+      ok: true,
+      value: { title: "对" },
+    });
   });
 });
 

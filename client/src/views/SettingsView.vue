@@ -185,7 +185,9 @@ async function signOut(): Promise<void> {
                 :aria-pressed="theme.layout === item.key"
                 @click="theme.setLayout(item.key)"
               >
-                <span class="lay-thumb" :class="`lay-thumb--${item.key}`" aria-hidden="true" />
+                <span class="lay-thumb" :class="`lay-thumb--${item.key}`" aria-hidden="true">
+                  <span class="lay-thumb__arm" />
+                </span>
                 <b>{{ item.label }}</b>
               </button>
             </div>
@@ -400,22 +402,71 @@ async function signOut(): Promise<void> {
   top: 17px;
 }
 
-/* 海报背景：右上角一张**悬出画面**的彩胶 + 左边三行（彩胶被框边裁掉一角，正是它的版式） */
+/* 海报背景：左歌词 + 右**整张**彩胶 + 唱臂（v5.85 起盘不再溢出画面 ——
+   缩略图从前画的是“右上一角被框边裁掉的盘”，那是旧版式） */
 .lay-thumb--poster::before {
   content: "";
   position: absolute;
-  right: -9px;
-  top: -9px;
-  width: 34px;
-  height: 34px;
+  right: 7px;
+  top: 12px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: conic-gradient(from 140deg, var(--cv1), var(--cv2), var(--cv1));
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+  /* 盘体漩涡 + 中心封面标（两种色源都跟着封面走） */
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.55) 0 24%, transparent 24%),
+    conic-gradient(from 140deg, var(--cv1), var(--cv2), var(--cv1));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
 }
 
 .lay-thumb--poster::after {
   left: 8px;
-  right: 46px;
+  right: 44px;
   top: 17px;
+}
+
+/* 唱臂（只给海报布局）：支点落在盘的 90% / 5%（盘在 right 7px / top 12px、径 30px
+   时 = 81,13），落针态几乎竖直地搭在盘面外圈上 —— 与实况同一套几何，只是等比缩小 */
+.lay-thumb__arm {
+  display: none;
+}
+
+.lay-thumb--poster .lay-thumb__arm {
+  display: block;
+  position: absolute;
+  left: 81px;
+  top: 13px;
+  width: 1.5px;
+  height: 19px;
+  border-radius: 1px;
+  background: var(--text-2);
+  transform-origin: top center;
+  transform: rotate(5deg);
+}
+
+/* 支点底盘 */
+.lay-thumb--poster .lay-thumb__arm::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transform: translateX(-50%);
+}
+
+/* 唱头 */
+.lay-thumb--poster .lay-thumb__arm::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 4px;
+  height: 4.5px;
+  border-radius: 1.5px;
+  background: var(--text-2);
+  transform: translateX(-50%);
 }
 </style>

@@ -1,107 +1,33 @@
 <script setup lang="ts">
-import { computed, ref, type Component } from "vue";
-import IconArrowRight from "~icons/ph/arrow-right";
-import IconPause from "~icons/ph/pause";
-import IconPlay from "~icons/ph/play";
-import IconRepeat from "~icons/ph/repeat";
-import IconRepeatOnce from "~icons/ph/repeat-once";
-import IconShuffle from "~icons/ph/shuffle";
 import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
-import { usePlayerStore } from "@/stores/player";
 import AppTooltip from "@/components/AppTooltip.vue";
+import ProgressBar from "@/components/ProgressBar.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
+import { usePlayback } from "@/composables/usePlayback";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { formatTime } from "@/utils/format";
-import { SEEK_STEP_SECONDS } from "@/utils/shortcuts";
-import type { PlayMode } from "@/utils/player";
 
 /**
  * 沉浸页底部控制与进度（VS-03：「底部居中控制与进度」；VS-09：三布局**共享**的子组件）。
  *
  * 状态与动作全部走 player store —— 与播放条是同一个来源，不存在"两套播放状态"。
- * ⚠️ **已知重复**（v6.8 记清）：这一份与 `PlayerBar` 各自写了一遍“模式映射 / 走带键 /
- * 进度条交互与 DOM”，抽 `PlaybackControls` 是个独立的活（两边宿主尺寸与断点行为不同，
- * 得先设计好插槽与令牌再动），不想再拖成一句空 TODO —— 改这一处时**记得同步另一处**。
+ * 控件的**状态与交互**已经与播放条共用一份（`composables/usePlayback` 的模式/播放
+ * 图标与总时长、`components/ProgressBar.vue` 的轨道与指针/键盘交互，v6.11）——
+ * 这里只剩“这一排怎么排”，不再各写一套控件逻辑。
  *
  * ⚠️ **控件数要取奇数（v5.98）**：这一排是「模式 / 上一首 / 播放 / 下一首 / 音量」共 5 个
  * —— 奇数才有一枚落在正中，而它必须正是**播放键**（左右各两个、宽度也对称）。
  * 原先这里还有第六个（收藏），偶数时“正中”落在两组之间，需求方一眼就看出不对称。
  * 所以收藏键挪去了歌名旁边（`ImTitle`，歌曲强相关的动作归歌曲自己的位置）。
  */
-const player = usePlayerStore();
-
-const MODE_ICONS: Record<PlayMode, Component> = {
-  seq: IconArrowRight,
-  list: IconRepeat,
-  one: IconRepeatOnce,
-  random: IconShuffle,
-};
-
-const modeIcon = computed(() => MODE_ICONS[player.mode]);
-const playIcon = computed(() => (player.playing ? IconPause : IconPlay));
-const totalSeconds = computed(() => player.duration || player.currentTrack?.duration || 0);
+const { player, modeIcon, playIcon, totalSeconds } = usePlayback();
 
 /** 手机断点：走带键独占一排、其余控件收进次排（Salt Player 的控件分布），
  *  并且手机上多一枚**队列**入口 —— 迷你条为了留白把队列键收起了，
  *  这里是手机端唯一能打开播放队列的地方（Salt 的全屏播放页也有这一枚）。 */
 const isMobile = useMediaQuery(MOBILE_QUERY);
-
-/* 进度条：与播放条同一套交互（点/拖都走 store 的 begin/update/end，数值夹取在 store 里已单测） */
-const barRef = ref<HTMLDivElement | null>(null);
-
-function ratioFromEvent(event: PointerEvent): number {
-  const rect = barRef.value?.getBoundingClientRect();
-  if (!rect || rect.width <= 0) return 0;
-  return (event.clientX - rect.left) / rect.width;
-}
-
-function onPointerDown(event: PointerEvent): void {
-  if (!player.hasTrack) return;
-  barRef.value?.setPointerCapture(event.pointerId);
-  player.beginSeek(ratioFromEvent(event));
-}
-
-function onPointerMove(event: PointerEvent): void {
-  if (!player.seeking) return;
-  player.updateSeek(ratioFromEvent(event));
-}
-
-/* 键盘拖进度（v6.8，与播放条同一套）：← → 各 5 秒（PL-08 的步长）、Home/End 到两端。
-   处理完 `stopPropagation()`：全局快捷键挂在 `window` 冒泡阶段，不停住会两处各跳一次。 */
-function onBarKeydown(event: KeyboardEvent): void {
-  if (!player.hasTrack) return;
-  let next: number | null = null;
-  switch (event.key) {
-    case "ArrowLeft":
-    case "ArrowDown":
-      next = player.displaySeconds - SEEK_STEP_SECONDS;
-      break;
-    case "ArrowRight":
-    case "ArrowUp":
-      next = player.displaySeconds + SEEK_STEP_SECONDS;
-      break;
-    case "Home":
-      next = 0;
-      break;
-    case "End":
-      next = totalSeconds.value;
-      break;
-    default:
-      return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-  player.seekTo(next);
-}
-
-function onPointerUp(event: PointerEvent): void {
-  if (!player.seeking) return;
-  barRef.value?.releasePointerCapture(event.pointerId);
-  // endSeek 不带参数：拖拽过程中 updateSeek 已经把目标写进 store（PL-03）
-  player.endSeek();
-}
 </script>
 
 <template>
@@ -154,32 +80,9 @@ function onPointerUp(event: PointerEvent): void {
 
     <div class="im-progress">
       <span class="time">{{ formatTime(player.displaySeconds) }}</span>
-      <div
-        ref="barRef"
-        class="progress"
-        :class="{
-          'progress--disabled': !player.hasTrack,
-          playing: player.playing,
-          seeking: player.seeking,
-        }"
-        :style="{ '--p': `${player.displayRatio * 100}%` }"
-        role="slider"
-        tabindex="0"
-        aria-label="播放进度"
-        aria-orientation="horizontal"
-        :aria-valuemin="0"
-        :aria-valuemax="Math.round(totalSeconds)"
-        :aria-valuenow="Math.round(player.displaySeconds)"
-        :aria-valuetext="`${formatTime(player.displaySeconds)} / ${formatTime(totalSeconds)}`"
-        :aria-disabled="!player.hasTrack"
-        @keydown="onBarKeydown"
-        @pointerdown="onPointerDown"
-        @pointermove="onPointerMove"
-        @pointerup="onPointerUp"
-      >
-        <div class="fill" :style="{ width: `${player.displayRatio * 100}%` }" />
-        <div class="knob" :style="{ left: `${player.displayRatio * 100}%` }" />
-      </div>
+      <!-- 轨道与播放条共用一份（`components/ProgressBar.vue`）：指针点/拖、键盘 ±5s、
+           `role="slider"` 与 `aria-*` 都在那一处维护 -->
+      <ProgressBar />
       <span class="time">{{ formatTime(totalSeconds) }}</span>
     </div>
   </div>

@@ -1,30 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, type Component } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { toPlaylistItem } from "@qingting/shared";
-import IconArrowRight from "~icons/ph/arrow-right";
 import IconHeartStraight from "~icons/ph/heart-straight";
 import IconHeartStraightDuotone from "~icons/ph/heart-straight-duotone";
 import IconMusicNotes from "~icons/ph/music-notes";
-import IconPause from "~icons/ph/pause";
-import IconPlay from "~icons/ph/play";
-import IconRepeat from "~icons/ph/repeat";
-import IconRepeatOnce from "~icons/ph/repeat-once";
-import IconShuffle from "~icons/ph/shuffle";
 import IconSkipBack from "~icons/ph/skip-back";
 import IconSkipForward from "~icons/ph/skip-forward";
 import { usePlayerStore } from "@/stores/player";
 import { useListeningStore } from "@/stores/listening";
 import AppTooltip from "@/components/AppTooltip.vue";
+import ProgressBar from "@/components/ProgressBar.vue";
 import ScrollingText from "@/components/ScrollingText.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
+import { usePlayback } from "@/composables/usePlayback";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { formatTime } from "@/utils/format";
 import { currentLineIndex, parseLyrics } from "@/utils/lyrics";
 import { isTouchTap } from "@/utils/pointer";
-import { SEEK_STEP_SECONDS } from "@/utils/shortcuts";
-import type { PlayMode } from "@/utils/player";
 
 /**
  * 常驻底部播放条（PRD 3.8 + PL-01~05）。
@@ -122,71 +116,11 @@ function onPlayClick(): void {
 
 const isMobile = useMediaQuery(MOBILE_QUERY);
 
-const MODE_ICONS: Record<PlayMode, Component> = {
-  seq: IconArrowRight,
-  list: IconRepeat,
-  one: IconRepeatOnce,
-  random: IconShuffle,
-};
+/* 模式图标 / 播放图标 / 总时长与沉浸页共用一份（`composables/usePlayback`，v6.11）——
+   原先两边各写了一遍，新增播放模式时只改一边就会出现“播放条上有、沉浸页上没有”。 */
+const { modeIcon, playIcon, totalSeconds } = usePlayback();
 
 const isIdle = computed(() => !player.hasTrack);
-const modeIcon = computed(() => MODE_ICONS[player.mode]);
-const playIcon = computed(() => (player.playing ? IconPause : IconPlay));
-
-const totalSeconds = computed(() => player.duration || player.currentTrack?.duration || 0);
-
-/* 进度条交互（PL-03）：用指针事件同时覆盖鼠标与触摸；
-   数值夹取与跳转都在 store（已单测），这里只把指针位置换算成比例 */
-const barRef = ref<HTMLDivElement | null>(null);
-
-function ratioFromEvent(event: PointerEvent): number {
-  const rect = barRef.value?.getBoundingClientRect();
-  if (!rect || rect.width <= 0) return 0;
-  return (event.clientX - rect.left) / rect.width;
-}
-
-function onPointerDown(event: PointerEvent): void {
-  if (!player.hasTrack) return;
-  barRef.value?.setPointerCapture(event.pointerId);
-  player.beginSeek(ratioFromEvent(event));
-}
-
-function onPointerMove(event: PointerEvent): void {
-  if (!player.seeking) return;
-  player.updateSeek(ratioFromEvent(event));
-}
-
-/* 键盘也能拖进度（v6.8）：进度条是自绘的，`role` / `aria-*` / 键盘步进都要自己补
-   （开发约定“换自绘时这几样一并补”，共用滑杆 `Slider.vue` 就是这么做的）。
-   步长取与全局快捷键同一份 `SEEK_STEP_SECONDS`（PL-08：±5 秒），按住可连发。
-   ⚠️ 处理完要 `stopPropagation()`：全局快捷键挂在 `window` 上（冒泡阶段），
-   不停住的话按一下方向键会同时按“全局 +5s”与这里各跳一次（10 秒）。 */
-function onBarKeydown(event: KeyboardEvent): void {
-  if (!player.hasTrack) return;
-  let next: number | null = null;
-  switch (event.key) {
-    case "ArrowLeft":
-    case "ArrowDown":
-      next = player.displaySeconds - SEEK_STEP_SECONDS;
-      break;
-    case "ArrowRight":
-    case "ArrowUp":
-      next = player.displaySeconds + SEEK_STEP_SECONDS;
-      break;
-    case "Home":
-      next = 0;
-      break;
-    case "End":
-      next = totalSeconds.value;
-      break;
-    default:
-      return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-  player.seekTo(next);
-}
-
 /* 长文本滚动（歌名 / 歌手 · 专辑）：宽度从 store 与 utils 拿，滚动交给 ScrollingText */
 const titleText = computed(() => player.currentTrack?.title ?? "尚未播放");
 const subtitleText = computed(() =>
@@ -302,36 +236,9 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
       <div class="progress-row">
         <span class="time">{{ formatTime(player.displaySeconds) }}</span>
-        <div
-          ref="barRef"
-          class="progress"
-          :class="{
-            'progress--disabled': !player.hasTrack,
-            playing: player.playing,
-            seeking: player.seeking,
-          }"
-          role="slider"
-          tabindex="0"
-          aria-label="播放进度"
-          aria-orientation="horizontal"
-          :aria-valuemin="0"
-          :aria-valuemax="Math.round(totalSeconds)"
-          :aria-valuenow="Math.round(player.displaySeconds)"
-          :aria-valuetext="`${formatTime(player.displaySeconds)} / ${formatTime(totalSeconds)}`"
-          :aria-disabled="!player.hasTrack"
-          @keydown="onBarKeydown"
-          @pointerdown="onPointerDown"
-          @pointermove="onPointerMove"
-          @pointerup="player.endSeek()"
-          @pointercancel="player.endSeek()"
-        >
-          <div class="fill" :style="{ width: `${player.displayRatio * 100}%` }" />
-          <div
-            v-if="player.hasTrack"
-            class="knob"
-            :style="{ left: `${player.displayRatio * 100}%` }"
-          />
-        </div>
+        <!-- 轨道本身是共用件（`ProgressBar.vue`，与沉浸页同一份交互与无障碍）：
+             这里只负责“时间贴两端”的排布 -->
+        <ProgressBar />
         <span class="time">{{ formatTime(totalSeconds) }}</span>
       </div>
     </div>

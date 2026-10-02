@@ -96,10 +96,12 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           confirm（二次确认的唯一入口：队列 + 发答案 - v5.53）、topLayer（“Esc 只关最上面那层”登记处 - v5.53）、
                           themeColor（`<meta name=theme-color>`：状态栏颜色跟主题走 - RT-07）、
                           pointer（触摸手势判定：`isTouchTap`，供迷你条/沉浸页滑动、长按进沉浸、抽屉用 - v5.32）、
+                          seek（进度条键盘跳转：±5 秒是**相对位移**，别用 `slider.stepValue`（它会对齐到步长整数倍）- v6.12）、
 client/src/views/         login/local/library/listening(favorites+recent)/online/playlist/settings + immersive(/now) + console/{overview,songs,upload}
 client/src/composables/   usePlayHistory（切歌时记一条最近播放 - PS-05）、
                           useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
                           useMediaQuery（响应式断点：只在“同一处要显示不同内容”时用 - v5.33）、
+                          usePlayback（播放控件的共用状态：模式/播放图标与总时长 —— 播放条与沉浸页共用一份 - v6.12）、
                           useNavDrawer（手机抽屉开合状态：按钮在页头、面板在外壳，两处共享 - v5.35）
                           useNavItems（一级导航项：侧栏与手机底栏共用一份 - RT-02）、
                           useMediaSession（把播放器状态接到锁屏/通知栏，挂 App.vue - RT-04）、
@@ -109,6 +111,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           QueuePopover（PL-06，两套壳层：桌面 Reka Popover 浮层 / 手机 Reka Dialog 半屏底部抽屉 - v5.40）、
                           QueuePanel（队列内容：标题行 + 清空 + 列表，两壳共用一份 - v5.40）、
                           ConfirmDialog（应用内二次确认：Reka Dialog + 自绘玻璃，挂 App.vue 全站一份 - v5.53）、
+                          ProgressBar（自绘进度条：轨道+填充+手柄+`role`/`aria-*`/键盘，播放条与沉浸页**共用一份** - v6.12）、
                           Slider（自绘滑杆：竖=音量条与均衡器十根竖杆、横=整体增益；几何在 utils/slider.ts - PL-13）、
                           AppTooltip（自绘玻璃提示：只有图标的键共用一份，label 同时是 aria-label - v5.71）、
                           AppToast（提示条宿主：Reka Toast + 自绘玻璃，挂 App.vue 全站一份 - v5.72）、

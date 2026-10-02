@@ -27,10 +27,19 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 
 <template>
   <div class="poster" :class="{ 'is-playing': playing }">
+    <div class="poster__col">
+      <ImTitle :title="title" :subtitle="subtitle" />
+      <LyricsView class="ly" :lines="lines" :time="time" @seek="emit('seek', $event)" />
+    </div>
+
     <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内；
-         光晕是装配的**兄弟节点** .vinyl-glow（比盘大 40%，要溢出盘外）——理由见下方样式。 -->
+         光晕是装配的**兄弟节点** .vinyl-glow（比盘大 40%，要溢出盘外）——理由见下方样式。
+         唱臂是第三个兄弟：它要盖在盘上（z-index），又不能跟着盘转。
+         v5.85：彩胶从“右上角溢出的背景”改成**自己一列**（需求方：“改成左边歌词右边胶”）
+         —— 唱臂的支点在盘外右上方，盘不完整就没地方放它。 -->
     <div class="poster__art" aria-hidden="true">
       <div class="vinyl-glow"></div>
+
       <div class="vinyl-assembly">
         <div class="v-disc">
           <div class="v-vinyl"></div>
@@ -42,64 +51,73 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
         </div>
         <div class="v-gloss"></div>
       </div>
-    </div>
 
-    <div class="poster__col">
-      <ImTitle :title="title" :subtitle="subtitle" />
-      <LyricsView class="ly" :lines="lines" :time="time" @seek="emit('seek', $event)" />
+      <!-- 唱臂：外层 .tonearm-box 与盘**同框**（都是 left/bottom 对齐的盘径方块），
+           于是下面那些百分数全是“盘径的百分比”，与素材自带的坐标一一对应：
+           支点 = 盘的 90% / 5%，臂长 = 盘径的 75%，落下 -4° / 抬起 -15°。
+           底座 .arm-base 不随臂转（拧在盘外面），臂体 .tonearm__arm 只做摆动。 -->
+      <div class="tonearm-box">
+        <div class="tonearm">
+          <img class="tonearm__arm" src="../../assets/vinyl/arm.png" alt="" />
+        </div>
+        <img class="arm-base" src="../../assets/vinyl/arm-base.png" alt="" />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .poster {
+  /* 左歌词 / 右彩胶（v5.85）：两列真的并排 —— 从前是“歌词 + 一张从右上角溢出去的背景盘”，
+     盘被窗口裁掉一半，唱臂就没地方站（支点在盘外右上方）。 */
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  gap: clamp(20px, 4vw, 64px);
   height: 100%;
   min-height: 0;
-  padding: 0 24px;
+  padding: 0 clamp(16px, 2.6vw, 40px);
 }
 
 /* ---------- 彩胶装配 ----------
-   DOM 对齐 PRD v4.2 定稿：外壳 .vinyl-assembly（不转、不裁剪——边缘环是它的 ::after，
-   所以共享元素过渡捕获到的就是“盘”本身）> 旋转盘 .v-disc（转 + 圆形裁剪，纹理的
-   overlay 混合只在盘内生效）> 盘体/纹理/标签；高光 .v-gloss 挂外壳内、压在盘上，
-   因为**光源固定**，它不跟着盘转。
-   光晕 .vinyl-glow 是装配的**兄弟节点**（v5.23 从外壳的 ::before 挪出来）：共享元素过渡
-   只快照“带名字那个元素”的盒子，而光晕要溢出盘外 20% —— 留在外壳里会被方形盒子硬裁成
-   一圈方边（实测：飞行末段盘外出现可见方形残影，落地才消失）。挪出来之后，飞行中的
-   快照只剩圆盘（盒子四角本就透明），光晕照常跟着页面淡化／淡入，两边互不干扰。
+   DOM 对齐 PRD v4.2 定稿：外壳 .vinyl-assembly（不转、不裁剪——边缘环是它的 ::after）>
+   旋转盘 .v-disc（转 + 圆形裁剪，纹理的 overlay 混合只在盘内生效）> 盘体/纹理/标签；
+   高光 .v-gloss 挂外壳内、压在盘上，因为**光源固定**，它不跟着盘转。
+   光晕 .vinyl-glow 与唱臂 .tonearm-box 都是装配的**兄弟节点**：光晕要溢出盘外 20%，
+   唱臂要盖在盘上又不能跟着盘转 —— 塞进外壳里不是被裁就是跟着转。
 
-   定位三变量收敛在 .poster__art 上，只用来摆外壳。**三者必须同源**：先由窗口算出
-   盘径，两个偏移再从盘径派生——否则窗口一变三方各按各的缩放率漂移，就是需求方看到的
-   “放大缩小页面彩胶到处跑动”（v4.75 修）：
-   原来 size = `min(86vh, 62vw)`（高度、宽度两个驱动轮流接管）、top = `-27vh`、
-   right = `-19vw`，三个变量三种缩放率，纵横比一变盘就滑走——实测盘心在窗口宽的
-   88%～94.8% 之间摆、盘径 558～860px 之间变。 */
+   v5.85 把“右上角溢出”的定位整个删掉了：盘有自己的栅格列，位置由版式给，**不留任何
+   按窗口百分比算的偏移** —— 也就不会再现 v4.75 那种“三个变量三种缩放率、缩放窗口时
+   盘到处跑”的问题（那条修的是症状，这条去掉了病因）。
+   画布比盘大一圈（右 8% / 上 10%）：上边留给配重（臂体从盘的 -6.5% 起），
+   右边留给抬起时的针尖（-15° 时落在盘的 105% 处）。 */
 .poster__art {
-  /* 盘径只由 vmin 一条驱动：宽高都平滑跟随，不会在两种模式间切换（缩放窗口时盘只会平稳地变大小，不跳）；
-     `62vw` 是**安全网**——方屏/竖屏下 vmin 会偏大，会把盘顶到歌词嘴边（721×1200 实测只剩 28px）；
-     `860px` 是给大屏的绝对上限（页面文字是定值 px，盘再大就和字脱节）。 */
-  --vinyl-d: min(80vmin, 62vw, 860px);
-  /* 偏移全部从盘径派生（盘径的百分比）：不论窗口多大、怎么缩放，盘与右上角的相对关系
-     永远一样——这才是“固定在右上角”。系数按需求方实拍参照 QQ 音乐校准（1226×935 下
-     盘心在窗口 88% 宽 / 18% 高处，与参照一致）。 */
-  --vinyl-t: calc(var(--vinyl-d) * -0.34);
-  --vinyl-r: calc(var(--vinyl-d) * -0.31);
-  position: absolute;
-  inset: 0;
+  /* 盘径：一条 vmin 驱动（宽高平滑跟随，不在两种模式间跳）；
+     `40vw` 是给又宽又矮的窗口的安全网，`560px` 是给大屏的绝对上限（页面文字是定值 px）。 */
+  --vinyl-d: min(56vh, 40vw, 560px);
+  --art-top: calc(var(--vinyl-d) * 0.1);
+  --art-right: calc(var(--vinyl-d) * 0.08);
+  position: relative;
+  width: calc(var(--vinyl-d) + var(--art-right));
+  height: calc(var(--vinyl-d) + var(--art-top));
   z-index: 0;
-  /* 装配占满整块版心，别挡住歌词行的点击 seek（歌词在 z-2） */
+  /* 装饰层：别挡住歌词行的点击 seek（歌词在 z-2） */
   pointer-events: none;
 }
 
-.vinyl-assembly {
+/* 盘与唱臂对齐同一个方块的**左下角**（盘在左，留白在上与右），两者同框同尺寸 ——
+   于是内层那些百分数全都是“盘径的百分比”，与参照实现的坐标一一对应。 */
+.vinyl-assembly,
+.tonearm-box {
   position: absolute;
-  top: var(--vinyl-t);
-  right: var(--vinyl-r);
+  left: 0;
+  bottom: 0;
   width: var(--vinyl-d);
   aspect-ratio: 1;
+}
+
+.vinyl-assembly {
   /* 混合模式只在这个壳里生效，不外溢到页面 */
   isolation: isolate;
 }
@@ -111,8 +129,8 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
    转起来才看得出）。旋转与盘同频同向（8s/圈），所以两者相对关系不变，只是那团柔光自己在缓慢流动。 */
 .vinyl-glow {
   position: absolute;
-  top: calc(var(--vinyl-t) - var(--vinyl-d) * 0.2);
-  right: calc(var(--vinyl-r) - var(--vinyl-d) * 0.2);
+  left: calc(var(--vinyl-d) * -0.2);
+  bottom: calc(var(--vinyl-d) * -0.2);
   width: calc(var(--vinyl-d) * 1.4);
   aspect-ratio: 1;
   background: var(--cv1);
@@ -223,11 +241,57 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
     url("../../assets/vinyl/grooves.png") center / cover no-repeat;
 }
 
+/* ---------- 唱臂（v5.85） ----------
+   素材是需求方指定的那张（参照实现 `01-colorfull/assets/arm@2x.png` → `assets/vinyl/arm.png`，
+   130×600；底座 `ArmBottom@2x.png` → `arm-base.png`，84×116）。
+   几何全部对应素材自带的坐标（都是“盘径的百分比”）：支点在盘的 90% / 5%、
+   臂体高 = 盘径的 75%、臂体自身的旋转轴心在图片的 61.9% / 15.3%（就是那张图里轴承圆心的
+   位置）—— 两个 transform-origin 因此重合：“整臂绕支点转”与“臂体自己轻摆”用的是同一个点。
+   角度：抬起 -15°（针在盘外）、落针 -4°（针落在外圈纹槽上，够不到中间那张封面）；
+   0.9s 与 cubic-bezier(0.34, 1.1, 0.4, 1) 也是参照实测的“过冲一点但很快稳”。
+   **不抄它的 arm-sway**（落针后持续轻摆）：那是装饰，不承载信息（简约优先）。 */
+.tonearm {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  transform-origin: 90% 5%;
+  transform: rotate(-15deg);
+  transition: transform 0.9s cubic-bezier(0.34, 1.1, 0.4, 1);
+}
+
+.poster.is-playing .tonearm {
+  transform: rotate(-4deg);
+}
+
+.tonearm__arm {
+  position: absolute;
+  left: 79.9%;
+  top: -6.5%;
+  height: 75%;
+  /* 只给高，宽交给图片自己的比例（130 / 600）—— 这样图片盒与素材坐标系严格同比，
+     上面那个 61.9% / 15.3% 的轴心才真的落在支点上。 */
+  width: auto;
+  transform-origin: 61.9% 15.3%;
+  filter: drop-shadow(0 8px 16px rgba(6, 10, 20, 0.5));
+}
+
+/* 底座：不随臂转，拧在盘外右上角（圆心 = 支点）。图是 84×116，所以宽 10.5% 时高 14.5%，
+   `top: -2.25%` 就是“圆心落在支点上”（5% − 14.5% / 2）—— 与素材同一套数，别自己凑。 */
+.arm-base {
+  position: absolute;
+  left: 84.75%;
+  top: -2.25%;
+  z-index: 4;
+  width: 10.5%;
+  height: auto;
+}
+
 /* ---------- 版式 ----------
-   本布局**不再自己加一层方向性遮罩**（原型有一层左实右虚的全页渐变）：
-   ① 页面已有统一的薄雾保证文字可读（与双栏/居中同一套），再叠一层是把可读性理由用得过度；
+   两列：歌词在左、彩胶在右（v5.85），两边都是真列 —— 从前是“歌词 + 一张从右上角溢出去的
+   背景盘”。本布局**不再自己加一层方向性遮罩**（原型有一层左实右虚的全页渐变）：
+   ① 页面已有统一的薄雾保证文字可读（与双栅/居中同一套），再叠一层是把可读性理由用得过度；
    ② 那层渐变淡到 70% 位置，实测会把彩胶左侧掠掉一层白，看着像盘面疆了；
-   ③ 彩胶最左的鼓包在右上角（它的圆心在画面外），与歌词列天然错开，不需要额外压暗。
+   ③ 盘现在是完整一张、与歌词各占一边，更不需要额外压暗。
    简约优先（v4.30）：能用一层说清的可读性，不加第二层。 */
 .poster__col {
   position: relative;
@@ -236,9 +300,9 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   flex-direction: column;
   justify-content: center;
   gap: 18px;
-  width: min(540px, 46vw);
-  /* 与彩胶拉开层次（原型值） */
-  margin-left: clamp(0px, 4vw, 64px);
+  width: 100%;
+  /* 歌词不跟着窗口无限拉宽：留给彩胶的是栅格的 gap，不是把一行字拉成一条 */
+  max-width: min(560px, 46vw);
   min-width: 0;
 }
 
@@ -269,29 +333,38 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   .poster.is-playing .vinyl-glow {
     animation: none;
   }
+
+  /* 唱臂落下是**状态**（播放/暂停），不是循环动效，所以保留，只去掉那 0.9s 的过渡 */
+  .tonearm {
+    transition: none;
+  }
 }
 
-/* 窄屏（RT-08 的最小照顾）：彩胶退到右上角变小，歌词占据下方整宽 */
+/* 窄屏（RT-08 的最小照顾）：两列摆不下（字会被压成一条），改成盘在上、歌词在下，
+   盘仍然是完整的（唱臂也照旧工作）。 */
 @media (max-width: 720px) {
   .poster {
-    padding: 0 16px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    justify-items: center;
+    gap: 12px;
+    padding: 6px 16px 0;
   }
 
   .poster__art {
-    /* 窄屏只改盘径：两个偏移是盘径的百分比（calc 派生），会跟着一起收，
-       不用也不能再手写一份——否则又是“三方各自漂移”的老毛病 */
-    --vinyl-d: min(62vmin, 88vw, 360px);
+    /* 窄屏只改盘径：画布尺寸与所有偏移都是它的派生值，不用也不能再手写一份
+       ——否则又是“三方各自漂移”的老毛病 */
+    --vinyl-d: min(34vmin, 52vw, 260px);
   }
 
   .poster__col {
     width: 100%;
-    margin-left: 0;
-    justify-content: flex-end;
-    padding-bottom: 4px;
+    max-width: none;
+    justify-content: flex-start;
   }
 
   .ly {
-    height: min(34vh, 280px);
+    height: min(30vh, 260px);
   }
 }
 </style>

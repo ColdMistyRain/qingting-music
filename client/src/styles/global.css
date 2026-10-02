@@ -803,8 +803,11 @@ select {
   gap: 18px;
 }
 
-/* 收藏（PS-05）：收藏中是**状态**，用主题色说出来（简约优先：颜色只表达状态）。 */
-.pb-fav.is-on {
+/* 状态键（收藏中等）用主题色说出来（PS-05；简约优先：颜色只表达状态）。
+   收到 `.ctl.is-on` 这一条上，三处（播放条 / 沉浸页控制栏 / 列表行）都由它说了算 ——
+   原先只有播放条写了 `.pb-fav.is-on`，沉浸页那枚收藏后只换图标、不变色，
+   同一个键两处两种表现（v5.70 一并收口）。 */
+.ctl.is-on {
   color: var(--accent);
 }
 
@@ -828,18 +831,24 @@ select {
     filter 0.22s ease-out;
 }
 
-/* 悬浮反馈**只给旁边那几枚图标按钮**：文字色由 --text-2 提到 --text-1。
-   主按钮必须排除（`:not(.play)`）——它自带 `class="ctl play"`，不排除的话这条 (0,3,0)
-   会盖掉 `.ctl.play` 的 (0,2,0) 主题色，鼠标一放上去图标就从主题色变成 --text-1
-   （浅色主题近黑、深色主题近白），也就是 v4.98 需求方说的
-   “中间图标的颜色不应该变成白色或者黑色”（实测悬停色 rgba(18,24,38,.94) / rgba(255,255,255,.94)）。
-   主按钮的悬浮反馈只有光，见下面 `.ctl.play:hover`。 */
+/* 悬浮反馈**只给旁边那几枚图标按钮**，而且分两半：
+   ① **光** —— 所有图标键都给（包括状态键：悬停总得有反馈），写成下面那条；
+   ② **提色**（文字色 --text-2 → --text-1）—— 只给**没有状态**的键。
+   两类键必须排除：
+   - `.play` 主按钮（v4.98 需求方："鼠标放在播放按钮上时中间图标的颜色不应该变成白色或者黑色"）：
+     它自带 `class="ctl play"`，不排除的话这条 (0,3,0) 会盖掉 `.ctl.play` 的 (0,2,0) 主题色，
+     一悬停就从主题色变成近黑/近白（实测悬停色 rgba(18,24,38,.94) / rgba(255,255,255,.94)）；
+   - `.is-on` 状态键（v5.70 实测）：同理，收藏着的心指针一放上去就从主题色变成 --text-1，
+     看起来就像"一悬停就变成没收藏"。
+   主按钮的悬浮反馈只有光（见下面 `.ctl.play:hover`）；状态键现在是"光 + 保持状态色"。 */
 .ctl:hover:not(:disabled):not(.play) {
-  color: var(--text-1);
-  /* 悬浮反馈用**光**而不是放大（v4.67 需求方：“这些按钮都不要放大效果”）：
-     drop-shadow 才能给 SVG 图标上光（text-shadow 对图标无效），
-     且它不改变盒子尺寸，鼠标悬停时目标不会动。 */
+  /* drop-shadow 才能给 SVG 图标上光（text-shadow 对图标无效），
+     且它不改变盒子尺寸，鼠标悬停时目标不会动（v4.67 需求方："这些按钮都不要放大效果"）。 */
   filter: drop-shadow(0 0 6px var(--glow-halo));
+}
+
+.ctl:hover:not(:disabled):not(.play):not(.is-on) {
+  color: var(--text-1);
 }
 
 .ctl:disabled {
@@ -1100,7 +1109,8 @@ select {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  /* 键间距与中间那组控件同一个值（.pb-ctrls 的 18px）：整条播放条只留一套节奏 */
+  gap: 18px;
 }
 
 /* ---------- 设置页：顶部 Tab（PRD 3.8，活跃 Tab 主题色下划线） ----------
@@ -1395,13 +1405,12 @@ kbd {
   /* 迷你条只留两枚键（Salt Player 的迷你条语言）：播放/暂停 + 下一首。
      上一首改走“在信息区左右滑”（手势见 PlayerBar.vue），沉浸页里仍是完整三键。
      音量点开的是 HoverCard（悬浮卡片），手机上既没有悬浮、也有系统音量键 —— 一并收起，
-     沉浸页里那枚保留（那里才是完整控制区）。
+     沉浸页里那枚保留（那里才是完整控制区）。收藏键跟着最右那组（.pb-right）一起收起。
      ⚠️ 音量键的 display 写在 VolumeControl.vue 的 scoped 样式里（`.vctl[data-v-x]`），
      特异性同为 (0,2,0) 而组件样式在运行时注入 → 源码顺序上它更靠后。
      所以这里必须写到 (0,3,0)：用 .playerbar 前缀，别省。 */
   .playerbar .pb-ctrls .ctl.mode,
   .playerbar .pb-ctrls .ctl.prev,
-  .playerbar .pb-ctrls .ctl.pb-fav,
   .playerbar .pb-ctrls .vctl,
   .pb-right {
     display: none;

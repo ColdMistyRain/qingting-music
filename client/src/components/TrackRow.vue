@@ -242,10 +242,10 @@ function onRowClick(event: MouseEvent): void {
   opacity: 1;
 }
 
-/* 收藏键（PS-05）：收藏中是**状态**，用主题色说出来（简约优先：颜色只表达状态）。
-   已收藏的那一枚常显 —— 否则列表看起来像“这一首没有收藏”，得把鼠标移上去才知道。 */
+/* 收藏键（PS-05）：已收藏的那一枚**常显** —— 否则列表看起来像“这一首没有收藏”，
+   得把鼠标移上去才知道。状态色（主题色）不在这里写第二份 —— 统一由 global.css 的
+   `.ctl.is-on` 给（v5.70 收口：播放条 / 沉浸页控制栏 / 列表行三处一个来源）。 */
 .row__actions .row__fav.is-on {
   opacity: 1;
-  color: var(--accent);
 }
 </style>

@@ -263,20 +263,6 @@ const marqueeActive = computed(() => player.playing || hovering.value);
 
         <!-- 音量：与沉浸页共用同一个控件（components/VolumeControl.vue，v4.62） -->
         <VolumeControl />
-
-        <!-- 收藏（PS-05）：对**正在播的那一首**生效（本地/云端都能收）。
-             手机不显示：迷你条按 v5.33 的定调只留两枚键，手机上的收藏入口在沉浸页控制栏。 -->
-        <button
-          class="ctl pb-fav"
-          :class="{ 'is-on': isFavorite }"
-          :title="isFavorite ? '取消收藏' : '收藏'"
-          :disabled="!canFavorite"
-          :aria-pressed="isFavorite"
-          @click="toggleFavorite"
-        >
-          <IconHeartFill v-if="isFavorite" class="icon" />
-          <IconHeartStraight v-else class="icon" />
-        </button>
       </div>
 
       <div class="progress-row">
@@ -306,6 +292,23 @@ const marqueeActive = computed(() => player.playing || hovering.value);
     </div>
 
     <div class="pb-right">
+      <!-- 收藏（PS-05）：对**正在播的那一首**生效（本地/云端都能收）。
+           放在队列键**左侧**、两枚并列在最右 —— 中间那组（模式/上一首/播放/下一首/音量）
+           因此对进度条左右对称，播放键正落在进度条中线上（带这枚键时是 6 枚，
+           播放键会偏左一档，实测偏 19px）。
+           手机整组收起（迷你条只留播放/下一首），手机上的收藏入口在沉浸页控制栏。 -->
+      <button
+        class="ctl pb-fav"
+        :class="{ 'is-on': isFavorite }"
+        :title="isFavorite ? '取消收藏' : '收藏'"
+        :disabled="!canFavorite"
+        :aria-pressed="isFavorite"
+        @click="toggleFavorite"
+      >
+        <IconHeartFill v-if="isFavorite" class="icon" />
+        <IconHeartStraight v-else class="icon" />
+      </button>
+
       <!-- 队列弹层（PL-06）：触发按钮由这里传入，保持播放条那套控件样式 -->
       <QueuePopover>
         <template #trigger>

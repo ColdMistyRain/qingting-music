@@ -14,7 +14,6 @@ import {
   PopoverTrigger,
 } from "reka-ui";
 import IconQueue from "~icons/ph/queue";
-import AppTooltip from "@/components/AppTooltip.vue";
 import QueuePanel from "@/components/QueuePanel.vue";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
 import { isTouchTap } from "@/utils/pointer";
@@ -34,14 +33,16 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  * 行为层用 Reka（铁律 1）、样式全部自己写（Reka 是无样式行为层）；
  * **内容**（标题行 + 列表）在 QueuePanel.vue，两套壳层共用一份。
  *
- * 触发键由**本组件自己渲染**（`.ctl` + 队列图标），调用方只传 `label` 当提示。
- * 为什么不把触发按钮做成插槽：那样“按钮”与“包住按钮的提示 / 触发器”就分在两个文件里，
- * 而 `as-child` 链要求**触发器的孩子就是一个元素** —— 一旦两边版本不一致（改了一半、HMR 半新半旧），
- * `PopoverTrigger` 就会去合并一个组件而不是按钮，表现是**点了完全没反应**（v5.71 实测踩到过）。
+ * 触发键由**本组件自己渲染**（`.ctl` + 队列图标），调用方只传 `label`（同时当 `aria-label` 与原生 `title`）。
+ * 为什么不把触发按钮做成插槽：那样“按钮”与“包住按钮的触发器”就分在两个文件里，
+ * `as-child` 链要求触发器的孩子就是一个**元素** —— 一旦两边版本不一致（改了一半、HMR 半新半旧），
+ * `PopoverTrigger` 就会去合并一个组件而不是按钮，表现是**点了完全没反应**（v5.73 实测踩到过）。
  * 收进同一个文件后，这条链不可能再被外力拆开。
  *
- * 触发键的提示也在这里包（调用方只传 `label`）：**Tooltip 必须套在 Popover/Dialog 触发器的外层** ——
- * `as-child` 只能往里合并，同一个元素不能左右各包一层。
+ * ⚠️ 这里**不要**再套我们自己的 `AppTooltip`（v5.74 实测）：Reka 的 `PopoverTrigger` 自己会包一层
+ * `PopperAnchor`，而 `AppTooltip`（`TooltipTrigger`）又在外面包一层 —— 两层 `as-child` 锚点套在同一个
+ * 按钮上时，**内层（浮层）的锚点算出来是零尺寸**，浮层被摆到 `y = -208`（屏幕外）：状态、
+ * `aria-expanded` 全对，用户却什么都看不到（“点了没反应”）。所以这一枚用原生 `title` 说名字。
  */
 withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const open = ref(false);
@@ -101,13 +102,11 @@ onBeforeUnmount(() => {
 <template>
   <!-- 桌面：贴着触发器弹出的浮层 -->
   <PopoverRoot v-if="!isMobile" v-model:open="open">
-    <AppTooltip :label="label" :disabled="!label">
-      <PopoverTrigger as-child>
-        <button class="ctl">
-          <IconQueue class="icon" />
-        </button>
-      </PopoverTrigger>
-    </AppTooltip>
+    <PopoverTrigger as-child>
+      <button class="ctl" :aria-label="label || undefined" :title="label || undefined">
+        <IconQueue class="icon" />
+      </button>
+    </PopoverTrigger>
 
     <PopoverPortal>
       <PopoverContent class="q-pop" side="top" align="end" :side-offset="10" force-mount>
@@ -119,13 +118,11 @@ onBeforeUnmount(() => {
   <!-- 手机：半屏底部抽屉。用 v-else 而不是再加一个断点判断：两套壳层共用一个开关，
        断点变化时只是换壳，不会出现“两个都开”。 -->
   <DialogRoot v-else v-model:open="open">
-    <AppTooltip :label="label" :disabled="!label">
-      <DialogTrigger as-child>
-        <button class="ctl">
-          <IconQueue class="icon" />
-        </button>
-      </DialogTrigger>
-    </AppTooltip>
+    <DialogTrigger as-child>
+      <button class="ctl" :aria-label="label || undefined" :title="label || undefined">
+        <IconQueue class="icon" />
+      </button>
+    </DialogTrigger>
 
     <DialogPortal>
       <!-- force-mount 两个（v5.50）：Reka 的 Dialog 默认“一关就卸载”，于是只有进场动画、

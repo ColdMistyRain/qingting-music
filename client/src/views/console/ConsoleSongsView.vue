@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import type { Song } from "@qingting/shared";
 import IconListDashes from "~icons/ph/list-dashes";
@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState.vue";
 import SongMetaDialog from "@/components/SongMetaDialog.vue";
 import { useLibraryStore } from "@/stores/library";
 import { confirmAction } from "@/utils/confirm";
+import { debounce } from "@/utils/debounce";
 import { formatDateTime, formatSize } from "@/utils/format";
 import { filterSongs, sortSongs, type SongSortKey, type SortDirection } from "@/utils/library";
 
@@ -32,6 +33,15 @@ const library = useLibraryStore();
 onMounted(() => void library.load());
 
 const keyword = ref("");
+/* 关键词拆两份（v6.9）：输入框读 `keyword`（即时回显），表格读 `query`（停 150ms 才跟上）。
+   这里比音乐库更值得防抖：每次按键都要把过滤结果整份**中文排序**
+   （`localeCompare(…, "zh-Hans-CN")`，369 首 ≈ 3100 次 ICU 比较）。 */
+const query = ref("");
+const applyQuery = debounce((value: string) => {
+  query.value = value;
+}, 150);
+watch(keyword, (value) => applyQuery.call(value));
+onBeforeUnmount(() => applyQuery.cancel());
 const sortKey = ref<SongSortKey>("uploadedAt");
 const direction = ref<SortDirection>("desc");
 const selected = ref<Set<string>>(new Set());
@@ -39,11 +49,11 @@ const busy = ref(false);
 const actionError = ref("");
 
 const rows = computed(() =>
-  sortSongs(filterSongs(library.songs, keyword.value), sortKey.value, direction.value),
+  sortSongs(filterSongs(library.songs, query.value), sortKey.value, direction.value),
 );
 
 /** 结果数只在“确实在筛”时才报（v5.97）：没筛时它就等于页头那个总数，没必要说两遍 */
-const isFiltering = computed(() => keyword.value.trim().length > 0);
+const isFiltering = computed(() => query.value.trim().length > 0);
 
 /** 正在编辑的那一条（AD-02）：弹窗由两个入口共用，这里只管“编辑哪首” */
 const editing = ref<Song | null>(null);

@@ -13,6 +13,7 @@ import { useAuthStore } from "@/stores/auth";
 import { usePlayerStore } from "@/stores/player";
 import { useTransferStore } from "@/stores/transfer";
 import { confirmAction } from "@/utils/confirm";
+import { mapWithConcurrency } from "@/utils/concurrency";
 import { collectFilesFromEntries, type EntryLike } from "@/utils/fileSystem";
 import { formatTime } from "@/utils/format";
 import {
@@ -100,32 +101,33 @@ function addFiles(files: readonly File[]): void {
     if (track) rememberLocalSource(track.id, file);
   });
 
-  // 读内嵌标签（LC-04）：成功则覆盖文件名解析结果并拿到封面；失败退回探测时长（LC-03）
-  audioFiles.forEach((file, index) => {
+  // 读内嵌标签（LC-04）：成功则覆盖文件名解析结果并拿到封面；失败退回探测时长（LC-03）。
+  // **并发上限 4**（v6.9）：拖一整个文件夹就是几百个文件，无上限并行会让几百次整文件解析
+  // 同时开工（内存峰值 + 主线程调度），且先解析完谁并不重要。
+  void mapWithConcurrency(audioFiles, 4, async (file, index) => {
     const track = tracks[index];
     if (!track) return;
     probing.value += 1;
-    void readAudioTags(file)
-      .then(async (tags) => {
-        if (!tags) {
-          const seconds = await probeDuration(track.url);
-          if (seconds !== null) player.patchDuration(track.id, seconds);
-          return;
-        }
-        const cover = coverUrlFrom(tags.picture);
-        player.patchTrack(track.id, {
-          ...(tags.title ? { title: tags.title } : {}),
-          ...(tags.artist ? { artist: tags.artist } : {}),
-          ...(tags.album ? { album: tags.album } : {}),
-          ...(cover ? { cover } : {}),
-          ...(tags.duration ? { duration: tags.duration } : {}),
-          // 内嵌歌词（LR-02）：挂到曲目上，沉浸页直接取，不必重新读文件
-          ...(tags.lyrics ? { lyrics: tags.lyrics } : {}),
-        });
-      })
-      .finally(() => {
-        probing.value -= 1;
+    try {
+      const tags = await readAudioTags(file);
+      if (!tags) {
+        const seconds = await probeDuration(track.url);
+        if (seconds !== null) player.patchDuration(track.id, seconds);
+        return;
+      }
+      const cover = coverUrlFrom(tags.picture);
+      player.patchTrack(track.id, {
+        ...(tags.title ? { title: tags.title } : {}),
+        ...(tags.artist ? { artist: tags.artist } : {}),
+        ...(tags.album ? { album: tags.album } : {}),
+        ...(cover ? { cover } : {}),
+        ...(tags.duration ? { duration: tags.duration } : {}),
+        // 内嵌歌词（LR-02）：挂到曲目上，沉浸页直接取，不必重新读文件
+        ...(tags.lyrics ? { lyrics: tags.lyrics } : {}),
       });
+    } finally {
+      probing.value -= 1;
+    }
   });
 }
 

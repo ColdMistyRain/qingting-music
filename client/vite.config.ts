@@ -44,6 +44,17 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,woff,woff2}"],
+        /* 不进预缓存清单的两类（v6.9）：预缓存是**安装时一次性全下**，把按需 chunks 也塞进去，
+           等于“首屏省下的下载量在 SW 安装时又还回去了”，而且每次 SW 更新会再来一遍。
+           实测原先清单里躺着 15 个 `*Parser-*.js`（music-metadata 的各容器解析器，
+           `utils/metadata.ts` 特意用动态 import 拆开的）与 23 个 <1KB 的单图标 chunk ——
+           它们交给浏览器按需请求即可。实测：预缓存 106 项 / 1240 KiB → **37 项 / 530 KiB**。 */
+        globIgnores: [
+          // 音乐标签解析器（动态 import 出来的，只在真的读标签时才需要）
+          "**/assets/*Parser-*.js",
+          // 单图标小 chunk：构建期把每个 `~icons/*` 拆成了独立小文件
+          "**/assets/*-????????.js",
+        ],
         // 这三条根路径不归 SPA 路由管（后端的东西），离线时该失败就失败
         navigateFallbackDenylist: [/^\/api\//, /^\/audio\//, /^\/covers\//],
         cleanupOutdatedCaches: true,
@@ -53,6 +64,13 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => (id.includes("node_modules/reka-ui") ? "reka" : undefined),
+      },
     },
   },
   server: {

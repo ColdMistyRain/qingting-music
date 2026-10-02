@@ -18,8 +18,7 @@ export function filterSongs(songs: readonly Song[], keyword: string): Song[] {
   );
 }
 
-/** 排序：文本按中文语序，数值按大小；返回新数组，不修改入参 */
-export function sortSongs(
+/** 排序：文本按中文语序，数值按大小；返回新数组，不修改入参 */ export function sortSongs(
   songs: readonly Song[],
   key: SongSortKey,
   direction: SortDirection = "asc",
@@ -47,4 +46,22 @@ export function songToTrack(song: Song): Track {
     // 有内嵌歌词时，播放器会在开播时去 /api/songs/:id/lyrics 拉一次（LR-02）
     hasLyrics: song.hasLyrics === true,
   };
+}
+
+/**
+ * 带缓存的 `songToTrack`（v6.9）：列表页每次按键都会 `filter` + `map` 一遍（369 首 = 369 次
+ * `encodeURIComponent`），而且**每次都会造一批新对象** —— 行组件的 props 因此次次都变，
+ * 浅比较救不了，整个列表跟着重渲染。按 `Song` 对象缓存（`WeakMap`，不阻止回收）：
+ * 同一条曲目只要还是同一个对象（曲库更新是**整体替换**该条对象的不可变写法），
+ * 拿到的就是同一个 `Track`，没改的行不会被重渲染。
+ * 纯函数版本 `songToTrack` 保留：需要“每次都新对象”的场景与单测仍用它。
+ */
+const trackCache = new WeakMap<Song, Track>();
+
+export function songToTrackCached(song: Song): Track {
+  const cached = trackCache.get(song);
+  if (cached) return cached;
+  const track = songToTrack(song);
+  trackCache.set(song, track);
+  return track;
 }

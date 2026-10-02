@@ -13,7 +13,7 @@ import { useLibraryStore } from "@/stores/library";
 import { useListeningStore } from "@/stores/listening";
 import { usePlayerStore } from "@/stores/player";
 import { confirmAction } from "@/utils/confirm";
-import { songToTrack } from "@/utils/library";
+import { songToTrackCached } from "@/utils/library";
 
 /**
  * 我的收藏 / 最近播放（PS-05）：同一份数据的两个入口，各占一个一级导航位。
@@ -51,7 +51,7 @@ const rows = computed(() => {
     if (item.source !== "server" || !item.refId) return [];
     const song = songs.get(item.refId);
     if (!song) return [];
-    return [{ item, key: playlistItemKey(item), track: songToTrack(song) }];
+    return [{ item, key: playlistItemKey(item), track: songToTrackCached(song) }];
   });
 });
 

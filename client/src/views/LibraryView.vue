@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import NavToggle from "@/components/NavToggle.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { toPlaylistItem, type Track } from "@qingting/shared";
 import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
@@ -15,7 +15,8 @@ import { useLibraryStore } from "@/stores/library";
 import { useListeningStore } from "@/stores/listening";
 import { usePlayerStore } from "@/stores/player";
 import { formatSize } from "@/utils/format";
-import { filterSongs, songToTrack } from "@/utils/library";
+import { debounce } from "@/utils/debounce";
+import { filterSongs, songToTrackCached } from "@/utils/library";
 
 /**
  * 音乐库（PRD 3.4 / LB-04）：登录用户都能浏览与播放，上传与删除在控制台（3.12）。
@@ -27,6 +28,14 @@ const library = useLibraryStore();
 const listening = useListeningStore();
 const player = usePlayerStore();
 const keyword = ref("");
+/* 关键词拆两份（v6.9）：`keyword` 绑输入框（**即时回显**，不防抖免得光标乱跳），
+   `query` 才是过滤用的那一份（停 150ms 才跟上）。369 首每次按键都要全量 filter + map，
+   连打几个字就是几十毫秒的主线程工作。 */
+const query = ref("");
+const applyQuery = debounce((value: string) => {
+  query.value = value;
+}, 150);
+watch(keyword, (value) => applyQuery.call(value));
 
 onMounted(() => {
   void library.load();
@@ -34,8 +43,10 @@ onMounted(() => {
   void listening.load();
 });
 
-const tracks = computed(() => filterSongs(library.songs, keyword.value).map(songToTrack));
-const isSearching = computed(() => keyword.value.trim().length > 0);
+onBeforeUnmount(() => applyQuery.cancel());
+
+const tracks = computed(() => filterSongs(library.songs, query.value).map(songToTrackCached));
+const isSearching = computed(() => query.value.trim().length > 0);
 const summary = computed(
   () => `云端曲库 · ${library.songs.length} 首 · ${formatSize(library.totalSize)}`,
 );

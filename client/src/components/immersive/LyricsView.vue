@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type VNodeRef } from "vue";
 import IconArrowDown from "~icons/ph/arrow-down";
 import {
   centerShift,
@@ -42,6 +42,18 @@ const activeWords = computed(() =>
 function depthOf(index: number): number {
   return Math.abs(index - activeIndex.value);
 }
+
+/* ---------- 逐帧重渲染收窄（v6.9） ----------
+   `props.time` 每秒变 60 次，而模板里真正该跟着变的只有**当前那一行**的逐字进度。
+   原先每帧都会：① 为每一行新建一个 `:ref` 箭头函数（Vue 每次都要 old(null)→new(el)
+   地重设，即对全表 `Map.delete/set`）；② 每行重算一次 `depthOf(i)`；③ 整表重建 vnode。
+   现在：ref 回调与 `--depth` 都预先算好（只在行数 / 当前句变化时重算），
+   模板再靠 `v-memo` 把非当前行的子树原样复用。
+   `depths` 必须进 memo 依赖：当前句一变，所有行的景深都跟着变（那是真需要重渲染的）。 */
+const depths = computed(() => props.lines.map((_, index) => depthOf(index)));
+const refSetters = computed<VNodeRef[]>(() =>
+  props.lines.map((_, index) => (el) => setLineRef(el as Element | null, index)),
+);
 /** 行级进度（0~1）：仅行级数据时的整句渐亮 */
 const activeRatio = computed(() => lineProgress(props.lines, activeIndex.value, props.time));
 
@@ -417,11 +429,12 @@ onBeforeUnmount(() => {
         <button
           v-for="(line, i) in lines"
           :key="`${line.time}-${i}`"
-          :ref="(el) => setLineRef(el as Element | null, i)"
+          v-memo="[i === activeIndex, i < activeIndex, depths[i]]"
+          :ref="refSetters[i]"
           type="button"
           class="lyline"
           :class="{ current: i === activeIndex, past: i < activeIndex }"
-          :style="{ '--depth': depthOf(i) }"
+          :style="{ '--depth': depths[i] }"
           :title="`跳转到 ${line.text}`"
           @click="onLineClick(line)"
         >

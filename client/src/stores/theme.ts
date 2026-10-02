@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { syncThemeColor } from "@/utils/themeColor";
 
 export type ThemeMode = "dark" | "light";
 /**
@@ -48,6 +49,8 @@ export const useThemeStore = defineStore("theme", () => {
   function apply(next: ThemeMode, persist: boolean): void {
     mode.value = next;
     document.documentElement.dataset.theme = next;
+    // 手机上的地址栏、以及添加到主屏幕后全屏运行时的状态栏颜色（RT-07）
+    syncThemeColor(next);
     if (persist) localStorage.setItem(STORAGE_KEY, next);
   }
 

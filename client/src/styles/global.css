@@ -18,6 +18,18 @@ a {
   text-decoration: none;
 }
 
+/* 关掉浏览器自带的点按高亮（v6.17）。
+   需求方拿真机对的：“那圈蓝色背景就是浏览自带，可以解决。别人的网址就没有”
+   —— 我们用 `getComputedStyle(html).webkitTapHighlightColor` 量到的确是 UA 默认的
+   `rgba(0, 0, 0, 0.18)`（我们从没设过）。它盖在按钮/导航项/tab 上就是一层蓝灰光斑，
+   与我们的语言（颜色只表达状态）无关，而且各平台颜色还不一样。
+   这条属性是**继承**的，写在 html 上全体生效。
+   反馈不会因此丢：`.btn:hover` / `.ctl:hover` / `.tab:hover` 这些自绘状态在触摸设备上
+   由浏览器在 touchstart 时套用（手机点下去能看到颜色变化），不是只有 UA 高亮在顶事。 */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* 交互控件里的文字**不许被选中**（v6.16）。
    需求方（手机）：“按在上面有蓝色的背景，不松手一会儿也会消失，看起来像是选中提示”
    —— 那不是浏览器自带的高亮，是我们的 `::selection`（tokens.css 里取 30% 主题色）：
@@ -39,6 +51,9 @@ summary,
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  /* 上面 html 上已经关过一次点按高亮；这里再写一遍是防旧的 iOS Safari
+     对“继承下去的” tap-highlight 不认（历史上就得写在元素自己身上） */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* 但表单控件要把“可选”收回来：上面那条是**继承**的，会一路传进输入框，

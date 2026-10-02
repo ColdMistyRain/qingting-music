@@ -40,11 +40,12 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  * `PopoverTrigger` 就会去合并一个组件而不是按钮，表现是**点了完全没反应**（v5.73 实测踩到过）。
  * 收进同一个文件后，这条链不可能再被外力拆开。
  *
- * ⚠️ 提示（`AppTooltip`）要挂在**按钮里面的图标**上，不能套在按钮（或 `PopoverTrigger`）外面（v5.74/5.75 实测）：
- * Reka 的 `PopoverTrigger` 自己会包一层 `PopperAnchor`，`TooltipTrigger` 又包一层 —— 两层 `as-child` 锚点
- * 抢**同一个元素**时，内层（浮层）的锚点算出来是零尺寸，浮层被摆到屏幕外（实测 `.q-pop` 盒 `0,-208`），
- * 而 `data-state` / `visibility` / `opacity` 全对：用户只看到“点了没反应”。
- * 挂在图标上时，提示的锚点是图标（相邻几像素、位置观感一致），浮层那条链一个锚点都不多。
+ * ⚠️ 提示（`AppTooltip`）要挂在**按钮里面的图标**上，不能套在按钮（或 `PopoverTrigger`）外面（v5.74/5.75 实测，v5.77 更正成因）：
+ * `PopperAnchor` 把锚点登记给**最近的那个** `PopperRoot`（`injectPopperRootContext()`），而 `TooltipRoot` 自己就渲染一个。
+ * 所以“提示在外”那种写法里，**Popover 的触发器把锚点登记到了 Tooltip 的 Root 上**，`PopoverContent` 读自己的 Root 永远是
+ * `undefined` → 浮层落到 `translate(0, -200%)`（实测盒 `0,-208`），而 `data-state` / `visibility` / `opacity` 全对：
+ * 用户只看到“点了没反应”。判别方法：那一版里**提示是对的、只有浮层错**（真是“两层锚点抢同一元素”的话坏的不该只有浮层）。
+ * 挂在图标上时，每个触发器都离自己的 Root 最近，图标又是个真元素（提示锚点就在按钮内、相邻几像素）。
  * 代价：`aria-describedby` 落在图标（`<svg>`）而不是按钮上 —— 键的**名字**仍由按钮自己的 `aria-label` 给，不受影响。
  */
 withDefaults(defineProps<{ label?: string }>(), { label: "" });

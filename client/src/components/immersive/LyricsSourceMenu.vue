@@ -17,7 +17,7 @@ import { decodeLyricsBytes } from "@/utils/lyricsLibrary";
  * 行为层仍然交给 Reka 的 Popover（打开/关闭、Esc、点外部、焦点归还，铁律 1）；
  * 触发键由本组件自己渲染（`.ctl` + 文件图标），调用方只传 `label` —— 理由见 QueuePopover：
  * “按钮”与“包住按钮的触发器”必须在同一个文件里；提示则挂在**按钮里面的图标**上
- * （不能让两层 `PopperAnchor` 抢同一个元素，否则浮层会被摆到屏幕外）。
+ * （把提示套在 `PopoverTrigger` 外面会让 Popover 的锚点被登记进 Tooltip 的 `PopperRoot`，浮层因此被摆到屏幕外）。
  */
 withDefaults(defineProps<{ label?: string }>(), { label: "" });
 const player = usePlayerStore();

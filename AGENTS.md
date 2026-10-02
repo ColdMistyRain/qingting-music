@@ -152,7 +152,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 12. **`npx.ps1` 同样被拦截（v5.32）**：与第 1 条同源—— `npx -y <pkg>` 在 PowerShell 下会报“未对文件 npx.ps1 进行数字签名”，**一律用 `npx.cmd`**。
 
-13. **vitest 偶发 worker 崩（v5.38 实测一次）**：日志里是 `Worker exited unexpectedly with exit code 3221226505`（= `0xC0000409`）+ `Test Files 8 passed (9)`、`Errors 1 error`，**没有一个断言失败** —— 这是 worker 进程在系统层崩了，不是你的改动坏了代码（那次只改了 CSS 与文档）。判据：`Tests x passed (y)` 里 y 小于用例总数、且没有 `FAIL`/`AssertionError`。处理：**重跑一次** `npm.cmd run test` 即可（实测重跑全绿）；如果连续两次都在**同一个文件**崩，再去查那个文件的用例。
+13. **vitest 偶发 worker 崩（v5.38 实测一次；v5.89 一天撞了四次）**：日志里是 `Worker exited unexpectedly with exit code 3221226505`（= `0xC0000409`）+ `Test Files 8 passed (9)`、`Errors 1 error`，**没有一个断言失败** —— 这是 worker 进程在系统层崩了，不是你的改动坏了代码（四次撞的文件是 `songs.lyrics` / `static` / `playlists.routes` 这些**互不相关**的用例，且都发生在本地开着 `npm run dev` 的时候，疑似资源竞争）。判据：`Tests x passed (y)` 里 y 小于用例总数、且没有 `FAIL`/`AssertionError`。处理：**重跑一次** `npm.cmd run test` 即可（实测每次重跑都全绿）；如果连续两次都在**同一个文件**崩，再去查那个文件的用例。
 
 14. **同一个键多层都在听时，靠“注册顺序”不可控（v5.40）**：沉浸页在 `window` 上听 Esc（收起整页）、Reka 弹层也在 `window` 上听 Esc（关自己），两个同级监听谁先注册谁先跑 —— 实测按一下**把抽屉和整页一起关了**。修法：在最上层挂**捕获阶段**的 `window` 监听（捕获一定早于冒泡），拦住事件并自己关闭最上面那层，保证“Esc 只关最上面那层”。同理，凡是有层级语义的交互，都要由**最上层主动吃掉**事件，不能指望下层自觉让路。
 

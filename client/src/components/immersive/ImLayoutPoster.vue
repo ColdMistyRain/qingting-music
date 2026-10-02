@@ -130,27 +130,66 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   isolation: isolate;
 }
 
-/* 外圈光晕。官方素材本身是浅灰的——灰色没有意义，有意义的是它的 alpha 分层：
-   当 mask 用、再填色，才得到跟着封面配色走的**有机**柔光（box-shadow 做不出这种不规则衰减）。
-   位置与尺寸全部从盘径派生（与外壳同源），比盘大 40% —— 它就是那个“要溢出”的东西。
-   它**随盘旋转**（v5.24 按原型与 3.9 动效表补上漏掉的 disc-spin 那一半：素材形状不规则，
-   转起来才看得出）。旋转与盘同频同向（8s/圈），所以两者相对关系不变，只是那团柔光自己在缓慢流动。 */
+/* 外圈柔光：**三团径向渐变叠出来**（没有图片、没有 mask）——
+   v5.89 之前是 `glow.png` 当 mask 再填主题色：形状是**死的**，只能整团一起转；
+   换成三团各自带偏移、大小、转速的柔光之后，合出来的形状一直在缓慢变形，
+   而周期是 LCM(8, 13, 17) ≈ 30 分钟 —— 人眼看着就是不重复的。
+   （PRD 3.9 当初那句“box-shadow 做不出这种不规则衰减”仍然成立：单团确实做不出；
+     但**多团叠加**可以，而且比一张固定形状的图更“活”。）
+   位置与尺寸全部从盘径与画布留白派生（与盘同源），比盘大 40%、以盘心为中心
+   —— 改了留白却忘了这里，柔光就会跑偏（v5.88 踩到，看着像“盘发灰发虚”）。 */
 .vinyl-glow {
   position: absolute;
-  /* 以**盘心**为中心（盘住在画布里侧 left/--art-pad、bottom/--art-pad-y，所以这里要带上它），
-     比盘大 40%：偏移一律从盘径与那两条留白派生 —— 改了留白却忘了这里，光晕就会跑偏，
-     看起来像“盘发灰发虚”（v5.88 踩到） */
   left: calc(var(--art-pad) - var(--vinyl-d) * 0.2);
   bottom: calc(var(--art-pad-y) - var(--vinyl-d) * 0.2);
   width: calc(var(--vinyl-d) * 1.4);
   aspect-ratio: 1;
-  background: var(--cv1);
-  background: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
-  -webkit-mask: url("../../assets/vinyl/glow.png") center / contain no-repeat;
-  mask: url("../../assets/vinyl/glow.png") center / contain no-repeat;
+  /* 颜色只在容器上取一次（跟随封面），三团都用 currentColor —— JS 依旧只写 --cover-src；
+     上一行是不支持相对色语法时的退回值 */
+  color: var(--cv1);
+  color: oklch(from var(--cover-src) clamp(0.52, calc(l + 0.04), 0.68) clamp(0.07, c, 0.15) h);
+  /* 主团：中心略偏左下（不偏的话就是同心圆，柔光不“活”） */
+  background: radial-gradient(
+    circle closest-side at 47% 53%,
+    color-mix(in oklab, currentColor 52%, transparent) 0%,
+    color-mix(in oklab, currentColor 38%, transparent) 55%,
+    color-mix(in oklab, currentColor 17%, transparent) 78%,
+    transparent 100%
+  );
   animation: v-spin 8s linear infinite;
   /* 暂停＝停在当前角度（像真的转盘停下）——与 .v-disc 同一套语义 */
   animation-play-state: paused;
+}
+
+/* 第二、三团：偏移与转速都不同，叠上去让形状缓慢流动 */
+.vinyl-glow::before,
+.vinyl-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  animation-play-state: paused;
+}
+
+.vinyl-glow::before {
+  background: radial-gradient(
+    circle closest-side at 40% 42%,
+    color-mix(in oklab, currentColor 40%, transparent) 0%,
+    color-mix(in oklab, currentColor 22%, transparent) 50%,
+    transparent 88%
+  );
+  animation: v-spin 13s linear infinite reverse;
+}
+
+.vinyl-glow::after {
+  background: radial-gradient(
+    circle closest-side at 58% 60%,
+    color-mix(in oklab, currentColor 32%, transparent) 0%,
+    color-mix(in oklab, currentColor 18%, transparent) 48%,
+    transparent 86%
+  );
+  animation: v-spin 17s linear infinite;
 }
 
 /* 呼吸只在播放时挂上：**暂停时没有呼吸动画 = opacity 回到 1（最亮帧）**。
@@ -161,6 +200,12 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
     v-spin 8s linear infinite,
     v-breathe 3.4s ease-in-out infinite;
   animation-play-state: running, running;
+}
+
+/* 两团副光跟着播放一起转（暂停时冻结在当前角度，与盘同一套语义） */
+.poster.is-playing .vinyl-glow::before,
+.poster.is-playing .vinyl-glow::after {
+  animation-play-state: running;
 }
 
 /* ::after = 盘缘内阴影环：一圈白边 + 向内晕开的深色，给盘体厚度 */
@@ -363,7 +408,10 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 @media (prefers-reduced-motion: reduce) {
   .v-disc,
   .vinyl-glow,
-  .poster.is-playing .vinyl-glow {
+  .poster.is-playing .vinyl-glow,
+  /* 柔光的两团副光（v5.89） */
+  .vinyl-glow::before,
+  .vinyl-glow::after {
     animation: none;
   }
 

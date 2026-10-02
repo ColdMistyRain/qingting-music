@@ -3,6 +3,7 @@ import { nextTick, onMounted, ref, watch } from "vue";
 import { PLAYLIST_NAME_MAX_LENGTH } from "@qingting/shared";
 import IconCheck from "~icons/ph/check";
 import IconX from "~icons/ph/x";
+import AppTooltip from "@/components/AppTooltip.vue";
 
 /**
  * 行内命名输入（PS-01）：侧栏「新建歌单」与详情页「重命名」共用一份。
@@ -54,18 +55,18 @@ function submit(): void {
       @keydown.enter.prevent="submit"
       @keydown.esc.prevent="emit('cancel')"
     />
-    <button
-      class="inline-name__btn"
-      type="button"
-      title="确定"
-      :disabled="!text.trim()"
-      @click="submit"
-    >
-      <IconCheck class="icon" />
-    </button>
-    <button class="inline-name__btn" type="button" title="取消" @click="emit('cancel')">
-      <IconX class="icon" />
-    </button>
+    <!-- 两枚键都只有图标 —— 按约定走 AppTooltip（label 同时是 aria-label，
+         图标键没有可见文字，名字不能丢），不再只给原生 title（v6.10） -->
+    <AppTooltip label="确定">
+      <button class="inline-name__btn" type="button" :disabled="!text.trim()" @click="submit">
+        <IconCheck class="icon" />
+      </button>
+    </AppTooltip>
+    <AppTooltip label="取消">
+      <button class="inline-name__btn" type="button" @click="emit('cancel')">
+        <IconX class="icon" />
+      </button>
+    </AppTooltip>
   </div>
 </template>
 

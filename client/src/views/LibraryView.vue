@@ -99,6 +99,14 @@ function toggleFavorite(index: number): void {
       <button class="btn btn-quiet" @click="library.load(true)">重试</button>
     </div>
 
+    <!-- 收藏状态没读出来（v6.11）：行尾那些心这时**全是假的**（一律显示未收藏），
+         而它们看着就像“这首歌没收藏过”——与其静默撒谎，不如明说并给重试 -->
+    <div v-if="listening.status === 'error'" class="strip">
+      <IconWarningCircle class="icon" />
+      <span>收藏状态没读出来，行尾的收藏键暂时不准</span>
+      <button class="btn btn-quiet" @click="listening.load(true)">重试</button>
+    </div>
+
     <div v-if="library.songs.length > 0" class="toolbar">
       <label class="search">
         <IconMagnifyingGlass class="icon" />

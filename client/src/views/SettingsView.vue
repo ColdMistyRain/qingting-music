@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import IconSignIn from "~icons/ph/sign-in";
 import IconSignOut from "~icons/ph/sign-out";
+import IconWarningCircle from "~icons/ph/warning-circle";
 import SegmentedControl from "@/components/SegmentedControl.vue";
 import EqualizerPanel from "@/components/EqualizerPanel.vue";
 import { useActiveIndicator } from "@/composables/useActiveIndicator";
@@ -250,6 +251,12 @@ async function signOut(): Promise<void> {
 
       <!-- 在线音源 -->
       <TabsContent value="online">
+        <!-- 读失败与“真的没配”是两件事（v6.10）：前者重试就行，后者才要去改环境变量 -->
+        <div v-if="config.status === 'error'" class="strip">
+          <IconWarningCircle class="icon" />
+          <span>{{ config.error }}</span>
+          <button class="btn btn-quiet" @click="config.load(true)">重试</button>
+        </div>
         <div class="set-card card">
           <b>网易云</b>
           <div class="set-row">

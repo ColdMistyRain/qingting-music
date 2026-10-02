@@ -20,7 +20,16 @@ const config = useConfigStore();
     </div>
 
     <EmptyState
-      v-if="config.onlineEnabled"
+      v-if="config.status === 'error'"
+      :icon="IconPlugsConnected"
+      title="配置没能读出来"
+      desc="后端可能刚重启还没就绪。稍后重试一下就好，本地播放与云端曲库不受影响。"
+      fill
+    >
+      <button class="btn btn-primary" @click="config.load(true)">重试</button>
+    </EmptyState>
+    <EmptyState
+      v-else-if="config.onlineEnabled"
       :icon="IconGlobe"
       title="音源已连上"
       desc="这个页面暂时还没有可搜索的内容。本地播放、云端曲库与歌单都能照常用。"

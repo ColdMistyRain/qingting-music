@@ -198,14 +198,13 @@ async function removeSelected(): Promise<void> {
           </option>
         </select>
       </label>
-      <button
-        class="ctl"
-        :title="direction === 'asc' ? '升序（点击改为降序）' : '降序（点击改为升序）'"
-        @click="toggleDirection"
-      >
-        <IconSortAscending v-if="direction === 'asc'" class="icon" />
-        <IconSortDescending v-else class="icon" />
-      </button>
+      <!-- 只有图标的键按约定走 AppTooltip（label 同时是 aria-label）——v6.10 从原生 title 收口 -->
+      <AppTooltip :label="direction === 'asc' ? '升序（点击改为降序）' : '降序（点击改为升序）'">
+        <button class="ctl" @click="toggleDirection">
+          <IconSortAscending v-if="direction === 'asc'" class="icon" />
+          <IconSortDescending v-else class="icon" />
+        </button>
+      </AppTooltip>
 
       <!-- 与音乐库同一条规则（v5.97）：总数在页头说过了，这里只在**筛选后**报结果数。
            元素常驻（空着也占位）—— 右边那枚批量删除按钮靠它的 `margin-left: auto` 贴边。 -->

@@ -4,23 +4,22 @@ import type { Track } from "@qingting/shared";
 import IconHeartFill from "~icons/ph/heart-fill";
 import IconHeartStraight from "~icons/ph/heart-straight";
 import IconMusicNotes from "~icons/ph/music-notes";
-import IconPause from "~icons/ph/pause";
-import IconPlay from "~icons/ph/play";
 import IconX from "~icons/ph/x";
 import AppTooltip from "@/components/AppTooltip.vue";
 import { formatTime } from "@/utils/format";
-import { isTouchTap } from "@/utils/pointer";
 
 /**
  * 通用曲目行（PRD 3.8 歌曲行结构）。
  * 本地列表、音乐库、在线搜索共用一套行视觉；行交互交给父组件决定。
+ *
+ * **行里不放播放/暂停键**（v5.96）：点整行就是播这首，行尾那列只放“对这首歌的动作”
+ * （收藏、从列表移除）。播放/暂停归底部播放条与沉浸页。
  */
 const props = withDefaults(
   defineProps<{
     track: Track;
     index: number;
     active: boolean;
-    playing: boolean;
     /** 纯浏览场景（如音乐库）不给移除按钮，删除入口统一在控制台（LB-05 / AD-02） */
     removable?: boolean;
     /** 收藏键（PS-05）：只有需要它的页面打开（收藏页、音乐库），默认不渲染 */
@@ -44,13 +43,16 @@ const SOURCE_LABELS: Record<Track["source"], string> = {
 };
 
 const sourceLabel = computed(() => SOURCE_LABELS[props.track.source]);
-const isPlaying = computed(() => props.active && props.playing);
 
-/** 触摸设备的“点一下”就是播这首（RT-03：手机端要能播放/切歌）。
-    桌面不变：单击无响应、双击播放 —— 所以只认 pointerType 为 touch 的点击。
-    行内的按钮全部 @click.stop，不会连带触发这里。 */
-function onRowClick(event: MouseEvent): void {
-  if (isTouchTap((event as PointerEvent).pointerType)) emit("play", props.index);
+/** 点这一行就是播这一首（v5.96）—— 列表行里不再有播放/暂停键。
+    需求方：“播放和暂停都不应该在列表中有这功能，列表行的最右应该放操作歌曲相关的动作”。
+    于是“点行即播”从触摸专属（v5.32）扩到鼠标：桌面也靠它，不再需要行内那枚键。
+    已经是当前曲目时点它**不做事**：列表只负责“选播哪一首”，暂停/续播归底部播放条；
+    顺带也避开了双击的第二下把这首歌从头再放一遍（播放键没了，双击也没必要了）。
+    行内动作键自己 @click.stop，不会连带触发这里。 */
+function onRowClick(): void {
+  if (props.active) return;
+  emit("play", props.index);
 }
 </script>
 
@@ -58,8 +60,8 @@ function onRowClick(event: MouseEvent): void {
   <div
     class="row"
     :class="{ 'row--active': active }"
+    :title="active ? undefined : `播放 ${track.title}`"
     @click="onRowClick"
-    @dblclick="emit('play', index)"
   >
     <div class="row__cover">
       <img v-if="track.cover" :src="track.cover" alt="" />
@@ -88,12 +90,6 @@ function onRowClick(event: MouseEvent): void {
           <IconHeartStraight v-else class="icon" />
         </button>
       </AppTooltip>
-      <AppTooltip :label="isPlaying ? '暂停' : '播放'">
-        <button class="ctl" @click.stop="emit('play', index)">
-          <IconPause v-if="isPlaying" class="icon" />
-          <IconPlay v-else class="icon" />
-        </button>
-      </AppTooltip>
       <AppTooltip v-if="removable" label="从列表移除">
         <button class="ctl row__remove" @click.stop="emit('remove', index)">
           <IconX class="icon" />
@@ -120,6 +116,8 @@ function onRowClick(event: MouseEvent): void {
   padding: 10px var(--row-pad-x);
   border-radius: var(--radius-row);
   transition: background 0.15s;
+  /* 整行都是播放入口（v5.96）—— 行内不再有播放键，所以要有“可点”的指示 */
+  cursor: pointer;
 }
 
 .row:hover {
@@ -223,9 +221,7 @@ function onRowClick(event: MouseEvent): void {
   }
 }
 
-/* 无悬浮能力的设备（触摸屏）：操作键**常显**。
-   手机上主要的播放入口是“点整行”（见 onRowClick），这枚键是**兜底与显式入口**：
-   万一某个引擎的 click 不带 pointerType（老引擎），还能靠它点。
+/* 无悬浮能力的设备（触摸屏）：动作键**常显** —— 触摸没有悬浮态，藏起来就点不到。
    用能力查询（hover）而不是宽度：桌面窗口调窄仍能悬浮，没必要常显。 */
 @media (hover: none) {
   .row__actions .ctl {
@@ -240,13 +236,12 @@ function onRowClick(event: MouseEvent): void {
   gap: 4px;
 }
 
-/* 操作键默认不占位，悬浮本行才显形（减少每行的视觉噪音）。
+/* 动作键默认不占位，悬浮本行才显形（减少每行的视觉噪音）。
    v5.95 需求方：“这个播放按钮有点多此一举了，我直接看底部的播放控件就知道哪首歌正在播放了”
    —— 原先这里还有一条 `.row--active .row__actions .ctl { opacity: 1 }`，把**正在播放那一行**
-   的播放键钉成常显当作“正在播放”标记。那个标记是重复的：① 行自己已经说了（歌名主题色
-   + 加粗 + 行底色 `--accent-soft`）；② 底部播放条一直在说（封面/歌名）。
-   删掉后它与其他行一视同仁（悬浮才显形），“哪个是当前曲目”回归行本身的强调；
-   触摸设备不受影响（上面那条 `hover: none` 已让所有键常显）。 */
+   的键钉成常显当作“正在播放”标记。那个标记是重复的：① 行自己已经说了（歌名主题色
+   + 加粗 + 行底色 `--accent-soft`）；② 底部播放条一直在说。
+   v5.96 进一步：那一列里连播放/暂停键也不放了（见 onRowClick），只留“对这首歌的动作”。 */
 .row__actions .ctl {
   opacity: 0;
   transition: opacity 0.15s;

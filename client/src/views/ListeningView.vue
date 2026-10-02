@@ -173,7 +173,6 @@ async function clearRecent(): Promise<void> {
           :track="row.track"
           :index="index"
           :active="currentId === row.track.id"
-          :playing="player.playing"
           :removable="false"
           show-favorite
           :favorite="listening.isFavorite(row.item)"

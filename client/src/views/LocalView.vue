@@ -175,13 +175,10 @@ onUnmounted(() => {
   window.removeEventListener("drop", onWindowDrop);
 });
 
-/** 点行上的播放键：正在播的那首再点即暂停。
-    “是不是正在播这首”统一按 **id** 判定（与列表高亮同一套口径），不用索引——
-    列表将来被搜索/排序/拖拽重排后，索引会对不上。 */
+/** 点整行就是播这首（v5.96：行里不再有播放/暂停键，也不再“再点一下即暂停”
+    —— 播放/暂停归底部播放条与沉浸页）。 */
 function onRowPlay(index: number): void {
-  const track = player.queue[index];
-  if (track && player.currentTrack?.id === track.id) player.toggle();
-  else player.playAt(index);
+  player.playAt(index);
 }
 
 /** 清空是不可逆的批量动作：先问一句，确认后才真清（LC-06）。
@@ -272,7 +269,6 @@ async function clearAll(): Promise<void> {
       <TrackList
         :tracks="player.queue"
         :active-id="player.currentTrack?.id ?? null"
-        :playing="player.playing"
         @play="onRowPlay"
         @remove="player.removeAt"
       />

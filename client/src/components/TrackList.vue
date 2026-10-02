@@ -18,16 +18,25 @@ withDefaults(
     tracks: readonly Track[];
     /** 正在播的那首用 id 判定：列表被搜索/排序后索引会错位 */
     activeId?: string | null;
-    playing?: boolean;
     /** 纯浏览场景（如音乐库）不给移除按钮，删除入口统一在控制台（LB-05 / AD-02） */
     removable?: boolean;
+    /** 行尾那枚收藏键（v5.96）。列表行不再放播放键之后，“最右那列”得有它该管的事 */
+    showFavorite?: boolean;
+    /** 这一首收藏了没 —— 由页面传入（行本身不碰 store，与 TrackRow 的同一套分工） */
+    favoriteOf?: (track: Track) => boolean;
   }>(),
-  { activeId: null, playing: false, removable: true },
+  {
+    activeId: null,
+    removable: true,
+    showFavorite: false,
+    favoriteOf: () => false,
+  },
 );
 
 defineEmits<{
   play: [index: number];
   remove: [index: number];
+  toggleFavorite: [index: number];
 }>();
 </script>
 
@@ -40,10 +49,12 @@ defineEmits<{
         :track="track"
         :index="index"
         :active="activeId === track.id"
-        :playing="playing"
         :removable="removable"
+        :show-favorite="showFavorite"
+        :favorite="favoriteOf(track)"
         @play="$emit('play', $event)"
         @remove="$emit('remove', $event)"
+        @toggle-favorite="$emit('toggleFavorite', $event)"
       />
     </template>
   </div>

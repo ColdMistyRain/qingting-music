@@ -2,6 +2,7 @@
 import NavToggle from "@/components/NavToggle.vue";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { toPlaylistItem, type Track } from "@qingting/shared";
 import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
 import IconMagnifyingGlass from "~icons/ph/magnifying-glass";
 import IconMusicNotes from "~icons/ph/music-notes";
@@ -11,6 +12,7 @@ import TrackList from "@/components/TrackList.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useLibraryStore } from "@/stores/library";
+import { useListeningStore } from "@/stores/listening";
 import { usePlayerStore } from "@/stores/player";
 import { formatSize } from "@/utils/format";
 import { filterSongs, songToTrack } from "@/utils/library";
@@ -22,10 +24,15 @@ import { filterSongs, songToTrack } from "@/utils/library";
  */
 const auth = useAuthStore();
 const library = useLibraryStore();
+const listening = useListeningStore();
 const player = usePlayerStore();
 const keyword = ref("");
 
-onMounted(() => void library.load());
+onMounted(() => {
+  void library.load();
+  // 行尾那枚收藏键要知道“收没收藏”，而收藏数据在服务端（PS-05）
+  void listening.load();
+});
 
 const tracks = computed(() => filterSongs(library.songs, keyword.value).map(songToTrack));
 const isSearching = computed(() => keyword.value.trim().length > 0);
@@ -38,13 +45,20 @@ const showErrorPanel = computed(() => library.status === "error" && library.song
 function playAt(index: number): void {
   const target = tracks.value[index];
   if (!target) return;
-  if (target.id === player.currentTrack?.id) {
-    player.toggle();
-    return;
-  }
   player.clear();
   player.addTracks(tracks.value);
   player.playAt(index);
+}
+
+/* 行尾那枚收藏键（v5.96）：列表行不再放播放/暂停键之后，“最右那列”放的是**对这首歌的动作**
+   —— 音乐库这一档只有收藏（删除在控制台，LB-05）。行只给“收没收藏”，存取全在 store。 */
+function isFavorite(track: Track): boolean {
+  return listening.isFavorite(toPlaylistItem(track));
+}
+
+function toggleFavorite(index: number): void {
+  const target = tracks.value[index];
+  if (target) void listening.toggleFavorite(toPlaylistItem(target));
 }
 </script>
 
@@ -128,9 +142,11 @@ function playAt(index: number): void {
         v-else
         :tracks="tracks"
         :active-id="player.currentTrack?.id ?? null"
-        :playing="player.playing"
         :removable="false"
+        show-favorite
+        :favorite-of="isFavorite"
         @play="playAt"
+        @toggle-favorite="toggleFavorite"
       />
     </div>
   </section>

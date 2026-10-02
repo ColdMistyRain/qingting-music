@@ -206,49 +206,46 @@ async function removeSelected(): Promise<void> {
       </button>
     </div>
 
-    <!-- 只有表格滚动（方案 A）：页头与工具条固定在上部 -->
-    <div class="page-frame__scroll">
-      <div
-        v-if="library.status === 'loading' && library.songs.length === 0"
-        class="page-frame__fill"
+    <!-- 加载 / 失败 / 空态：撑满页框并居中（与页框同级，不放进卡里） -->
+    <div v-if="library.status === 'loading' && library.songs.length === 0" class="page-frame__fill">
+      <p class="note">正在读取曲库…</p>
+    </div>
+
+    <div v-else-if="showErrorPanel" class="page-frame__fill">
+      <div class="fail card">
+        <span class="fail__badge"><IconWarningCircle class="icon" /></span>
+        <div class="fail__title">曲库没能读出来</div>
+        <p class="fail__desc">{{ library.error }}</p>
+        <button class="btn btn-primary" @click="library.load(true)">重试</button>
+      </div>
+    </div>
+
+    <div v-else-if="showEmptyState" class="page-frame__fill">
+      <EmptyState
+        :icon="IconListDashes"
+        title="曲库还是空的"
+        desc="上传的音乐会出现在这里，可以搜索、排序与批量管理。"
+        fill
       >
-        <p class="note">正在读取曲库…</p>
+        <RouterLink class="btn btn-primary" :to="{ name: 'console-upload' }">去上传音乐</RouterLink>
+      </EmptyState>
+    </div>
+
+    <!-- 表格（方案 A）：卡就是这张“表” —— 表头钉在卡顶、只有行滚（v5.79）。
+         滚动区**放进卡里**而不是把表头挪到卡外：两者因此共享卡的同一套内边距，天然对齐。 -->
+    <div v-else class="songs card">
+      <div class="sg sg--head">
+        <label class="sg__check">
+          <input type="checkbox" :checked="allSelected" aria-label="全选" @change="toggleAll" />
+        </label>
+        <span></span>
+        <span>曲目</span>
+        <span class="sg__num">大小</span>
+        <span class="sg__num">上传时间</span>
+        <span></span>
       </div>
 
-      <div v-else-if="showErrorPanel" class="page-frame__fill">
-        <div class="fail card">
-          <span class="fail__badge"><IconWarningCircle class="icon" /></span>
-          <div class="fail__title">曲库没能读出来</div>
-          <p class="fail__desc">{{ library.error }}</p>
-          <button class="btn btn-primary" @click="library.load(true)">重试</button>
-        </div>
-      </div>
-
-      <div v-else-if="showEmptyState" class="page-frame__fill">
-        <EmptyState
-          :icon="IconListDashes"
-          title="曲库还是空的"
-          desc="上传的音乐会出现在这里，可以搜索、排序与批量管理。"
-          fill
-        >
-          <RouterLink class="btn btn-primary" :to="{ name: 'console-upload' }"
-            >去上传音乐</RouterLink
-          >
-        </EmptyState>
-      </div>
-
-      <div v-else class="songs card">
-        <div class="sg sg--head">
-          <label class="sg__check">
-            <input type="checkbox" :checked="allSelected" aria-label="全选" @change="toggleAll" />
-          </label>
-          <span></span>
-          <span>曲目</span>
-          <span class="sg__num">大小</span>
-          <span class="sg__num">上传时间</span>
-          <span></span>
-        </div>
-
+      <div class="page-frame__scroll">
         <p v-if="rows.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
 
         <div v-for="song in rows" :key="song.id" class="sg">
@@ -375,6 +372,26 @@ async function removeSelected(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 0;
+  /* 有内容时卡自己撑满页框剩下的高度 —— 卡里的滚动区才有确定高度可滚（v5.79） */
+  flex: 1;
+  min-height: 0;
+  /* 撤掉全局“页框直接子元素让出滚动条宽度”的补偿（那条是为“滚动区当页框直接子元素”写的）：
+     滚动条现在在卡里，卡再让一次就会左右不对称；改由表头自己让（见下）。 */
+  margin-right: 0;
+}
+
+/* 卡里的滚动区（v5.79）：只有行滚，表头钉在卡顶。
+   全局那条“负边距铺到岛边”也是为“滚动区当页框直接子元素”写的，放进卡里要撤掉，
+   否则滚动区左右各溢出卡边 20px。 */
+.songs > .page-frame__scroll {
+  margin-inline: 0;
+  padding-inline: 0;
+  min-height: 0;
+}
+
+/* 表头与行一起让出滚动条宽度：滚动条在卡里，行被它挤窄，而表头（在滚动区外）不会自动跟着窄 */
+.songs > .sg--head {
+  margin-right: var(--scrollbar-size, 0px);
 }
 
 @media (max-width: 1024px) {
@@ -426,8 +443,9 @@ async function removeSelected(): Promise<void> {
 }
 
 .sg--head {
-  /* 与曲目列表表头同一规则：不吸顶、不加底色（吸顶要不透明底，
-     而在玻璃岛上它一定露成色带，见 global.css 的说明） */
+  /* 与曲目列表表头同一规则：**不吸顶、不加底色** —— 它现在在滚动区**外面**（卡里的第一个孩子，
+     只有下面的行滚），所以不用不透明底去盖从下面经过的行。
+     （v5.79 之前它与行一起在滚动区里，于是跟着一起滚 —— 那是 bug，不是“跟随头部”。） */
   height: 34px;
   border-bottom: 1px solid var(--glass-border);
   border-radius: 0;
@@ -490,6 +508,14 @@ async function removeSelected(): Promise<void> {
 
 .sg--head .sg__num {
   color: var(--text-3);
+}
+
+/* 表头最后一格是空占位。它必须与行里“两个图标键 + 6px 间距”同宽 ——
+   否则那一列在行里是 48px、在表头里是 0，`minmax(0, 1fr)` 的曲目列就会多吞 48px，
+   表头的「大小 / 上传时间」整体右移 48px（v5.79 实测：行 436 / 表头 484）。
+   宽度从图标尺寸令牌派生，键尺寸变了这里跟着变。 */
+.sg--head > :last-child {
+  width: calc(var(--ctl-icon-size, 21px) * 2 + 6px);
 }
 
 .sg__actions {

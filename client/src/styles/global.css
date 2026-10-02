@@ -18,6 +18,40 @@ a {
   text-decoration: none;
 }
 
+/* 交互控件里的文字**不许被选中**（v6.16）。
+   需求方（手机）：“按在上面有蓝色的背景，不松手一会儿也会消失，看起来像是选中提示”
+   —— 那不是浏览器自带的高亮，是我们的 `::selection`（tokens.css 里取 30% 主题色）：
+   手机上按住一枚按钮不放，系统会开始**选文字**，按钮里的字就被选成一片蓝；
+   松手前它自己消失是系统的长按行为把它收走了（看着就像“这枚键被选中了”）。
+   只关**控件**（按钮 / 链接 / 标签 / 开关 / 滑杆 / tab）—— 正文、歌词、曲名仍照旧可选：
+   复制歌名与歌词是正经需求，别一起关掉。
+   `-webkit-touch-callout: none` 顺带关掉 iOS 长按弹出的“复制 / 查询”系统浮层：
+   点住一枚按钮弹出系统菜单同样是多余的。 */
+button,
+a,
+label,
+summary,
+[role="button"],
+[role="tab"],
+[role="radio"],
+[role="switch"],
+[role="slider"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 但表单控件要把“可选”收回来：上面那条是**继承**的，会一路传进输入框，
+   而用户得能选中/复制自己输入的内容。Chromium 对可编辑元素有特殊处理（实测照旧能选），
+   别的引擎不保证 —— 显式写一条最省心。 */
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 html,
 body,
 #app {

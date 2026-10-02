@@ -7,6 +7,7 @@ import { playlistItemKey, type PlaylistItem, type Track } from "@qingting/shared
 import EmptyState from "@/components/EmptyState.vue";
 import NavToggle from "@/components/NavToggle.vue";
 import SegmentedControl from "@/components/SegmentedControl.vue";
+import TrackListHead from "@/components/TrackListHead.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import { useLibraryStore } from "@/stores/library";
 import { useListeningStore } from "@/stores/listening";
@@ -124,33 +125,43 @@ async function clearRecent(): Promise<void> {
       <SegmentedControl v-model="tab" :options="TAB_OPTIONS" />
     </div>
 
-    <EmptyState
-      v-if="listening.status === 'loading' && items.length === 0"
-      :icon="IconHeartStraight"
-      title="正在读取…"
-      desc="收藏与播放记录都在服务器上，稍等一下。"
-    />
+    <!-- 列不出来的那些：一句小字说清楚，不静默消失。它说明的是这份列表，所以钉在帧上、不跟着滚 -->
+    <p v-if="hidden > 0" class="my-note">
+      有 {{ hidden }} 条暂时列不出来（本地文件不在当前列表里，或云端那首已经不在曲库）。
+    </p>
 
-    <EmptyState
-      v-else-if="items.length === 0 && tab === 'favorites'"
-      :icon="IconHeartStraight"
-      title="还没有收藏"
-      desc="播放条上那颗心，或在音乐库里点一下 —— 喜欢的歌就会收在这里。"
-    />
+    <!-- 表头 = “说明”：与音乐库同一套骨架 —— 在滚动区外面，不吸顶、不加底色（v4.41） -->
+    <TrackListHead v-if="rows.length > 0" />
 
-    <EmptyState
-      v-else-if="items.length === 0"
-      :icon="IconTrash"
-      title="还没有播放记录"
-      desc="听过一首歌之后，这里会留下最近播放的 100 条。"
-    />
+    <!-- 只有列表滚动（与音乐库同一套骨架）：状态撑满帧并居中，列表才是滚动内容 -->
+    <div class="page-frame__scroll">
+      <EmptyState
+        v-if="listening.status === 'loading' && items.length === 0"
+        class="page-frame__fill"
+        :icon="IconHeartStraight"
+        title="正在读取…"
+        desc="收藏与播放记录都在服务器上，稍等一下。"
+      />
 
-    <template v-else>
-      <p v-if="hidden > 0" class="my-note">
-        有 {{ hidden }} 条暂时列不出来（本地文件不在当前列表里，或云端那首已经不在曲库）。
-      </p>
+      <EmptyState
+        v-else-if="items.length === 0 && tab === 'favorites'"
+        class="page-frame__fill"
+        :icon="IconHeartStraight"
+        title="还没有收藏"
+        desc="播放条上那颗心，或在音乐库里点一下 —— 喜欢的歌就会收在这里。"
+      />
 
-      <p v-if="rows.length === 0" class="my-note">这一批现在都没有能播的。</p>
+      <EmptyState
+        v-else-if="items.length === 0"
+        class="page-frame__fill"
+        :icon="IconTrash"
+        title="还没有播放记录"
+        desc="听过一首歌之后，这里会留下最近播放的 100 条。"
+      />
+
+      <div v-else-if="rows.length === 0" class="page-frame__fill">
+        <p class="my-note">这一批现在都没有能播的。</p>
+      </div>
 
       <div v-else class="row-list">
         <TrackRow
@@ -167,7 +178,7 @@ async function clearRecent(): Promise<void> {
           @toggle-favorite="toggleFavorite"
         />
       </div>
-    </template>
+    </div>
   </section>
 </template>
 

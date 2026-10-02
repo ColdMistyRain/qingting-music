@@ -305,152 +305,160 @@ function exportJson(): void {
       </div>
     </div>
 
-    <!-- 未登录（AC-01）：歌单是服务器功能，只给一句引导，不渲染点不动的假控件 -->
-    <EmptyState
-      v-if="!canEdit"
-      :icon="IconPlaylist"
-      title="登录后才能用歌单"
-      desc="歌单存在服务器上，登录后就能把喜欢的歌收进来。"
-    />
+    <!-- 页头（封面 / 名称 / 操作）：与其它列表页同一套骨架 —— 钉在帧上不滚，只有下面的曲目滚 -->
+    <div v-if="playlist" class="pl-head">
+      <div class="pl-cover">
+        <img v-if="cover" :src="cover" alt="" />
+        <IconPlaylist v-else class="icon" />
+      </div>
 
-    <EmptyState
-      v-else-if="!playlist && playlists.status === 'ready'"
-      :icon="IconPlaylist"
-      title="这个歌单不在了"
-      desc="可能已经在别处删除。回音乐库或本地播放接着听吧。"
-    />
+      <div class="pl-info">
+        <InlineNameInput
+          v-if="renaming"
+          :model-value="playlist.name"
+          placeholder="歌单名"
+          @submit="submitRename"
+          @cancel="renaming = false"
+        />
+        <p v-else class="pl-name" :title="playlist.name">{{ playlist.name }}</p>
+        <p class="pl-meta">
+          {{ playlist.items.length }} 首
+          <template v-if="totalSeconds > 0"> · {{ formatTime(totalSeconds) }}</template>
+        </p>
+      </div>
 
-    <template v-else-if="playlist">
-      <div class="pl-head">
-        <div class="pl-cover">
-          <img v-if="cover" :src="cover" alt="" />
-          <IconPlaylist v-else class="icon" />
-        </div>
+      <div class="pl-actions">
+        <button class="btn btn-primary" :disabled="playable.length === 0" @click="playAll">
+          <IconPlay class="icon" />
+          播放全部
+        </button>
+        <button class="btn" :disabled="busy" @click="picking = true">
+          <IconPlus class="icon" />
+          添加曲目
+        </button>
+        <button class="btn" :disabled="busy" @click="renaming = true">
+          <IconPencilSimple class="icon" />
+          重命名
+        </button>
+        <DropdownMenuRoot>
+          <DropdownMenuTrigger as-child>
+            <button class="btn" :disabled="playlist.items.length === 0">
+              <IconDownloadSimple class="icon" />
+              导出
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuContent class="pl-menu" side="bottom" align="end" :side-offset="6">
+              <DropdownMenuItem class="pl-menu__item" @select="exportM3U8">
+                <IconMusicNotes class="icon" />
+                <span>
+                  M3U8 播放列表
+                  <small>别的播放器直接能读</small>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem class="pl-menu__item" @select="exportJson">
+                <IconFileCode class="icon" />
+                <span>
+                  JSON 备份
+                  <small>留着以后还原</small>
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenuPortal>
+        </DropdownMenuRoot>
+        <button class="btn btn-danger" :disabled="busy" @click="removePlaylist">
+          <IconTrash class="icon" />
+          删除
+        </button>
+      </div>
+    </div>
 
-        <div class="pl-info">
-          <InlineNameInput
-            v-if="renaming"
-            :model-value="playlist.name"
-            placeholder="歌单名"
-            @submit="submitRename"
-            @cancel="renaming = false"
-          />
-          <p v-else class="pl-name">{{ playlist.name }}</p>
-          <p class="pl-meta">
-            {{ playlist.items.length }} 首
-            <template v-if="totalSeconds > 0"> · {{ formatTime(totalSeconds) }}</template>
+    <p v-if="playlist && actionError" class="pl-error" role="alert">{{ actionError }}</p>
+
+    <!-- 只有列表滚动（与其它列表页同一套骨架）：状态撑满帧并居中，曲目列表才是滚动内容 -->
+    <div class="page-frame__scroll">
+      <!-- 未登录（AC-01）：歌单是服务器功能，只给一句引导，不渲染点不动的假控件 -->
+      <EmptyState
+        v-if="!canEdit"
+        class="page-frame__fill"
+        :icon="IconPlaylist"
+        title="登录后才能用歌单"
+        desc="歌单存在服务器上，登录后就能把喜欢的歌收进来。"
+      />
+
+      <EmptyState
+        v-else-if="!playlist && playlists.status === 'ready'"
+        class="page-frame__fill"
+        :icon="IconPlaylist"
+        title="这个歌单不在了"
+        desc="可能已经在别处删除。回音乐库或本地播放接着听吧。"
+      />
+
+      <template v-else-if="playlist">
+        <div v-if="entries.length === 0" class="page-frame__fill">
+          <p class="pl-empty">
+            这个歌单还是空的。点「添加曲目」从音乐库里挑，或把当前播放列表整体加进来。
           </p>
         </div>
 
-        <div class="pl-actions">
-          <button class="btn btn-primary" :disabled="playable.length === 0" @click="playAll">
-            <IconPlay class="icon" />
-            播放全部
-          </button>
-          <button class="btn" :disabled="busy" @click="picking = true">
-            <IconPlus class="icon" />
-            添加曲目
-          </button>
-          <button class="btn" :disabled="busy" @click="renaming = true">
-            <IconPencilSimple class="icon" />
-            重命名
-          </button>
-          <DropdownMenuRoot>
-            <DropdownMenuTrigger as-child>
-              <button class="btn" :disabled="playlist.items.length === 0">
-                <IconDownloadSimple class="icon" />
-                导出
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuContent class="pl-menu" side="bottom" align="end" :side-offset="6">
-                <DropdownMenuItem class="pl-menu__item" @select="exportM3U8">
-                  <IconMusicNotes class="icon" />
-                  <span>
-                    M3U8 播放列表
-                    <small>别的播放器直接能读</small>
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem class="pl-menu__item" @select="exportJson">
-                  <IconFileCode class="icon" />
-                  <span>
-                    JSON 备份
-                    <small>留着以后还原</small>
-                  </span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenuPortal>
-          </DropdownMenuRoot>
-          <button class="btn btn-danger" :disabled="busy" @click="removePlaylist">
-            <IconTrash class="icon" />
-            删除
-          </button>
-        </div>
-      </div>
-
-      <p v-if="actionError" class="pl-error" role="alert">{{ actionError }}</p>
-
-      <p v-if="entries.length === 0" class="pl-empty">
-        这个歌单还是空的。点「添加曲目」从音乐库里挑，或把当前播放列表整体加进来。
-      </p>
-
-      <ol v-else ref="listEl" class="pl-list" :class="{ 'is-dragging': dragging }">
-        <li
-          v-for="(entry, index) in entries"
-          :key="entry.key"
-          class="pl-row"
-          :class="{
-            'is-missing': !entry.track,
-            'is-dragging': dragFrom === index,
-            'is-drop-line': dragging && dragFrom !== dragTo && dragTo === index,
-          }"
-          :style="dragFrom === index ? { '--drag-offset': `${dragOffset}px` } : undefined"
-        >
-          <!-- 序号格就是拖拽把手（不另占一列，也不和行里的播放按钮抢点击）：
-               hover / 键盘聚焦时数字换成把手图标，触屏直接显示把手 -->
-          <AppTooltip :label="`拖动排序：${entry.title}（也可用 ↑ ↓）`">
-            <button
-              class="pl-grip"
-              :class="{ 'is-active': dragFrom === index }"
-              :disabled="entries.length < 2"
-              :aria-label="`拖动排序 ${entry.title}，共 ${entries.length} 首，当前第 ${index + 1} 首`"
-              @pointerdown="startDrag(index, $event)"
-              @pointermove="moveDrag"
-              @pointerup="endDrag"
-              @pointercancel="resetDrag"
-              @keydown.up.prevent="nudge(index, -1)"
-              @keydown.down.prevent="nudge(index, 1)"
-            >
-              <span class="pl-grip__num">{{ index + 1 }}</span>
-              <IconDotsSixVertical class="icon pl-grip__icon" />
-            </button>
-          </AppTooltip>
-
-          <button
-            class="pl-main"
-            :disabled="!entry.track"
-            :title="entry.track ? `播放 ${entry.title}` : entry.reason"
-            @click="playFrom(entry)"
+        <ol v-else ref="listEl" class="pl-list" :class="{ 'is-dragging': dragging }">
+          <li
+            v-for="(entry, index) in entries"
+            :key="entry.key"
+            class="pl-row"
+            :class="{
+              'is-missing': !entry.track,
+              'is-dragging': dragFrom === index,
+              'is-drop-line': dragging && dragFrom !== dragTo && dragTo === index,
+            }"
+            :style="dragFrom === index ? { '--drag-offset': `${dragOffset}px` } : undefined"
           >
-            <span class="pl-art">
-              <img v-if="entry.item.cover" :src="entry.item.cover" alt="" />
-              <IconPlaylist v-else class="icon" />
-            </span>
-            <span class="pl-text">
-              <b>{{ entry.title }}</b>
-              <small>{{ entry.track ? entry.artist : entry.reason }}</small>
-            </span>
-            <span class="pl-time">{{ formatTime(entry.item.duration ?? null) }}</span>
-          </button>
+            <!-- 序号格就是拖拽把手（不另占一列，也不和行里的播放按钮抢点击）：
+               hover / 键盘聚焦时数字换成把手图标，触屏直接显示把手 -->
+            <AppTooltip :label="`拖动排序：${entry.title}（也可用 ↑ ↓）`">
+              <button
+                class="pl-grip"
+                :class="{ 'is-active': dragFrom === index }"
+                :disabled="entries.length < 2"
+                :aria-label="`拖动排序 ${entry.title}，共 ${entries.length} 首，当前第 ${index + 1} 首`"
+                @pointerdown="startDrag(index, $event)"
+                @pointermove="moveDrag"
+                @pointerup="endDrag"
+                @pointercancel="resetDrag"
+                @keydown.up.prevent="nudge(index, -1)"
+                @keydown.down.prevent="nudge(index, 1)"
+              >
+                <span class="pl-grip__num">{{ index + 1 }}</span>
+                <IconDotsSixVertical class="icon pl-grip__icon" />
+              </button>
+            </AppTooltip>
 
-          <AppTooltip :label="`把《${entry.title}》移出歌单`">
-            <button class="pl-remove" :disabled="busy" @click="removeEntry(entry)">
-              <IconX class="icon" />
+            <button
+              class="pl-main"
+              :disabled="!entry.track"
+              :title="entry.track ? `播放 ${entry.title}` : entry.reason"
+              @click="playFrom(entry)"
+            >
+              <span class="pl-art">
+                <img v-if="entry.item.cover" :src="entry.item.cover" alt="" />
+                <IconPlaylist v-else class="icon" />
+              </span>
+              <span class="pl-text">
+                <b>{{ entry.title }}</b>
+                <small>{{ entry.track ? entry.artist : entry.reason }}</small>
+              </span>
+              <span class="pl-time">{{ formatTime(entry.item.duration ?? null) }}</span>
             </button>
-          </AppTooltip>
-        </li>
-      </ol>
-    </template>
+
+            <AppTooltip :label="`把《${entry.title}》移出歌单`">
+              <button class="pl-remove" :disabled="busy" @click="removeEntry(entry)">
+                <IconX class="icon" />
+              </button>
+            </AppTooltip>
+          </li>
+        </ol>
+      </template>
+    </div>
 
     <!-- 添加曲目的选择器：直接列曲库，点一下加一首、可连点 -->
     <DialogRoot v-model:open="picking">
@@ -554,8 +562,12 @@ function exportJson(): void {
 }
 
 .pl-info {
-  flex: 1;
-  min-width: 0;
+  /* `flex: 1` 等于 `1 1 0%`：基准宽度为 0，按钮组一挤就把这一块压成 0 宽 ——
+     歌单名于是“一个字一行”竖着排（实测 818px 下“tmp-骨架验证”就是竖的）。
+     所以基准要取内容宽度（auto），并留一个保底宽度：宁可让按钮组内部换行，
+     也不要让这一块消失。 */
+  flex: 1 1 auto;
+  min-width: 140px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -565,6 +577,10 @@ function exportJson(): void {
   font-size: 18px;
   font-weight: 600;
   color: var(--text-1);
+  /* 页头是钉住的（不跟着列表滚），高度必须稳定：过长的歌单名截断，不要换成多行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pl-meta {

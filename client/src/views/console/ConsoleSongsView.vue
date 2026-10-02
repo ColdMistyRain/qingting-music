@@ -65,8 +65,8 @@ function startEdit(song: Song): void {
 }
 
 /** 保存成功：就地换掉列表里那一条，并在队列里同步（曲目可能正在唱） */
-function onMetaSaved(song: Song): void {
-  library.applyUpdated(song);
+function onMetaSaved(song: Song, assets: { lyrics?: string }): void {
+  library.applyUpdated(song, assets);
 }
 
 const allSelected = computed(

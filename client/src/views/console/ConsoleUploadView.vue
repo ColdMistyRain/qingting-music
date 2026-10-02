@@ -80,8 +80,8 @@ function editItemMeta(item: UploadItem): void {
   metaOpen.value = true;
 }
 
-function onMetaSaved(song: Song): void {
-  library.applyUpdated(song);
+function onMetaSaved(song: Song, assets: { lyrics?: string }): void {
+  library.applyUpdated(song, assets);
   // 这一行的结果文字里有歌名，改了要跟着变，不然看起来像“没保存”
   const item = items.value.find((entry) => entry.song?.id === song.id);
   if (item) item.message = `${formatSize(song.size)} · ${song.title}`;

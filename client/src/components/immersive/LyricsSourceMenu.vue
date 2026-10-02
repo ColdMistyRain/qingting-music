@@ -26,10 +26,13 @@ const open = ref(false);
 const failed = ref(false);
 const fileRef = ref<HTMLInputElement | null>(null);
 
-/** 现在用的是哪一份：菜单里写清楚，省得用户猜 */
+/** 现在用的是哪一份：菜单里写清楚，省得用户猜。
+ *  云端曲目的歌词存在服务器上（可能是文件里内嵌的，也可能是在曲库管理里贴上来的），
+ *  所以那一档不写“曲目自带” —— 手动设过的那份同样是“曲库里的”。 */
 const status = computed(() => {
   if (player.hasImportedLyrics) return "正在使用手动导入的歌词";
   if (!player.lyricsSource.trim()) return "这首歌暂时没有歌词";
+  if (player.currentTrack?.source === "server") return "正在使用曲库里的歌词";
   return "正在使用曲目自带的歌词";
 });
 

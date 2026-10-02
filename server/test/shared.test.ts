@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  COVER_MIME_BY_EXTENSION,
+  LYRICS_MAX_LENGTH,
   PLAYLIST_NAME_MAX_LENGTH,
   SONG_FIELD_MAX_LENGTH,
   dedupePlaylistItems,
   fileExtension,
   hasAccess,
+  hasLyricTiming,
   isAudioFileName,
+  isCoverFileName,
   parseTrackFileName,
   pickEmbeddedLyrics,
   playlistItemKey,
   toPlaylistItem,
+  validateLyricsText,
   validatePlaylistName,
   validateSongMeta,
   type PlaylistItem,
@@ -40,6 +45,51 @@ describe("isAudioFileName", () => {
     expect(isAudioFileName("cover.jpg")).toBe(false);
     expect(isAudioFileName("a.mp3.exe")).toBe(false);
     expect(isAudioFileName("song")).toBe(false);
+  });
+});
+
+describe("封面白名单与校验（AD-02 扩展，v6.13）", () => {
+  it("四种图片扩展名命中，音频与 gif 不算封面", () => {
+    for (const name of ["a.jpg", "b.JPEG", "c.png", "d.webp"]) {
+      expect(isCoverFileName(name)).toBe(true);
+    }
+    expect(isCoverFileName("a.gif")).toBe(false);
+    expect(isCoverFileName("a.mp3")).toBe(false);
+    expect(isCoverFileName("封面")).toBe(false);
+  });
+
+  it("落盘 / 清理 / GET /covers 三处共用同一张 MIME 表", () => {
+    expect(Object.keys(COVER_MIME_BY_EXTENSION).sort()).toEqual(["jpeg", "jpg", "png", "webp"]);
+    expect(COVER_MIME_BY_EXTENSION.jpg).toBe("image/jpeg");
+  });
+});
+
+describe("hasLyricTiming / validateLyricsText（AD-02 扩展，v6.13）", () => {
+  it("认得 LRC、增强型 LRC 与 yrc 三种时间标签", () => {
+    expect(hasLyricTiming("[00:12.00]今天")).toBe(true);
+    expect(hasLyricTiming("[00:12]今天")).toBe(true);
+    expect(hasLyricTiming("[00:12.00]<00:12.50>今<00:13.00>天")).toBe(true);
+    expect(hasLyricTiming("[12000,3000](0,500,0)今")).toBe(true);
+  });
+
+  it("纯文本、空文本都不算能用的歌词（我们的歌词引擎按时间轴走）", () => {
+    expect(hasLyricTiming("今天天气不错\n但是没有时间标签")).toBe(false);
+    expect(hasLyricTiming("[ti:歌名]\n[ar:歌手]")).toBe(false);
+    expect(hasLyricTiming("")).toBe(false);
+  });
+
+  it("校验：去掉首尾空白后存那一份，空 / 非文本 / 无标签 / 超长都拒", () => {
+    expect(validateLyricsText("  [00:01.00]hi  ")).toEqual({ ok: true, value: "[00:01.00]hi" });
+
+    const empty = validateLyricsText("   ");
+    expect(empty.ok).toBe(false);
+    const notText = validateLyricsText(42);
+    expect(notText.ok).toBe(false);
+    const noTiming = validateLyricsText("就是一段普通文字");
+    expect(noTiming.ok).toBe(false);
+    if (!noTiming.ok) expect(noTiming.message).toContain("时间标签");
+    const tooLong = validateLyricsText(`[00:01.00]${"长".repeat(LYRICS_MAX_LENGTH)}`);
+    expect(tooLong.ok).toBe(false);
   });
 });
 

@@ -1,11 +1,10 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Router } from "express";
-import { fileExtension } from "@qingting/shared";
+import { COVER_MIME_BY_EXTENSION, fileExtension } from "@qingting/shared";
 import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
-import { COVER_MIME_BY_EXTENSION } from "../services/covers.js";
 import { pipeFile } from "../services/fileStream.js";
 import { parseRangeHeader } from "../services/range.js";
 

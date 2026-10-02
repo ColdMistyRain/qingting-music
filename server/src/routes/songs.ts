@@ -1,12 +1,15 @@
 import { mkdirSync } from "node:fs";
-import { readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
 import {
+  COVER_MAX_BYTES,
   SONG_DUPLICATE_CODE,
   fileExtension,
   isAudioFileName,
+  isCoverFileName,
+  validateLyricsText,
   validateSongMeta,
   type Song,
 } from "@qingting/shared";
@@ -14,34 +17,48 @@ import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail, sendOk } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
 import { parseAudioFile, decodeUploadFileName } from "../services/metadata.js";
-import { pruneCovers, removeCoverVariants } from "../services/covers.js";
+import {
+  coverNameOf,
+  newCoverName,
+  pruneCovers,
+  removeCoverByName,
+  writeCover,
+} from "../services/covers.js";
 import { pruneLyrics, readLyrics, removeLyrics, saveLyrics } from "../services/lyrics.js";
 import {
   createSongId,
   createStoredName,
   loadSongs,
+  songEditedAssets,
   songEditedFields,
   toSongListResult,
   updateSongs,
+  withSongAssets,
   withSongMeta,
 } from "../services/storage.js";
 
 /**
  * 云端曲库（PRD 3.4 / 3.12，接口见 5.6）。
  *   GET    /api/songs           列表（访客及以上，LB-04）
- *   GET    /api/songs/:id/lyrics 内嵌歌词原文（访客及以上，LR-02）
+ *   GET    /api/songs/:id/lyrics 歌词原文（访客及以上，LR-02）
  *   POST   /api/songs/upload    上传（管理员，LB-01/02/03）
  *   PUT    /api/songs/:id       改标题/歌手/专辑（管理员，AD-02）
+ *   PUT    /api/songs/:id/cover 换封面（管理员，AD-02 扩展 / v6.13）
+ *   DELETE /api/songs/:id/cover 去掉封面（管理员，AD-02 扩展 / v6.13）
+ *   PUT    /api/songs/:id/lyrics 设置歌词正文（管理员，AD-02 扩展 / v6.13）
  *   DELETE /api/songs/:id       删除曲目与文件（管理员，LB-05）
  *   POST   /api/songs/reindex   扫 uploads 重建索引（管理员，LB-11 / AD-05）
  *
  * 索引每次现读现写（文件很小），不上内存缓存：省掉一整套缓存失效的坑。
- * 内嵌歌词不走索引：正文存 `data/lyrics/<id>.lrc`，索引里只留 `hasLyrics` 标记
+ * 歌词正文不进索引：正文存 `data/lyrics/<id>.lrc`，索引里只留 `hasLyrics` 标记
  * （列表接口每次都要整读索引，几 MB 的歌词文本不该拖着一起走）。
  */
 
 /** 扩展名不在白名单（LB-02）：交给下面的错误映射翻成 415 */
 class UnsupportedAudioError extends Error {}
+
+/** 封面不是图片（AD-02 扩展）：同样翻成 415 */
+class UnsupportedImageError extends Error {}
 
 export function createSongsRouter(config: AppConfig): Router {
   const router = Router();
@@ -58,6 +75,23 @@ export function createSongsRouter(config: AppConfig): Router {
     fileFilter: (_req, file, cb) => {
       if (!isAudioFileName(file.originalname)) {
         cb(new UnsupportedAudioError("只支持 MP3 / FLAC / WAV / OGG / M4A / AAC / OPUS 音频"));
+        return;
+      }
+      cb(null, true);
+    },
+  });
+
+  /**
+   * 封面用**内存盘**（AD-02 扩展）：一张封面几百 KB，读进 Buffer 后由我们自己命名落盘
+   * （与内嵌封面走同一条 `writeCover`）；尺寸上限也是自己的 —— 音频那 300 MB 的上限
+   * 拿来量图片没有任何意义。
+   */
+  const coverUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: COVER_MAX_BYTES, files: 1 },
+    fileFilter: (_req, file, cb) => {
+      if (!isCoverFileName(file.originalname)) {
+        cb(new UnsupportedImageError(coverHint()));
         return;
       }
       cb(null, true);
@@ -91,7 +125,7 @@ export function createSongsRouter(config: AppConfig): Router {
     "/upload",
     requireAccess("admin"),
     upload.single("file"),
-    mapUploadError,
+    uploadErrorMapper("audio"),
     asyncHandler(async (req, res) => {
       const file = req.file;
       if (!file) {
@@ -183,6 +217,103 @@ export function createSongsRouter(config: AppConfig): Router {
     }),
   );
 
+  /**
+   * 换封面（AD-02 扩展，v6.13）：新文件 + **新名字**落盘，再把索引指过去，最后删旧图。
+   *
+   * 顺序与删歌同一条纪律：**先写文件 → 再写索引 → 最后删文件**。中途失败最多留一张孤儿封面
+   * （`pruneCovers` 能收），反过来则是索引指向一张已经不在的图（界面上就是一个破图）。
+   */
+  router.put(
+    "/:id/cover",
+    requireAccess("admin"),
+    coverUpload.single("cover"),
+    uploadErrorMapper("cover"),
+    asyncHandler(async (req, res) => {
+      const id = String(req.params.id);
+      const file = req.file;
+      if (!file) {
+        sendFail(res, 400, "没有收到图片（字段名应为 cover）");
+        return;
+      }
+
+      const songs = await loadSongs(config.dataDir);
+      const song = songs.find((entry) => entry.id === id);
+      if (!song) {
+        sendFail(res, 404, "这首曲目不在曲库里");
+        return;
+      }
+
+      const extension = fileExtension(decodeUploadFileName(file.originalname));
+      const name = newCoverName(id, extension);
+      await writeCover(config, name, file.buffer);
+
+      const updated = withSongAssets({ ...song, coverUrl: `/covers/${name}` }, ["cover"]);
+      await updateSongs(config.dataDir, (current) =>
+        current.map((entry) => (entry.id === id ? updated : entry)),
+      );
+
+      // 旧封面现在没人引用了：按**索引里那个准确的文件名**删，不用 id 前缀去猜（见 covers.ts 注释）
+      await removeCoverByName(config, coverNameOf(song.coverUrl));
+      sendOk(res, updated);
+    }),
+  );
+
+  /** 去掉封面（AD-02 扩展）：索引里去掉这条引用，界面回到占位图；文件照旧最后删 */
+  router.delete(
+    "/:id/cover",
+    requireAccess("admin"),
+    asyncHandler(async (req, res) => {
+      const id = String(req.params.id);
+      const songs = await loadSongs(config.dataDir);
+      const song = songs.find((entry) => entry.id === id);
+      if (!song) {
+        sendFail(res, 404, "这首曲目不在曲库里");
+        return;
+      }
+
+      const updated = withSongAssets({ ...song, coverUrl: null }, ["cover"]);
+      await updateSongs(config.dataDir, (current) =>
+        current.map((entry) => (entry.id === id ? updated : entry)),
+      );
+      await removeCoverByName(config, coverNameOf(song.coverUrl));
+      sendOk(res, updated);
+    }),
+  );
+
+  /**
+   * 设置歌词正文（AD-02 扩展，v6.13）：上传 `.lrc` 文件与直接粘文本**走同一条接口** ——
+   * 文件在浏览器里先按编码回退读成文本（`utils/lyricsLibrary` 的 `decodeLyricsBytes`），
+   * 所以服务端只认一种输入：一段带时间标签的歌词文本。
+   */
+  router.put(
+    "/:id/lyrics",
+    requireAccess("admin"),
+    asyncHandler(async (req, res) => {
+      const id = String(req.params.id);
+      const songs = await loadSongs(config.dataDir);
+      const song = songs.find((entry) => entry.id === id);
+      if (!song) {
+        sendFail(res, 404, "这首曲目不在曲库里");
+        return;
+      }
+
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const check = validateLyricsText(body.text);
+      if (!check.ok) {
+        sendFail(res, 400, check.message);
+        return;
+      }
+
+      // 先写正文、再写索引：反过来会出现“索引说这首歌有歌词，正文却还没落盘”
+      await saveLyrics(config.dataDir, id, check.value);
+      const updated = withSongAssets({ ...song, hasLyrics: true }, ["lyrics"]);
+      await updateSongs(config.dataDir, (current) =>
+        current.map((entry) => (entry.id === id ? updated : entry)),
+      );
+      sendOk(res, updated);
+    }),
+  );
+
   router.delete(
     "/:id",
     requireAccess("admin"),
@@ -229,11 +360,20 @@ export function createSongsRouter(config: AppConfig): Router {
           const originalName = previous?.originalName ?? name;
           const parsed = await parseAudioFile(fullPath, originalName);
           const id = previous?.id ?? createSongId();
-          const coverName = await saveCover(config, id, parsed.cover);
+
+          // 手动设过的资源（AD-02 扩展）一律不动：封面照旧、歌词照旧。
+          // 只记“改过的字段”是不够的 —— 封面与歌词是文件级的资源，用户换了封面、
+          // 粘了歌词之后跑一次重建索引，不该把它们换回文件里那份。
+          const assets = previous ? songEditedAssets(previous) : [];
+          const keepCover = assets.includes("cover");
+          const keepLyrics = assets.includes("lyrics");
+          const coverName = keepCover ? null : await saveCover(config, id, parsed.cover);
 
           // 歌词跟着重建一起重抽：以前上传的曲目就是这样补上歌词的
-          if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
-          else await removeLyrics(config.dataDir, id);
+          if (!keepLyrics) {
+            if (parsed.lyrics) await saveLyrics(config.dataDir, id, parsed.lyrics);
+            else await removeLyrics(config.dataDir, id);
+          }
 
           // 手动改过的字段（AD-02）必须保住：重建索引是拿文件里的标签重抽的，
           // 不记账的话用户填的歌名/歌手会被一次 reindex 冲回原样
@@ -247,13 +387,18 @@ export function createSongsRouter(config: AppConfig): Router {
             artist: keep("artist", parsed.artist),
             album: keep("album", parsed.album),
             duration: parsed.duration,
-            coverUrl: coverName ? `/covers/${coverName}` : (previous?.coverUrl ?? null),
+            coverUrl: keepCover
+              ? (previous?.coverUrl ?? null)
+              : coverName
+                ? `/covers/${coverName}`
+                : (previous?.coverUrl ?? null),
             originalName,
             storedName: name,
             size: info.size,
             uploadedAt: previous?.uploadedAt ?? info.mtime.toISOString(),
-            hasLyrics: parsed.lyrics !== null,
+            hasLyrics: keepLyrics ? previous?.hasLyrics === true : parsed.lyrics !== null,
             ...(edited.length > 0 ? { editedFields: [...edited] } : {}),
+            ...(assets.length > 0 ? { editedAssets: [...assets] } : {}),
           });
           if (!previous) added += 1;
         }
@@ -271,7 +416,7 @@ export function createSongsRouter(config: AppConfig): Router {
       // 不清理的话孤儿封面只增不减（歌词早就有这一手了）
       await pruneCovers(
         config,
-        songs.flatMap((song) => (song.coverUrl ? [path.basename(song.coverUrl)] : [])),
+        songs.flatMap((song) => [coverNameOf(song.coverUrl)].filter(Boolean)),
       );
 
       sendOk(res, {
@@ -287,20 +432,33 @@ export function createSongsRouter(config: AppConfig): Router {
 }
 
 /** multer 的错误翻译成 HTTP 语义：超限 413、格式不符 415、其余 400（都是文件本身的问题） */
-function mapUploadError(error: unknown, _req: Request, res: Response, next: NextFunction): void {
-  if (error instanceof UnsupportedAudioError) {
-    sendFail(res, 415, error.message);
-    return;
-  }
-  if (error instanceof multer.MulterError) {
-    if (error.code === "LIMIT_FILE_SIZE") {
-      sendFail(res, 413, "文件超过单文件大小上限");
+function uploadErrorMapper(kind: "audio" | "cover") {
+  return (error: unknown, _req: Request, res: Response, next: NextFunction): void => {
+    if (error instanceof UnsupportedAudioError || error instanceof UnsupportedImageError) {
+      sendFail(res, 415, error.message);
       return;
     }
-    sendFail(res, 400, "上传请求不合法");
-    return;
-  }
-  next(error);
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        sendFail(
+          res,
+          413,
+          kind === "cover"
+            ? `封面超过 ${Math.round(COVER_MAX_BYTES / 1024 / 1024)} MB`
+            : "文件超过单文件大小上限",
+        );
+        return;
+      }
+      sendFail(res, 400, "上传请求不合法");
+      return;
+    }
+    next(error);
+  };
+}
+
+/** 封面格式提示（只在一处写，界面上的 accept 与这里的白名单同源） */
+function coverHint(): string {
+  return "只支持 JPG / PNG / WebP 图片";
 }
 
 function readOverwrite(value: unknown): boolean {
@@ -308,27 +466,26 @@ function readOverwrite(value: unknown): boolean {
   return first === "1" || first === "true";
 }
 
-/** 内嵌封面落盘（LB-03）：与音频同目录，文件名用曲目 id */
+/**
+ * 内嵌封面落盘（LB-03）：与音频同目录，文件名 = 曲目 id + 随机串（见 `covers.ts`）。
+ * 用**新名字**而不是覆盖旧名字：`/covers` 的响应带一天缓存，同名替换会看不到新图（v6.13）。
+ * 旧封面的清理交给调用方在**索引写完之后**做（删歌 / 换封面 / reindex 的收尾）。
+ */
 async function saveCover(
   config: AppConfig,
   id: string,
   cover: { data: Buffer; extension: string } | null,
 ): Promise<string | null> {
   if (!cover) return null;
-  const name = `${id}.${cover.extension}`;
-  mkdirSync(config.uploadDir, { recursive: true });
-  // 先清掉这首歌名下**其它扩展名**的旧封面（v6.8）：索引只指向/新写下的那个，
-  // 不先清的话 jpg 与 png 会同时留着、没人再引用，只会在 uploads 里慢慢堆
-  await removeCoverVariants(config, id);
-  await writeFile(path.join(config.uploadDir, name), cover.data);
+  const name = newCoverName(id, cover.extension);
+  await writeCover(config, name, cover.data);
   return name;
 }
 
 /** 删除一首曲目对应的音频与封面文件（LB-05） */
 async function removeSongFiles(config: AppConfig, song: Song): Promise<void> {
   await removeQuietly(path.join(config.uploadDir, song.storedName));
-  const coverName = song.coverUrl ? path.basename(song.coverUrl) : "";
-  if (coverName) await removeQuietly(path.join(config.uploadDir, coverName));
+  await removeCoverByName(config, coverNameOf(song.coverUrl));
 }
 
 /** 删文件失败不该让接口挂掉：文件不在、被占用都无所谓，用户要的是“列表里没了” */

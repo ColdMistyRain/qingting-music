@@ -2,11 +2,14 @@ import { mkdir, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
+import { COVER_MIME_BY_EXTENSION } from "@qingting/shared";
 import { createApp } from "../src/app.js";
 import {
-  COVER_MIME_BY_EXTENSION,
+  coverMime,
+  coverNameOf,
+  newCoverName,
   pruneCovers,
-  removeCoverVariants,
+  removeCoverByName,
 } from "../src/services/covers.js";
 import { tempDirs, testConfig, wavBuffer } from "./helpers.js";
 
@@ -17,24 +20,57 @@ async function setup() {
   return { app: createApp(config), config };
 }
 
-describe("removeCoverVariants（v6.8）", () => {
-  it("删掉同一首歌名下所有扩展名的旧封面，但不动别人的文件", async () => {
-    const { config } = await setup();
-    await writeFile(path.join(config.uploadDir, "song1.jpg"), "old-jpg");
-    await writeFile(path.join(config.uploadDir, "song1.png"), "older-png");
-    await writeFile(path.join(config.uploadDir, "song2.png"), "别首歌的");
-
-    await removeCoverVariants(config, "song1");
-
-    const names = await readdir(config.uploadDir);
-    expect(names).not.toContain("song1.jpg");
-    expect(names).not.toContain("song1.png");
-    expect(names).toContain("song2.png");
+describe("封面文件名（v6.13：新封面 = 新文件）", () => {
+  it("每次生成的名字都不一样（否则同日替换会被 /covers 的一天缓存挡住）", () => {
+    const first = newCoverName("song1", "jpg");
+    const second = newCoverName("song1", "jpg");
+    expect(first).not.toBe(second);
+    expect(first.startsWith("song1-")).toBe(true);
+    expect(first.endsWith(".jpg")).toBe(true);
   });
 
-  it("没有旧封面时也不报错（首次落盘就是这条路径）", async () => {
+  it("从 coverUrl 里取文件名：兼容带查询串的值，路径成分与非法扩展名一律取不到", () => {
+    expect(coverNameOf("/covers/abc-123.png")).toBe("abc-123.png");
+    expect(coverNameOf("/covers/abc.jpg?v=2")).toBe("abc.jpg");
+    expect(coverNameOf("/covers/../data/songs.json")).toBe("");
+    expect(coverNameOf("/covers/abc.mp3")).toBe("");
+    expect(coverNameOf(null)).toBe("");
+  });
+
+  it("扩展名白名单是共享的（落盘 / 清理 / /covers 三处同一份）", () => {
+    expect(Object.keys(COVER_MIME_BY_EXTENSION).sort()).toEqual(["jpeg", "jpg", "png", "webp"]);
+    expect(coverMime("a.webp")).toBe("image/webp");
+    expect(coverMime("a.gif")).toBeNull();
+  });
+});
+
+describe("removeCoverByName（按准确文件名删）", () => {
+  it("只删指定的那一个，别人的封面不动", async () => {
     const { config } = await setup();
-    await expect(removeCoverVariants(config, "nobody")).resolves.toBeUndefined();
+    await writeFile(path.join(config.uploadDir, "song1-old.jpg"), "旧图");
+    await writeFile(path.join(config.uploadDir, "song1-new.png"), "新图");
+    await writeFile(path.join(config.uploadDir, "song2.png"), "别首歌的");
+
+    await removeCoverByName(config, "song1-old.jpg");
+
+    const names = await readdir(config.uploadDir);
+    expect(names).not.toContain("song1-old.jpg");
+    expect(names).toEqual(expect.arrayContaining(["song1-new.png", "song2.png"]));
+  });
+
+  it("文件名不像封面（音频 / 带路径）时直接拒绡，不做任何删除", async () => {
+    const { config } = await setup();
+    await writeFile(path.join(config.uploadDir, "song1.mp3"), "音频");
+
+    await removeCoverByName(config, "song1.mp3");
+    await removeCoverByName(config, "../data/songs.json");
+
+    expect(await readdir(config.uploadDir)).toContain("song1.mp3");
+  });
+
+  it("文件不在也不报错", async () => {
+    const { config } = await setup();
+    await expect(removeCoverByName(config, "nobody.jpg")).resolves.toBeUndefined();
   });
 });
 
@@ -42,19 +78,16 @@ describe("pruneCovers（v6.8）", () => {
   it("删掉索引不再引用的封面，保留在用的那些，且**绝不碰音频**", async () => {
     const { config } = await setup();
     await writeFile(path.join(config.uploadDir, "keep.png"), "留着");
+    await writeFile(path.join(config.uploadDir, "keep-2.jpg"), "新命名也认");
     await writeFile(path.join(config.uploadDir, "orphan.jpg"), "没人引用");
     await writeFile(path.join(config.uploadDir, "song.mp3"), "音频");
 
-    const removed = await pruneCovers(config, ["keep.png"]);
+    const removed = await pruneCovers(config, ["keep.png", "keep-2.jpg"]);
 
     expect(removed).toBe(1);
     const names = await readdir(config.uploadDir);
-    expect(names).toEqual(expect.arrayContaining(["keep.png", "song.mp3"]));
+    expect(names).toEqual(expect.arrayContaining(["keep.png", "keep-2.jpg", "song.mp3"]));
     expect(names).not.toContain("orphan.jpg");
-  });
-
-  it("封面扩展名白名单是共享的（落盘 / 清理 / /covers 三处同一份）", async () => {
-    expect(Object.keys(COVER_MIME_BY_EXTENSION).sort()).toEqual(["jpeg", "jpg", "png", "webp"]);
   });
 });
 

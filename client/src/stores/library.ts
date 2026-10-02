@@ -84,16 +84,22 @@ export const useLibraryStore = defineStore("library", () => {
   }
 
   /**
-   * 手动改完元信息后（AD-02）：就地换掉列表里那一条（不动顺序，列表是按上传时间排的），
+   * 手动改完元信息 / 封面 / 歌词后（AD-02）：就地换掉列表里那一条（不动顺序，列表是按上传时间排的），
    * 顺带把**队列/正在播放**那一份也改掉 —— 曲目可能已经在队列里了，
-   * 不同步的话会出现“列表改了、播放条上还是旧名字”。
+   * 不同步的话会出现“列表改了、播放条上还是旧名字 / 旧封面”。
+   *
+   * `assets.lyrics` 是刚刚存下的歌词正文（粘贴或从文件读来的）：直接回填到 Track 上，
+   * 省的再拉一次接口；没传就只同步标记（下一次开播会自己去取）。
    */
-  function applyUpdated(song: Song): void {
+  function applyUpdated(song: Song, assets: { lyrics?: string } = {}): void {
     songs.value = songs.value.map((item) => (item.id === song.id ? song : item));
     usePlayerStore().patchTrack(song.id, {
       title: song.title,
       artist: song.artist,
       album: song.album,
+      cover: song.coverUrl,
+      hasLyrics: song.hasLyrics === true,
+      ...(assets.lyrics ? { lyrics: assets.lyrics } : {}),
     });
   }
 

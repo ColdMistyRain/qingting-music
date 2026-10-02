@@ -58,6 +58,11 @@ export interface Song {
    * **重建索引时必须保住它们**，否则一次 reindex 就把人填的信息冲掉了。
    */
   editedFields?: SongEditableField[];
+  /**
+   * 被**手动设置过**的资源（AD-02 扩展，v6.13）：封面 / 歌词。
+   * 与 `editedFields` 同一套道理：重建索引不许拿文件里的内嵌资源把它们冲掉。
+   */
+  editedAssets?: SongAssetField[];
 }
 
 /** 歌单内的一条曲目引用（跨来源，PS-02） */
@@ -151,6 +156,28 @@ export function isAudioFileName(fileName: string): boolean {
   return (AUDIO_EXTENSIONS as readonly string[]).includes(fileExtension(fileName));
 }
 
+/* ---------- 封面（AD-02 扩展，v6.13）：手动上传的封面 ---------- */
+
+/** 封面白名单：服务端落盘、`GET /covers` 与前端选文件前的预检共用这一份 */
+export const COVER_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;
+
+export type CoverExtension = (typeof COVER_EXTENSIONS)[number];
+
+export const COVER_MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+/** 单张封面上限（8 MB）：内嵌封面通常几百 KB，这个上限只用来挡“选错了文件” */
+export const COVER_MAX_BYTES = 8 * 1024 * 1024;
+
+/** 是否命中封面扩展名白名单 */
+export function isCoverFileName(fileName: string): boolean {
+  return (COVER_EXTENSIONS as readonly string[]).includes(fileExtension(fileName));
+}
+
 /** 解析不出歌手时的占位（LB-03 / LC-03 共用同一套文案） */
 export const UNKNOWN_ARTIST = "未知歌手";
 /** 解析不出专辑时的占位 */
@@ -232,6 +259,20 @@ export const EMPTY_LISTENING: ListeningData = { favorites: [], recent: [] };
 export const SONG_EDITABLE_FIELDS = ["title", "artist", "album"] as const;
 export type SongEditableField = (typeof SONG_EDITABLE_FIELDS)[number];
 
+/**
+ * 手动设置过的**资源**（AD-02 扩展，v6.13）：封面与歌词。
+ *
+ * 与 `editedFields` 分开记：那个数组里的每个名字都是一个**文本字段**，
+ * 校验器会按字段名去取字符串值；封面/歌词不是字段（一个是文件、一个是另一个文件），
+ * 混在一起会让 `withSongMeta` 与 `validateSongMeta` 都得写特例。
+ *
+ * 记账的理由与 `editedFields` 一样：重建索引（LB-11）是拿音频文件里的标签与内嵌资源
+ * 重抽一遍的，不记账的话一次 reindex 就会把用户手动选的封面（换成内嵌那张）
+ * 与手动粘的歌词（换成文件里那份、甚至直接清掉）冲走。
+ */
+export const SONG_ASSET_FIELDS = ["cover", "lyrics"] as const;
+export type SongAssetField = (typeof SONG_ASSET_FIELDS)[number];
+
 /** 单个字段的长度上限（歌名/歌手/专辑都不该长到离谱） */
 export const SONG_FIELD_MAX_LENGTH = 120;
 
@@ -276,6 +317,48 @@ export function validateSongMeta(
   }
 
   if (touched === 0) return { ok: false, message: "没有要改的字段" };
+  return { ok: true, value };
+}
+
+/* ---------- 手动设置歌词（AD-02 扩展，v6.13）：前后端共用校验 ---------- */
+
+/** 歌词正文的长度上限（13 万字符够放一份 5 分钟歌的逐字歌词，还能挡住误粘进来的整篇文章） */
+export const LYRICS_MAX_LENGTH = 128 * 1024;
+
+/**
+ * 这份歌词里有没有**时间标签**。
+ *
+ * 为什么必须查这一条：我们的歌词引擎（LR-01/LR-05）整条链路都按时间轴走 ——
+ * 不带标签的纯文本解析出来是**零行**，存进去等于存了一份永远不显示的歌词，
+ * 用户只会看到“这首歌暂时没有歌词”，比直接告诉他“这份歌词没有时间标签”更让人困惑。
+ * 认的形状与 `client/src/utils/lyrics.ts` 的解析器一致：LRC 的 `[mm:ss.xx]`、
+ * 增强型 LRC 的行内 `<mm:ss.xx>`、yrc 的 `[起始ms,时长ms]`。
+ */
+export function hasLyricTiming(text: string): boolean {
+  return /\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]|<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>|\[\d+,\d+\]/.test(
+    text,
+  );
+}
+
+/**
+ * 校验手动设置/粘贴的歌词：必须是文本、去掉首尾空白后不为空、不超长，且**带时间标签**。
+ * 返回的 `value` 已经 trim 过（存的就是这一份）。
+ */
+export function validateLyricsText(
+  input: unknown,
+): { ok: true; value: string } | { ok: false; message: string } {
+  if (typeof input !== "string") return { ok: false, message: "歌词必须是文本" };
+  const value = input.trim();
+  if (!value) return { ok: false, message: "歌词是空的" };
+  if (value.length > LYRICS_MAX_LENGTH) {
+    return { ok: false, message: `歌词太长了（上限 ${Math.floor(LYRICS_MAX_LENGTH / 1024)} KB）` };
+  }
+  if (!hasLyricTiming(value)) {
+    return {
+      ok: false,
+      message: "这份歌词里没有时间标签（形如 [00:12.34]），没法跟着播放进度走",
+    };
+  }
   return { ok: true, value };
 }
 

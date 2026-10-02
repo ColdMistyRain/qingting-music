@@ -1,9 +1,11 @@
 import { nanoid } from "nanoid";
 import {
+  SONG_ASSET_FIELDS,
   SONG_EDITABLE_FIELDS,
   UNKNOWN_ALBUM,
   UNKNOWN_ARTIST,
   type Song,
+  type SongAssetField,
   type SongEditableField,
   type SongListResult,
   type SongMetaPatch,
@@ -108,6 +110,25 @@ export function withSongMeta(song: Song, patch: SongMetaPatch): Song {
   // 按固定顺序输出，方便直接看 json
   next.editedFields = SONG_EDITABLE_FIELDS.filter((field) => edited.has(field));
   return next;
+}
+
+/**
+ * 读出“手动设置过的资源”（AD-02 扩展，v6.13）。与 `songEditedFields` 同一套清洗：
+ * 手改坏的 json 里它可能是字符串，不拦一下会算出 `["c","o",…]` 这种脏值。
+ */
+export function songEditedAssets(song: Song): SongAssetField[] {
+  if (!Array.isArray(song.editedAssets)) return [];
+  return SONG_ASSET_FIELDS.filter((asset) => song.editedAssets?.includes(asset));
+}
+
+/**
+ * 记下“封面/歌词是手动设的”（AD-02 扩展）。
+ * 重建索引会拿文件里的内嵌资源重抽一遍，不记账的话一次 reindex 就把人手动选的封面
+ * 与手动粘的歌词冲掉了 —— 与 `withSongMeta` 的 `editedFields` 是同一件道理的两种资源。
+ */
+export function withSongAssets(song: Song, assets: readonly SongAssetField[]): Song {
+  const edited = new Set([...songEditedAssets(song), ...assets]);
+  return { ...song, editedAssets: SONG_ASSET_FIELDS.filter((asset) => edited.has(asset)) };
 }
 
 /** 运行期校验：手工改坏的 songs.json 里混进脏对象时不至于把接口带崩 */ function isSong(

@@ -61,13 +61,13 @@ server/src/config.ts      环境变量 → AppConfig（PRD 5.5 全量清单，�
 server/src/http.ts        统一响应 sendOk/sendFail + errorHandler
 server/src/static.ts      前端静态托管（生产）：SPA 兜底 + 缓存策略（入口/SW 不缓存，assets 长缓存）
 server/src/services/auth.ts  签名 Cookie 签发/验签、密码比对、密钥持久化
-server/src/services/storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退 + 内嵌歌词）、lyrics（data/lyrics/<id>.lrc 按需读写）、range（Range 解析）
+server/src/services/storage（data/songs.json 原子读写）、metadata（标签解析 + 文件名回退 + 内嵌歌词）、lyrics（data/lyrics/<id>.lrc 按需读写）、range（Range 解析）、covers（封面落盘/删除/孤儿清理：新封面一律新文件名 - v6.13）
 server/src/services/jsonStore.ts  单文件 JSON 存储的**唯一实现**（原子写＝临时名带随机后缀 + rename、读-改-写**串行**、坏文件改名留证）- v6.8：
                           曲库索引 / 歌单 / 收藏三份数据都是它的薄封装，**加新的 JSON 数据也走它**（别再手写 load→改→save）
 server/src/services/fileStream.ts 流式响应唯一入口 `pipeFile`（v6.8）：源流挂 error + 响应结束时销毁源流 ——
                           **别再写 `createReadStream(...).pipe(res)`**（文件在 stat 之后被删 = 未捕获异常 = 进程退出）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
-server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/内嵌歌词）、audio（/audio + /covers）、stats、playlists
+server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/改元信息/换封面/设歌词）、audio（/audio + /covers）、stats、playlists
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen
 client/src/assets/        logo-mark.png（品牌标记：透明底单色，供 `.brand-mark` 遮罩上色；水印已裁掉）
 client/public/            PWA 图标四张（192 / 512 / maskable 512 / apple-touch-icon）—— 由 logo-mark.png
@@ -116,7 +116,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           AppTooltip（自绘玻璃提示：只有图标的键共用一份，label 同时是 aria-label - v5.71）、
                           AppToast（提示条宿主：Reka Toast + 自绘玻璃，挂 App.vue 全站一份 - v5.72）、
                           EqualizerPanel（均衡器面板：设置页「音效」Tab - PL-13）、
-                          SongMetaDialog（元信息编辑弹窗：上传页与曲库管理共用一份 - AD-02 / v5.61）、
+                          SongMetaDialog（曲目信息弹窗：元信息 + 封面 + 歌词，上传页与曲库管理共用一份 - AD-02 / v5.61 / v6.13）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
                           TrackRow（通用曲目行：**行内不放播放/暂停键**，点行即播；行尾只放对这首歌的动作 - v5.96）、EmptyState、
                           immersive/{LyricsView,ImTitle,ImControls,LyricsSourceMenu}（沉浸页三布局共享件：歌词壳层（自研）/ 标题＋收藏键 / 控制栏 / 歌词来源菜单）
@@ -131,6 +131,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 **手机端（v5.32/5.33/5.34/5.35，RT-01/02/03/05/06）**：`<768px` 导航收进**左侧抽屉**（`NavDrawer` 面板 + 页头里的 `NavToggle` 按钮：与标题同一行、可从屏幕左缘右滑拉出，遮罩/左滑/选完自动收起）—— 桌面侧栏不变（收起 = 68px 图标条）；播放条变迷你条（**只剩 播放/暂停 + 下一首**，进度是**封面外圈的圆角矩形环** —— QQ 音乐那种，第二行显示**当前歌词**）；列表收起「专辑/来源」两列、删除键隐藏；管理台只给「请使用电脑访问」提示。手势：**行单击即播**（v5.96 起桌面与触摸同一套，行里不再有播放键）、迷你条与沉浸页左右滑切歌、沉浸页下滑收起 / 上滑歌词铺满、**长按播放键进沉浸**；滑动与长按类手势均只认真实触摸。**队列（v5.40/5.41）**：手机上是**从底部升起的抽屉**（点沉浸页底部的列表键弹出，把手下滑 ≥40px 或点遮罩/Esc 收起；**最多半屏**：行多时正好盖住走带键那片——背后的东西不能透出来看，行少时贴着底部收短；点某首换曲后不自动收起）。**移动端参考对象＝Salt Player（椒盐音乐）**：无推荐流的简易首页、左侧抽屉、迷你条歌词、长按进沉浸、封面取色、横竖屏与平板、通知栏控制。**沉浸页底栏在手机上铺满**（v5.93）：宽度只由容器决定（`.im-bottom` 侧内边距 14px + 控制区 `min(560px, 100%)`），三组键用 grid `1fr auto 1fr` 分列 —— 模式贴左、走带键居中、队列贴右；不用 `space-between`（左组 22px vs 右组 66px，中间那组会被推偏 22px）。桌面保持“居中一簇”（`min(560px, 74vw)`）不动。**时间放到轨道两端下方**（v5.94，参照 QQ 手机版）：手机档 `.im-progress` 改成两行 grid（`"bar bar" / "elapsed total"`），轨道因此**独占整行**（390×844 实测 270 → 362px），时间贴两端与轨道对齐；桌面仍是一行 flex。落地时踩到源码顺序坑：基础规则写在媒体查询**之后**时，同特异性会把它覆盖回来（且只压回一半，见 `开发约定`）。**锁屏/通知栏（RT-04）**：锁屏显示封面+歌名+歌手+专辑，六个动作全接上（`utils/mediaSession.ts` + `useMediaSession`，挂在 `App.vue`）。
 
 **曲目元信息可编辑（v5.61，AD-02）**：上传的音频可能压根没有标签（或写错了），所以“曲库索引里的显示信息”要能手动改 —— 改的是**索引**、不重写音频容器里的标签；改过的字段记在 `Song.editedFields` 里，**重建索引时保住它们**（没改过的照旧按标签重抽），客户端只提交**真正改过的字段**（`utils/songMeta.ts`，否则歌手/专辑会永久脱离标签）。一个弹窗（`SongMetaDialog.vue`）两处入口：上传队列「已完成」那一行给「编辑信息」（标签缺失时这枚键着色提示）、曲库管理每行给「编辑曲目信息」；保存后列表当场变名、队列里正在播的那一份也跟着变，歌单展示改用实时元信息。
+**同一个弹窗还能补封面与歌词（v6.13，AD-02 扩展）**：`PUT|DELETE /api/songs/:id/cover`（内存盘收图 → `uploads/<曲目 id>-<随机串>.<扩展名>`，**新封面一律新文件**：`/covers` 带一天缓存，同名覆盖看不到新图）+ `PUT /api/songs/:id/lyrics`（JSON `{ text }`；**上传文件与粘文本是同一条接口**——文件在浏览器里先按编码回退读成文本）。歌词**必须带时间标签**（纯文本解析出零行，收下等于存一份永远不显示的歌词）。手动设过的封面/歌词记在 `Song.editedAssets`（与 `editedFields` 对称），**重建索引不拿内嵌资源顶掉它们**；删旧封面按**索引里那个准确文件名**删（别按 id 前缀猜，`nanoid` 字母表含 `-`）。
 
 **歌单（v5.58，PS-01~06）**：歌单存在服务器端（`data/playlists.json`，与曲库索引同一套原子写法）；接口 `GET / POST / PUT / DELETE /api/playlists` + `PUT /api/playlists/:id/items`（**整表替换**，添加/移除/排序都是一件事），权限按 AC-03 归**访客级**。前端：侧栏「歌 单」分区接上真数据（＋行内输入新建、曲目数徽标）+ 歌单详情页（头部/播放全部/重命名/删除/添加曲目选择器/移除单曲/**拖拽排序**）；“这条能不能播”收在 `utils/playlistEntries` 一处（云端被删 / 本地缺失 / 在线未接入三种情况各自有话说）。**排序（v5.63 / PS-04）**：序号格兼把手（平时是序号，hover / 聚焦 / 触屏是把手图标），指针事件跟手拖拽（落点线 + 边缘自滚 + `touch-action: none`），也支持键盘 ↑ ↓ 且挪完焦点归位；下标运算在 `movePlaylistItem`（纯函数、有单测），仍走整表替换。**导出（v5.64 / PS-06）**：「导出」下拉菜单（Reka DropdownMenu）两种格式 —— **M3U8** 给能播的写绝对地址、本地/在线/已删的写成注释行（不假装能播），**JSON** 带 `format`+`version` 可还原；整个导出在浏览器里生成文件，不走服务端（`utils/playlistExport`，纯函数 + 10 例单测）。收藏/最近播放见下方 v5.67 一段。
 

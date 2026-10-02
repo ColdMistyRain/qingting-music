@@ -70,6 +70,15 @@ export function apiPut<T>(path: string, body?: unknown): Promise<T> {
   });
 }
 
+/**
+ * PUT 二进制（FormData）请求，直接返回 data 部分 —— 换封面（AD-02 扩展）用它。
+ * ⚠️ **不要自己写 Content-Type**：多部分请求的 `boundary` 由浏览器生成，
+ * 手写一个 `multipart/form-data` 只会把 boundary 弄丢，服务端解析出来是空 body。
+ */
+export function apiPutForm<T>(path: string, body: FormData): Promise<T> {
+  return request<T>(path, { method: "PUT", body });
+}
+
 /** DELETE 请求，直接返回 data 部分 */
 export function apiDelete<T>(path: string): Promise<T> {
   return request<T>(path, { method: "DELETE" });

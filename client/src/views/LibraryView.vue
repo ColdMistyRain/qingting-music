@@ -93,9 +93,9 @@ function toggleFavorite(index: number): void {
         <IconMagnifyingGlass class="icon" />
         <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />
       </label>
-      <span class="toolbar__spacer count">
-        {{ isSearching ? `找到 ${tracks.length} 首` : `共 ${library.songs.length} 首` }}
-      </span>
+      <!-- 总数只在**页头**说一次（v5.97）：这里原先不搜也报一遍“共 N 首”，
+           与页头的“云端曲库 · 14 首”完全重复。这个位置只负责**筛选结果**，没搜就不说。 -->
+      <span v-if="isSearching" class="toolbar__spacer count">找到 {{ tracks.length }} 首</span>
     </div>
 
     <!-- 表头 = “说明”：放在滚动区外面（固定层），所以既不用吸顶、也不用底色，

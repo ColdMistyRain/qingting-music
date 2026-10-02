@@ -42,6 +42,9 @@ const rows = computed(() =>
   sortSongs(filterSongs(library.songs, keyword.value), sortKey.value, direction.value),
 );
 
+/** 结果数只在“确实在筛”时才报（v5.97）：没筛时它就等于页头那个总数，没必要说两遍 */
+const isFiltering = computed(() => keyword.value.trim().length > 0);
+
 /** 正在编辑的那一条（AD-02）：弹窗由两个入口共用，这里只管“编辑哪首” */
 const editing = ref<Song | null>(null);
 const metaOpen = ref(false);
@@ -194,11 +197,9 @@ async function removeSelected(): Promise<void> {
         <IconSortDescending v-else class="icon" />
       </button>
 
-      <span class="toolbar__spacer count">
-        {{
-          rows.length === library.songs.length ? `共 ${rows.length} 首` : `找到 ${rows.length} 首`
-        }}
-      </span>
+      <!-- 与音乐库同一条规则（v5.97）：总数在页头说过了，这里只在**筛选后**报结果数。
+           元素常驻（空着也占位）—— 右边那枚批量删除按钮靠它的 `margin-left: auto` 贴边。 -->
+      <span class="toolbar__spacer count">{{ isFiltering ? `找到 ${rows.length} 首` : "" }}</span>
 
       <button class="btn btn-danger" :disabled="selectedCount === 0" @click="askRemoveSelected">
         <IconTrash class="icon" />

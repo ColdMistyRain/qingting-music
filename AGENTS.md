@@ -69,7 +69,9 @@ client/src/assets/        logo-mark.png（品牌标记：透明底单色，供 `
 client/public/            PWA 图标四张（192 / 512 / maskable 512 / apple-touch-icon）—— 由 logo-mark.png
                           在真实浏览器里合成（alpha 涂白 + 主题色圆角底），构建时原样拷进 dist（RT-07）
 client/src/styles/        tokens.css（令牌 + OKLCH 取色核心）、global.css（外壳与共用类）、
-                          material.css（材质双模式：islands 玻璃浮岛 / flat **全实心**（无玻璃、层级靠投影）- v4.55/v5.92，含 Apple 实测配方）
+                          material.css（材质双模式：islands 玻璃浮岛 / flat **全实心**（无玻璃、层级靠投影）- v4.55/v5.92，含 Apple 实测配方）。
+                          投影的层级感＝**模糊半径 + 偏移**（贴得近 = 紧），不是浓度：常驻面（岛内卡片 / 播放条）同一族几何、
+                          播放条只把方向翻上来；大柔影只给真浮层（v6.7）
 client/src/layouts/       PlayerLayout（侧栏+内容+播放条，含空格键快捷键）、ConsoleLayout（控制台独立布局）
 client/src/router/        路由表 + 守卫（身份决定可达页面）
 client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、

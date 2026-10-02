@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { HoverCardContent, HoverCardPortal, HoverCardRoot, HoverCardTrigger } from "reka-ui";
 import IconSpeakerHigh from "~icons/ph/speaker-high";
 import IconSpeakerSlash from "~icons/ph/speaker-slash";
-import VerticalSlider from "@/components/VerticalSlider.vue";
+import Slider from "@/components/Slider.vue";
 import { usePlayerStore } from "@/stores/player";
 
 /**
@@ -25,9 +25,9 @@ const icon = computed(() => (silent.value ? IconSpeakerSlash : IconSpeakerHigh))
 const sliderValue = computed(() => (silent.value ? 0 : player.volume));
 const levelPercent = computed(() => (silent.value ? "0%" : `${Math.round(player.volume * 100)}%`));
 
-/* ---------- 竖向拖拽交给 VerticalSlider（自绘，v4.64 / v5.68 抽成共用件） ----------
+/* ---------- 竖向拖拽交给 Slider（自绘，v4.64 / v5.68 抽成共用件） ----------
    原生 range 加 rotate(-90deg) 之后点击映射对、拖动不跟手（AGENTS 坑 7），
-   所以音量与均衡器共用同一个自绘竖杆；这里只管把 0~1 的音量映射过去。 */
+   所以音量与均衡器共用同一个自绘滑杆；这里只管把 0~1 的音量映射过去。 */
 function setVolume(ratio: number): void {
   player.setVolume(Math.min(1, Math.max(0, ratio)));
 }
@@ -54,7 +54,7 @@ function setVolume(ratio: number): void {
         role="group"
         aria-label="音量调节"
       >
-        <VerticalSlider
+        <Slider
           class="vol-pop__track"
           :model-value="sliderValue"
           :min="0"
@@ -133,9 +133,9 @@ function setVolume(ratio: number): void {
 }
 
 .vol-pop__track {
-  /* 尺寸交给共用竖杆（--vsl-*）；命中区比可见轨道宽那一点也在那里 */
-  --vsl-width: 18px;
-  --vsl-height: 84px;
+  /* 尺寸交给共用滑杆（--sld-*）；命中区比可见轨道宽那一点也在那里 */
+  --sld-thickness: 18px;
+  --sld-length: 84px;
 }
 
 .vol-pop__value {

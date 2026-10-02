@@ -191,44 +191,11 @@
   display: none !important;
 }
 
-/* ---------- 原生滑杆自绘：轨道与播放进度条同一令牌 ----------
-   appearance:none 后轨道用 --fill-track、主题色填充用渐变断点 --p 随值同步 */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-  --p: 50%;
-}
-
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 99px;
-  background: linear-gradient(to right, var(--accent) var(--p), var(--fill-track) var(--p));
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -4px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-}
-
-input[type="range"]::-moz-range-track {
-  height: 6px;
-  border-radius: 99px;
-  background: linear-gradient(to right, var(--accent) var(--p), var(--fill-track) var(--p));
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent);
-}
+/* ---------- 原生滑杆不再用 ----------
+   这里曾是照原型搬来的 `input[type="range"]` 配方（轨道 + 淡入断点）。原型里另有一段 JS
+   时时维护断点 `--p`，只抄 CSS 会得到一根**填充永远停在 50%** 的条子（v5.69 实测：
+   整体增益 +10dB 时填充仍只到中线）。现在竖横两种滑杆都是自绘的 `components/Slider.vue`，
+   填充几何在 `utils/slider.ts`，别再往这里加原生 range 的样式。 */
 
 /* ---------- 自定义复选框：OS 对勾风格与玻璃主题脱节 ---------- */
 input[type="checkbox"] {

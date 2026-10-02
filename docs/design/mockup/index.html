@@ -213,6 +213,8 @@
                 <option value="自定义">自定义</option>
               </select>
               <div class="eq-grid" id="fx-bands"></div>
+              <!-- 正式实现里这根是**自绘横杆**（填充从中线往两侧长）：原生 range 的填充从 min 端起算，
+                   双极控件会被读成 0~100% 的进度条（PRD v5.69） -->
               <div class="fx-gain set-row"><span>增益</span><input type="range" id="fx-gain" min="-10" max="10" value="0" step="1"><span id="fx-gain-v" style="min-width:36px;text-align:right">0dB</span></div>
               <div class="fx-save"><input class="input" id="fx-name" placeholder="保存当前曲线为自定义预设"><button class="btn" id="fx-save">保存</button></div>
               <div class="set-note">开关用于 A/B 对比（关闭时音频直通）；增益过大时限幅器自动防止爆音</div>

@@ -16,7 +16,7 @@ import {
 import IconCaretDown from "~icons/ph/caret-down";
 import IconCheck from "~icons/ph/check";
 import IconX from "~icons/ph/x";
-import VerticalSlider from "@/components/VerticalSlider.vue";
+import Slider from "@/components/Slider.vue";
 import { useEqualizerStore } from "@/stores/equalizer";
 import {
   EQ_BANDS,
@@ -32,8 +32,9 @@ import {
 /**
  * 均衡器与音效面板（PL-13，设置 › 音效）。
  *
- * 十根竖杆是**自绘**的 `VerticalSlider`（与音量条共用）：原生 range 加 rotate(-90deg)
- * 拖动不跟手（AGENTS 坑 7），原型那版正是这么写的，这里不重复那个坑。
+ * 十一根滑杆都是**自绘**的 `Slider`（与音量条共用）：原生 range 加 rotate(-90deg)
+ * 拖动不跟手（AGENTS 坑 7），而它的填充又是从 min 端起算的（双极控件会被读成进度条，坑 23）——
+ * 十段频率是竖杆、整体增益是横杆，两个朝向同一套几何与填充语义。
  * 预设用 Reka 的 Select（选型表里指定 EQ 预设用它），行为层交给它、皮肤还是我们的。
  *
  * 界面只在有意义的时机说数字：每段上面是当前增益、下面是频率；拖动时上面那个数就变了。
@@ -133,7 +134,7 @@ function removeCustom(name: string): void {
     <div class="fx__bands">
       <div v-for="(freq, index) in EQ_BANDS" :key="freq" class="fx__band">
         <span class="fx__band-value">{{ formatGain(settings.gains[index]) }}</span>
-        <VerticalSlider
+        <Slider
           class="fx__band-track"
           :model-value="settings.gains[index]"
           :min="EQ_GAIN_MIN"
@@ -150,15 +151,16 @@ function removeCustom(name: string): void {
 
     <div class="fx__row fx__row--gain">
       <span class="fx__label">增益</span>
-      <input
+      <Slider
         class="fx__gain"
-        type="range"
+        orientation="horizontal"
+        centered
+        :model-value="settings.master"
         :min="EQ_MASTER_MIN"
         :max="EQ_MASTER_MAX"
-        step="1"
-        :value="settings.master"
-        aria-label="整体增益"
-        @input="eq.setMaster(Number(($event.target as HTMLInputElement).value))"
+        label="整体增益"
+        :value-text="`${formatGain(settings.master)} 分贝`"
+        @update:model-value="eq.setMaster"
       />
       <span class="fx__gain-value">{{ formatGain(settings.master) }}dB</span>
     </div>
@@ -300,8 +302,8 @@ function removeCustom(name: string): void {
 }
 
 .fx__band-track {
-  --vsl-height: 148px;
-  --vsl-width: 24px;
+  --sld-length: 148px;
+  --sld-thickness: 24px;
 }
 
 .fx__band-freq {
@@ -312,8 +314,8 @@ function removeCustom(name: string): void {
 
 .fx__row--gain .fx__gain {
   flex: 1;
-  accent-color: var(--accent);
-  cursor: pointer;
+  /* 这是根横杆：命中区厚度交给共用滑杆，长度由 flex 撑开 */
+  --sld-thickness: 20px;
 }
 
 .fx__gain-value {
@@ -347,8 +349,8 @@ function removeCustom(name: string): void {
   }
 
   .fx__band-track {
-    --vsl-height: 118px;
-    --vsl-width: 20px;
+    --sld-length: 118px;
+    --sld-thickness: 20px;
   }
 
   .fx__band-value,

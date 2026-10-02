@@ -1005,7 +1005,7 @@ select {
    各自只保留定位（一个靠 left/top 一个靠 bottom + translateY），视觉全在这里。 */
 .progress .knob,
 .vol-pop__thumb,
-.vsl__thumb {
+.sld__thumb {
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -1027,9 +1027,9 @@ select {
 .vol-pop__track:hover .vol-pop__thumb,
 .vol-pop__track:focus-within .vol-pop__thumb,
 .vol-pop__track.dragging .vol-pop__thumb,
-.vsl:hover .vsl__thumb,
-.vsl:focus-within .vsl__thumb,
-.vsl.dragging .vsl__thumb {
+.sld:hover .sld__thumb,
+.sld:focus-within .sld__thumb,
+.sld.dragging .sld__thumb {
   opacity: 1;
 }
 

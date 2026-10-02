@@ -70,6 +70,12 @@
    UA 的 accent-color 内绘轨道在部分内核/偏好下渲染成黑色（与主题脱节），
    appearance:none 后轨道用 --fill-track、蓝色填充用渐变断点 --p 随值同步；
    EQ 竖向滑杆由 rotate(-90deg) 旋转，渐变「向右=已填充」旋转后即朝下 */
+
+/* ⚠️ 正式实现（`client/`）已不用这根配方，两个原因（v5.69）：
+   ① 填充是**从 min 端起算**的 —— ±dB 这种双极控件照它画会被读成 0~100% 的进度条；
+   ② 它靠 JS 时时维护断点 `--p`（本目录 js/mockup.js 的「滑杆填充同步」），只搬 CSS 会得到
+      一根填充永远停在 50% 的死条子。正式实现改用自绘滑杆（`components/Slider.vue`，
+      几何在 `utils/slider.ts`，竖/横同一个实现）。原型保留原样，只作参考。 */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;

@@ -8,8 +8,16 @@ import {
   DialogPortal,
   DialogRoot,
   DialogTitle,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuRoot,
+  DropdownMenuTrigger,
 } from "reka-ui";
 import IconDotsSixVertical from "~icons/ph/dots-six-vertical";
+import IconDownloadSimple from "~icons/ph/download-simple";
+import IconFileCode from "~icons/ph/file-code";
+import IconMusicNotes from "~icons/ph/music-notes";
 import IconPencilSimple from "~icons/ph/pencil-simple";
 import IconPlay from "~icons/ph/play";
 import IconPlaylist from "~icons/ph/playlist";
@@ -30,6 +38,7 @@ import { formatTime } from "@/utils/format";
 import { songToTrack } from "@/utils/library";
 import { playableTracks, playlistTotalDuration, resolvePlaylist } from "@/utils/playlistEntries";
 import type { PlaylistEntry } from "@/utils/playlistEntries";
+import { exportFileName, toExportJson, toM3U8 } from "@/utils/playlistExport";
 
 /**
  * 歌单详情（PRD 3.6 / 原型 v2.6）：头部（封面 / 名称 / 曲目数 / 总时长）+ 操作 + 编号曲目列表。
@@ -246,6 +255,44 @@ async function removePlaylist(): Promise<void> {
     await router.push({ name: "library" });
   });
 }
+
+/**
+ * 导出（PS-06）：在浏览器里生成文件、交给下载，不走服务端（不新增接口与存储）。
+ * 地址要用绝对路径：导出的 M3U8 常常是拿到手机/车机上的另一个播放器里去开的。
+ */
+function downloadText(name: string, text: string, mime: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.rel = "noopener";
+  // 有些引擎要求链接先入文档才认这次点击；用完顺手收回对象地址（回收放在下一拍，
+  // 立刻回收会把还没开始的下载掐掉）
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportM3U8(): void {
+  const current = playlist.value;
+  if (!current) return;
+  downloadText(
+    exportFileName(current.name, "m3u8"),
+    toM3U8(current.name, entries.value, { origin: location.origin }),
+    "audio/x-mpegurl",
+  );
+}
+
+function exportJson(): void {
+  const current = playlist.value;
+  if (!current) return;
+  downloadText(
+    exportFileName(current.name, "json"),
+    toExportJson(current, new Date().toISOString()),
+    "application/json",
+  );
+}
 </script>
 
 <template>
@@ -307,6 +354,32 @@ async function removePlaylist(): Promise<void> {
             <IconPencilSimple class="icon" />
             重命名
           </button>
+          <DropdownMenuRoot>
+            <DropdownMenuTrigger as-child>
+              <button class="btn" :disabled="playlist.items.length === 0">
+                <IconDownloadSimple class="icon" />
+                导出
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuContent class="pl-menu" side="bottom" align="end" :side-offset="6">
+                <DropdownMenuItem class="pl-menu__item" @select="exportM3U8">
+                  <IconMusicNotes class="icon" />
+                  <span>
+                    M3U8 播放列表
+                    <small>别的播放器直接能读</small>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem class="pl-menu__item" @select="exportJson">
+                  <IconFileCode class="icon" />
+                  <span>
+                    JSON 备份
+                    <small>留着以后还原</small>
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenuPortal>
+          </DropdownMenuRoot>
           <button class="btn btn-danger" :disabled="busy" @click="removePlaylist">
             <IconTrash class="icon" />
             删除
@@ -811,5 +884,55 @@ async function removePlaylist(): Promise<void> {
   justify-content: space-between;
   gap: 8px;
   margin-top: 4px;
+}
+
+/* 导出（PS-06）：材质取“大面”那一档（--tray-*）。
+   菜单是开在**成片正文**（列表行）上的，`--panel-*` 那一档只有 0.46/0.52 的遮盖度，
+   在模糊不参与合成的环境里两层字会叠成一片（v5.53 的确认框同理）。
+   ⚠️ 这里**故意不加** `force-mount`：菜单不需要退场动画，关上就卸载 ——
+   而带定位的浮层一旦常驻，Reka 的包装层（[data-reka-popper-content-wrapper]）
+   会留一块隐形的命中区吞掉后面的点击（v5.62 实测踩过）；实测关掉菜单后
+   `elementFromPoint` 命中的仍是底下那个按钮。 */
+.pl-menu {
+  z-index: 92;
+  min-width: 212px;
+  padding: 6px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--glass-border);
+  background: var(--tray-bg);
+  backdrop-filter: var(--tray-blur);
+  -webkit-backdrop-filter: var(--tray-blur);
+  box-shadow: var(--panel-sheen), var(--panel-shadow);
+  animation: pl-pop-in 0.16s var(--ease-ios);
+}
+
+.pl-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+  outline: none;
+}
+
+.pl-menu__item[data-highlighted] {
+  background: var(--hover);
+}
+
+.pl-menu__item .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--text-3);
+}
+
+.pl-menu__item small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-3);
 }
 </style>

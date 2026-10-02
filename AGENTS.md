@@ -70,7 +70,7 @@ client/src/layouts/       PlayerLayout（侧栏+内容+播放条，含空格键�
 client/src/router/        路由表 + 守卫（身份决定可达页面）
 client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、
                           library、transfer（本地列表→上传页的 File 交接 - LC-07）
-client/src/utils/         player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
+client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息 / 排序下标）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
@@ -106,9 +106,9 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 **曲目元信息可编辑（v5.61，AD-02）**：上传的音频可能压根没有标签（或写错了），所以“曲库索引里的显示信息”要能手动改 —— 改的是**索引**、不重写音频容器里的标签；改过的字段记在 `Song.editedFields` 里，**重建索引时保住它们**（没改过的照旧按标签重抽），客户端只提交**真正改过的字段**（`utils/songMeta.ts`，否则歌手/专辑会永久脱离标签）。一个弹窗（`SongMetaDialog.vue`）两处入口：上传队列「已完成」那一行给「编辑信息」（标签缺失时这枚键着色提示）、曲库管理每行给「编辑曲目信息」；保存后列表当场变名、队列里正在播的那一份也跟着变，歌单展示改用实时元信息。
 
-**歌单（v5.58，PS-01~04）**：歌单存在服务器端（`data/playlists.json`，与曲库索引同一套原子写法）；接口 `GET / POST / PUT / DELETE /api/playlists` + `PUT /api/playlists/:id/items`（**整表替换**，添加/移除/排序都是一件事），权限按 AC-03 归**访客级**。前端：侧栏「歌 单」分区接上真数据（＋行内输入新建、曲目数徽标）+ 歌单详情页（头部/播放全部/重命名/删除/添加曲目选择器/移除单曲/**拖拽排序**）；“这条能不能播”收在 `utils/playlistEntries` 一处（云端被删 / 本地缺失 / 在线未接入三种情况各自有话说）。**排序（v5.63 / PS-04）**：序号格兼把手（平时是序号，hover / 聚焦 / 触屏是把手图标），指针事件跟手拖拽（落点线 + 边缘自滚 + `touch-action: none`），也支持键盘 ↑ ↓ 且挪完焦点归位；下标运算在 `movePlaylistItem`（纯函数、有单测），仍走整表替换。**未做**：收藏/最近播放（PS-05）、导出（PS-06），均 P2。
+**歌单（v5.58，PS-01~06）**：歌单存在服务器端（`data/playlists.json`，与曲库索引同一套原子写法）；接口 `GET / POST / PUT / DELETE /api/playlists` + `PUT /api/playlists/:id/items`（**整表替换**，添加/移除/排序都是一件事），权限按 AC-03 归**访客级**。前端：侧栏「歌 单」分区接上真数据（＋行内输入新建、曲目数徽标）+ 歌单详情页（头部/播放全部/重命名/删除/添加曲目选择器/移除单曲/**拖拽排序**）；“这条能不能播”收在 `utils/playlistEntries` 一处（云端被删 / 本地缺失 / 在线未接入三种情况各自有话说）。**排序（v5.63 / PS-04）**：序号格兼把手（平时是序号，hover / 聚焦 / 触屏是把手图标），指针事件跟手拖拽（落点线 + 边缘自滚 + `touch-action: none`），也支持键盘 ↑ ↓ 且挪完焦点归位；下标运算在 `movePlaylistItem`（纯函数、有单测），仍走整表替换。**导出（v5.64 / PS-06）**：「导出」下拉菜单（Reka DropdownMenu）两种格式 —— **M3U8** 给能播的写绝对地址、本地/在线/已删的写成注释行（不假装能播），**JSON** 带 `format`+`version` 可还原；整个导出在浏览器里生成文件，不走服务端（`utils/playlistExport`，纯函数 + 10 例单测）。**未做**：收藏/最近播放（PS-05），P2。
 
-**下一步**（建议顺序）：歌单收尾（PS-06 导出，P2）→ **在线音源（3.5，需服务端）** → PWA 与离线（RT-07）→ 生产静态托管（服务端）→ **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。
+**下一步**（建议顺序）：**在线音源（3.5，需服务端）** → PWA 与离线（RT-07）→ 生产静态托管（服务端）→ **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）；P2 的收藏/最近播放（PS-05）可插空做。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 
@@ -132,7 +132,7 @@ client/src/utils/format.ts  formatTime/formatSize/formatDateTime
 
 14. **同一个键多层都在听时，靠“注册顺序”不可控（v5.40）**：沉浸页在 `window` 上听 Esc（收起整页）、Reka 弹层也在 `window` 上听 Esc（关自己），两个同级监听谁先注册谁先跑 —— 实测按一下**把抽屉和整页一起关了**。修法：在最上层挂**捕获阶段**的 `window` 监听（捕获一定早于冒泡），拦住事件并自己关闭最上面那层，保证“Esc 只关最上面那层”。同理，凡是有层级语义的交互，都要由**最上层主动吃掉**事件，不能指望下层自觉让路。
 
-15. **无头浏览器里 `backdrop-filter` 不参与合成（v5.40）**：抽屉用玻璃（`--panel-bg` + `blur(64px)`，总遮盖度算下来 0.94）时，背后那排走带键在截图里**能认出形状** —— 因为模糊压根没生效（`getComputedStyle` 里照样声明着 `blur(64px)`，**声明了不等于渲染了**）。两条结论：① 验证“玻璃够不够挡”别只看截图，也别只信 computed 值；② **不要拿模糊当“藏信息”的手段** —— 真的不能露（背景里是同屏的第二套控件）就该让它是不透明面。（v5.46 补充：**VS Code 自带浏览器（Electron）**里同样不参与合成 —— 它恰好可以当“模糊不在时还看不看得清”的最坏情况环境；左侧抽屉的玻璃因此取 0.80/0.88，而不是小浮层的 0.46/0.52。）
+15. **无头浏览器里 `backdrop-filter` 不参与合成（v5.40）**：抽屉用玻璃（`--panel-bg` + `blur(64px)`，总遮盖度算下来 0.94）时，背后那排走带键在截图里**能认出形状** —— 因为模糊压根没生效（`getComputedStyle` 里照样声明着 `blur(64px)`，**声明了不等于渲染了**）。两条结论：① 验证“玻璃够不够挡”别只看截图，也别只信 computed 值；② **不要拿模糊当“藏信息”的手段** —— 真的不能露（背景里是同屏的第二套控件）就该让它是不透明面。（v5.46 补充：**VS Code 自带浏览器（Electron）**里同样不参与合成 —— 它恰好可以当“模糊不在时还看不看得清”的最坏情况环境；左侧抽屉的玻璃因此取 0.80/0.88，而不是小浮层的 0.46/0.52。）**同类现象（v5.64 实测）**：无头 Firefox 里对**浮层**（带定位包装层的 Popover / 菜单）截图会把它拍成半透明 —— 面板的 `backgroundColor` 量出来是不透明的 `rgb(255,255,255)`、`opacity` 是 1，截图里却像 10% 的白纱。别急着改 CSS，换真实浏览器（VS Code 自带那个）一看就正常。
 
 16. **验证浏览器时别只收 `error`，`warning` 也要看（v5.42 实测）**：前几版的无头脚本只写 `if (m.type() === "error")`，于是一条 Reka 的无障碍告警（`Missing Description or aria-describedby … for DialogContent`）从 v5.40 起一直没被发现 —— 换到 VS Code 自带浏览器（`browser_console_messages` 会把 warning 单列出来）才看到。两条：① 弹层的 a11y 属性要配全（Reka 的 `Dialog` 对 `DialogTitle` **和** `DialogDescription` 都有要求，`Popover` 没有）；② 验证脚本把 warning 一并报出来。
 

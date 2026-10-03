@@ -249,6 +249,12 @@ function scheduleMeasure(seeking = false): void {
 }
 
 watch(activeIndex, (now, before) => scheduleMeasure(Math.abs(now - before) > 1));
+// 音/译开关切换（v6.46）：副线出现/消失会改变每一行的行高，
+// 行的 offsetTop 全部偏移 —— 必须重新测量居中，否则当前句停在错位处
+watch(
+  () => [store.translationVisible, store.romanVisible],
+  () => scheduleMeasure(),
+);
 // 换歌/换歌词：手动浏览的位置对新歌没有意义，直接回到自动居中
 watch(
   () => props.lines,

@@ -38,11 +38,16 @@ onMounted(() => {
   if (canUsePlaylists.value) void online.loadAccount();
 });
 
-// 登录态就绪后把网易云歌单拉下来（loadPlaylists 自带 ready 守卫，与在线页的触发互不打架）
+// 所选音源登录后把它的歌单拉下来（loadPlaylists 自带 ready 守卫，与在线页的触发互不打架）；
+// 切音源或另一边登录态变化时跟着换（v6.57：侧栏歌单跟随音源）
+const sidebarProviderSection = computed(() =>
+  online.provider === "qq" ? online.qqLoggedIn : online.loggedIn,
+);
+const providerSectionTitle = computed(() => (online.provider === "qq" ? "QQ 音乐歌单" : "网易云歌单"));
 watch(
-  () => online.loggedIn,
-  (loggedIn) => {
-    if (loggedIn) void online.loadPlaylists();
+  () => [online.provider, online.loggedIn, online.qqLoggedIn] as const,
+  ([provider, neteaseLoggedIn, qqLoggedIn]) => {
+    if (provider === "qq" ? qqLoggedIn : neteaseLoggedIn) void online.loadPlaylists(true);
   },
   { immediate: true },
 );
@@ -172,17 +177,17 @@ function dismissPlaylistError(): void {
           </ul>
         </div>
 
-        <!-- 网易云歌单（ON-10）：登录后把自己在网易云的歌单列在这里，点击即到「在线搜索」打开。
-             分区标题注明来源（需求方："在上面说明这个是网易云的歌单"）；
-             会话存各浏览器自己手里（v6.31），所以这份列表跟着登录那台浏览器走。 -->
-        <template v-if="online.loggedIn">
+        <!-- 音源歌单（ON-10 / v6.57）：登录后把该音源的歌单列在这里，点击即到「在线搜索」打开。
+             分区跟随所选音源（标题随音源变）；会话存各浏览器自己手里（v6.31），
+             所以这份列表跟着登录那台浏览器走。 -->
+        <template v-if="sidebarProviderSection">
           <div class="sb-sep" />
           <div class="sb-section">
             <div class="sb-section-head">
-              <span class="lbl">网易云歌单</span>
+              <span class="lbl">{{ providerSectionTitle }}</span>
               <!-- 刷新整份歌单列表（v6.35 补 2，需求方圈了分区头右侧）：
                    手动刷新期间旧列表保持可见（闪一下再回来很难受） -->
-              <AppTooltip label="刷新网易云歌单" :disabled="!props.collapsed" side="right" :side-offset="10">
+              <AppTooltip label="刷新音源歌单" :disabled="!props.collapsed" side="right" :side-offset="10">
                 <button
                   class="sb-refresh"
                   :class="{ 'is-loading': online.playlistsStatus === 'loading' }"

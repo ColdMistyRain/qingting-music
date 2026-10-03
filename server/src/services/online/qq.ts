@@ -86,6 +86,11 @@ function sessionSecretPath(dataDir: string): string {
   return path.join(dataDir, "qq-session-secret");
 }
 
+/** 扫码登录态的落盘位置（加密信封，包自己写） */
+function sessionStatePath(dataDir: string): string {
+  return path.join(dataDir, "qq-auth-sessions.enc");
+}
+
 function ensureSessionSecret(dataDir: string): string {
   const file = sessionSecretPath(dataDir);
   try {
@@ -118,10 +123,15 @@ async function boot(dataDir: string): Promise<string> {
     PORT: process.env.PORT,
     LOG_LEVEL: process.env.LOG_LEVEL,
     QQ_SESSION_SECRET: process.env.QQ_SESSION_SECRET,
+    QQ_AUTH_SESSION_PATH: process.env.QQ_AUTH_SESSION_PATH,
   };
   process.env.PORT = String(port);
   process.env.LOG_LEVEL = "silent";
   process.env.QQ_SESSION_SECRET = ensureSessionSecret(dataDir);
+  // 登录态加密落盘（包在 import 时自动接，Folia 同款配置）：
+  // 包默认把会话放**进程内存** —— 后端一重启全部登录失效（v6.57 实测 401 的根因）。
+  // 文件走包自己的原子写 + 用会话密钥加密，owner-only 权限。
+  process.env.QQ_AUTH_SESSION_PATH = sessionStatePath(dataDir);
 
   let lib: QqMusicLib;
   try {
@@ -134,6 +144,8 @@ async function boot(dataDir: string): Promise<string> {
     else process.env.LOG_LEVEL = previous.LOG_LEVEL;
     if (previous.QQ_SESSION_SECRET === undefined) delete process.env.QQ_SESSION_SECRET;
     else process.env.QQ_SESSION_SECRET = previous.QQ_SESSION_SECRET;
+    if (previous.QQ_AUTH_SESSION_PATH === undefined) delete process.env.QQ_AUTH_SESSION_PATH;
+    else process.env.QQ_AUTH_SESSION_PATH = previous.QQ_AUTH_SESSION_PATH;
   }
 
   const server = lib.server;

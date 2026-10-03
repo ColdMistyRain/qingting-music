@@ -499,13 +499,16 @@ onBeforeUnmount(() => {
           :title="`跳转到 ${line.text}`"
           @click="onLineClick(line)"
         >
-          <!-- 逐字（LR-05）：字级高亮，做完的字带一点主题色辉光 -->
+          <!-- 逐字（LR-05；v6.36 补：AMLL 的进度条式扫过）——
+               每个字按**自己的时长**把颜色从压暗的行色连续插值到主题色（--p 0~1，
+               每帧由 activeWords 驱动），整句看上去就是一道软边扫过的进度条；
+               唱完的字带主题色辉光。二值的 done 切换是跳变的，不是这个效果。 -->
           <template v-if="i === activeIndex && line.words?.length">
             <span
               v-for="(word, wi) in line.words"
               :key="wi"
               class="ch"
-              :class="{ done: (activeWords[wi] ?? 0) >= 1 }"
+              :style="{ '--p': activeWords[wi] ?? 0 }"
               >{{ word.text }}</span
             >
           </template>
@@ -702,17 +705,14 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 
-/* 逐字（LR-05）：未唱到的字压暗，唱到的字亮起 + 辉光（Apple Music 的标志性效果） */
+/* 逐字（LR-05；v6.36 补重做为 AMLL 的进度条式扫过）：
+   每个字随**自己的时长**把颜色从 34% 可见的行色连续插值到全亮主题色（--p 0~1，
+   逐帧由 activeWords 驱动），辉光强度也随进度走 —— 整句就是一道软边扫过的进度条。
+   旧的二值 done 切换（暗 0.34 → 亮 1，0.18s 过渡）是逐字跳变，不是这个效果。 */
 .lyline .ch {
-  opacity: 0.34;
-  transition: opacity 0.18s;
-}
-
-.lyline .ch.done {
-  opacity: 1;
-  text-shadow:
-    0 0 18px var(--accent-soft),
-    0 0 6px var(--accent-soft);
+  --p: 0;
+  color: color-mix(in srgb, var(--accent) calc((0.34 + var(--p) * 0.66) * 100%), transparent);
+  text-shadow: 0 0 calc(var(--p) * 14px) var(--accent-soft);
 }
 
 /* 行级歌词不做“自左向右渐亮”（v6.19 拆掉）：LRC 没有字级时间，那层填充只能编一个

@@ -163,6 +163,42 @@ describe("网易云适配器 · 歌词（ON-05）", () => {
     expect(stub.calls.some((path) => path.startsWith("/lyric?"))).toBe(true);
   });
 
+  it("JSON 行与文本 yrc 混在同一个字段：JSON 行转行级 LRC，文本 yrc 原样保留（逐字不丢）", async () => {
+    // 实测周深《起风了》：credits 是 JSON 行，唱词是真·文本 yrc，混在 yrc 字段里
+    const mixed = [
+      '{"t":0,"c":[{"tx":"作曲: "},{"tx":"高桥优"}]}',
+      '{"t":1000,"c":[{"tx":"作词: "},{"tx":"米果"}]}',
+      "[24810,3150](24810,630,0)这(25440,300,0)一(25740,390,0)路",
+      "[27960,2820](27960,540,0)顺(28500,270,0)着",
+    ].join("\n");
+    const { provider } = makeProvider({ "/lyric/new": { body: { yrc: { lyric: mixed } } } });
+
+    const text = await provider.getLyrics("1");
+    expect(text).toBe(
+      "[00:00.00]作曲: 高桥优\n" +
+        "[00:01.00]作词: 米果\n" +
+        "[24810,3150](24810,630,0)这(25440,300,0)一(25740,390,0)路\n" +
+        "[27960,2820](27960,540,0)顺(28500,270,0)着",
+    );
+  });
+
+  it("纯 JSON 行歌词归一成行级 LRC；普通文本行原样保留（可能是 LRC/yrc 行，由解析器取舍），负起点夹到 0", async () => {
+    const jsonLyric = [
+      '{"t":0,"c":[{"tx":"作词: "},{"tx":"Lucky 小爱"}]}',
+      '{"t":1000,"c":[{"tx":"第一句"}]}',
+      "不是 JSON 的行会被跳过",
+      '{"t":"不是数字"}',
+      '{"t":2500,"c":[]}',
+      '{"t":-500,"c":[{"tx":"预备行"}]}',
+    ].join("\n");
+    const { provider } = makeProvider({ "/lyric/new": { body: { lrc: { lyric: jsonLyric } } } });
+
+    const text = await provider.getLyrics("1");
+    expect(text).toBe(
+      "[00:00.00]作词: Lucky 小爱\n[00:01.00]第一句\n不是 JSON 的行会被跳过\n[00:00.00]预备行",
+    );
+  });
+
   it("两边都是空歌词 → null；上游 5xx 抛 UpstreamError（不回落）", async () => {
     const blank = makeProvider({ "/lyric/new": { body: { lrc: { lyric: "" } } } });
     expect(await blank.provider.getLyrics("1")).toBeNull();

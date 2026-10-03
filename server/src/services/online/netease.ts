@@ -227,6 +227,61 @@ function isVipOnly(fee: unknown): boolean {
   return fee === 1;
 }
 
+/** 毫秒 → LRC 时间标签 `[mm:ss.xx]`；负起点（网易给的预备时间）夹到 0 */
+function lrcTime(ms: number): string {
+  const clamped = Math.max(0, ms);
+  const minutes = Math.floor(clamped / 60000);
+  const seconds = Math.floor((clamped % 60000) / 1000);
+  const hundredths = Math.floor((clamped % 1000) / 10);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(hundredths).padStart(2, "0")}`;
+}
+
+/** 单条 JSON 歌词行 → 行级 LRC 行；认不出（t 缺失 / c 为空）返回 null */
+function jsonLineToLrc(line: string): string | null {
+  try {
+    const parsed = JSON.parse(line) as { t?: unknown; c?: Array<{ tx?: unknown }> };
+    const ms = Number(parsed.t);
+    if (!Number.isFinite(ms)) return null;
+    const words = Array.isArray(parsed.c)
+      ? parsed.c
+          .map((chunk) => (chunk && typeof chunk === "object" ? String(chunk.tx ?? "") : ""))
+          .join("")
+      : "";
+    if (!words.trim()) return null;
+    return `[${lrcTime(ms)}]${words}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 网易云歌词的归一化（**逐行甄别，混合格式共存**）。
+ *
+ * 实测（2026-10）：yrc / lrc 字段里会出现两种行**混在同一个字段**的情况 ——
+ * - credits 等行是 JSON：`{"t":<毫秒>,"c":[{"tx":"作词: "},{"tx":"周杰伦",...}]}`，
+ *   块里只有文本与歌手图/链接元数据，**没有逐字时间**；
+ * - 唱词行是**真·文本 yrc**：`[24810,3150](24810,630,0)这(25440,300,0)一…`（周深《起风了》实测）。
+ *
+ * 所以绝不能按"整段是不是 JSON"分流（那样会把唱词逐字整段丢掉），而是逐行处理：
+ * JSON 行转成行级 LRC（它本来就没有逐字时间可保，v6.20 定调不做假逐字）；
+ * **文本 yrc 行原样保留** —— 逐字能力完整交给客户端解析器（它能同时消费两种行）。
+ */
+function normalizeNeteaseLyric(text: string): string {
+  const out: string[] = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("{")) {
+      const converted = jsonLineToLrc(trimmed);
+      if (converted) out.push(converted);
+      continue;
+    }
+    // 文本 yrc / LRC / 其余行：原样保留（客户端解析器认不出的自己会跳）
+    out.push(trimmed);
+  }
+  return out.join("\n");
+}
+
 export interface NeteaseProviderOptions {
   /** 外接自部署服务的地址；不传就走内嵌库（默认） */
   baseUrl?: string;
@@ -321,7 +376,9 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
         const { body } = await call("lyric_new", { id }, cookie);
         const yrc = body.yrc as { lyric?: unknown } | undefined;
         const lrc = body.lrc as { lyric?: unknown } | undefined;
-        const text = asString(yrc?.lyric).trim() || asString(lrc?.lyric).trim();
+        const text =
+          normalizeNeteaseLyric(asString(yrc?.lyric).trim()) ||
+          normalizeNeteaseLyric(asString(lrc?.lyric).trim());
         return text || null;
       } catch (error) {
         // 只有"这个接口不存在"才值得回落；上游真断了就让 502 说实话
@@ -331,7 +388,7 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
       }
       const { body } = await call("lyric", { id, lv: -1, kv: -1, tv: -1, rv: -1 }, cookie);
       const lrc = body.lrc as { lyric?: unknown } | undefined;
-      const text = asString(lrc?.lyric).trim();
+      const text = normalizeNeteaseLyric(asString(lrc?.lyric).trim());
       return text || null;
     },
 

@@ -66,11 +66,12 @@ watch(
   },
 );
 
-// 登录态就绪后把歌单列表备好（一次轻请求；未登录时这步自动失败、静默）
+// 登录态就绪后把各已登录平台的歌单备好（侧栏双分区同时展示，v6.57 补 6）
 watch(
-  () => online.loggedIn,
-  (loggedIn) => {
-    if (loggedIn) void online.loadPlaylists(true);
+  () => [online.loggedIn, online.qqLoggedIn] as const,
+  ([neteaseLoggedIn, qqLoggedIn]) => {
+    if (neteaseLoggedIn) void online.loadPlaylists("netease", true);
+    if (qqLoggedIn) void online.loadPlaylists("qq", true);
   },
   { immediate: true },
 );
@@ -138,12 +139,15 @@ const hasResults = computed(() => listStatus.value === "ready" && displayTracks.
 const noResults = computed(() => listStatus.value === "ready" && displayTracks.value.length === 0);
 
 const pageTitle = computed(() =>
-  collectionMode.value ? (activePlaylist.value?.name ?? "网易云歌单") : "在线搜索",
+  collectionMode.value
+    ? (activePlaylist.value?.name ?? (online.provider === "qq" ? "QQ 音乐歌单" : "网易云歌单"))
+    : "在线搜索",
 );
 const pageSubtitle = computed(() => {
   if (!collectionMode.value) return online.provider === "qq" ? "音源：QQ 音乐" : "音源：网易云";
   const total = activePlaylist.value?.trackCount ?? online.collectionTracks.length;
-  return `网易云歌单 · ${total} 首`;
+  const label = online.provider === "qq" ? "QQ 音乐歌单" : "网易云歌单";
+  return `${label} · ${total} 首`;
 });
 
 function playAt(index: number): void {

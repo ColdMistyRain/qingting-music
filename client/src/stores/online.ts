@@ -158,7 +158,7 @@ export const useOnlineStore = defineStore("online", () => {
     // 歌单内容缓存也是账号数据：退出一并清（v6.34）
     clearCollectionCache("netease");
     session.value = null;
-    playlists.value = [];
+    playlistsByProvider.value.netease = [];
     activePlaylistId.value = null;
     collectionTracks.value = [];
     collectionStatus.value = "idle";
@@ -178,27 +178,35 @@ export const useOnlineStore = defineStore("online", () => {
   const loggedIn = computed(() => session.value !== null);
   const profile = computed(() => session.value?.profile ?? null);
 
-  /* ---------- 收藏夹（歌单）---------- */
-  const playlists = ref<OnlinePlaylistInfo[]>([]);
-  const playlistsStatus = ref<OnlineStatus>("idle");
-  const playlistsError = ref("");
+  /* ---------- 收藏夹（歌单）：按音源分槽，侧栏同时展示各已登录平台（v6.57 补 6）---------- */
+  const playlistsByProvider = ref<Record<AccountProvider, OnlinePlaylistInfo[]>>({
+    netease: [],
+    qq: [],
+  });
+  const playlistsStatusByProvider = ref<Record<AccountProvider, OnlineStatus>>({
+    netease: "idle",
+    qq: "idle",
+  });
+  const playlistsErrorByProvider = ref<Record<AccountProvider, string>>({
+    netease: "",
+    qq: "",
+  });
 
-  async function loadPlaylists(force = false): Promise<void> {
-    if (playlistsStatus.value === "loading") return;
-    if (playlistsStatus.value === "ready" && !force) return;
-    playlistsStatus.value = "loading";
+  async function loadPlaylists(target: AccountProvider, force = false): Promise<void> {
+    const status = playlistsStatusByProvider.value[target];
+    if (status === "loading") return;
+    if (status === "ready" && !force) return;
+    playlistsStatusByProvider.value[target] = "loading";
     try {
-      // 跟随所选音源（v6.57：QQ 登录后侧栏就是 QQ 的歌单；切音源由 setProvider 清态重拉）
-      playlists.value = (await fetchOnlineCollections(provider.value)).playlists;
-      playlistsStatus.value = "ready";
+      playlistsByProvider.value[target] = (await fetchOnlineCollections(target)).playlists;
+      playlistsStatusByProvider.value[target] = "ready";
     } catch (error) {
-      // 未登录（401）是最常见的原因：给一句能照着做的话
-      const label = provider.value === "qq" ? "QQ 音乐" : "网易云";
-      playlistsError.value =
+      const label = target === "qq" ? "QQ 音乐" : "网易云";
+      playlistsErrorByProvider.value[target] =
         error instanceof ApiError && error.status === 401
           ? `还没有登录${label}账号`
           : (error instanceof Error ? error.message : "歌单没能读出来");
-      playlistsStatus.value = "error";
+      playlistsStatusByProvider.value[target] = "error";
     }
   }
 
@@ -217,7 +225,9 @@ export const useOnlineStore = defineStore("online", () => {
     } catch {
       // 存不上就算了：这次会话内仍然有效
     }
-    // 切源 = 换语境：搜索结果与打开中的歌单都清掉，歌单列表换成新音源的
+    // 切源 = 换搜索语境：搜索结果清掉。歌单**不跟随** —— 侧栏同时展示
+    // 各个已登录平台的歌单（v6.57 补 6，需求方："不管选择那个音源，
+    // 已经登录的平台所收藏的歌单都应该展示出来"）
     closePlaylist();
     searchKeyword.value = "";
     searchStatus.value = "idle";
@@ -225,12 +235,6 @@ export const useOnlineStore = defineStore("online", () => {
     searchTracks.value = [];
     lastSearchKeyword.value = "";
     searchSeq += 1;
-    playlists.value = [];
-    playlistsStatus.value = "idle";
-    playlistsError.value = "";
-    if (next === "qq" ? qqSession.value !== null : session.value !== null) {
-      void loadPlaylists(true);
-    }
   }
 
   /* ---------- 搜索（ON-02）：结果跨页保留（v6.45，需求方连点"继续"后我把
@@ -273,8 +277,13 @@ export const useOnlineStore = defineStore("online", () => {
   const collectionStatus = ref<OnlineStatus>("idle");
   const collectionError = ref("");
 
+  /** 打开的歌单属于哪个音源（缓存与曲目映射都跟着它走，与搜索音源无关） */
+  const activePlaylistProvider = ref<AccountProvider>("netease");
   const activePlaylist = computed(
-    () => playlists.value.find((entry) => entry.id === activePlaylistId.value) ?? null,
+    () =>
+      playlistsByProvider.value.netease.find((entry) => entry.id === activePlaylistId.value) ??
+      playlistsByProvider.value.qq.find((entry) => entry.id === activePlaylistId.value) ??
+      null,
   );
 
   /**
@@ -286,14 +295,24 @@ export const useOnlineStore = defineStore("online", () => {
    * （初版是 stale-while-revalidate：缓存照摆、后台再拉一份对音源 —— 显式的
    *   「刷新列表」按钮出现后，那次自动请求成了多余流量，按需求方的预期收敛。）
    */
+  /** 打开的歌单属于哪个音源：先按侧栏两份列表认领；认领不出（列表还没加载 /
+      存档恢复等场景）回退到当前搜索音源 —— 缓存与曲目请求本来就按音源分键 */
+  function resolvePlaylistProvider(id: string): AccountProvider {
+    if (playlistsByProvider.value.netease.some((entry) => entry.id === id)) return "netease";
+    if (playlistsByProvider.value.qq.some((entry) => entry.id === id)) return "qq";
+    return provider.value;
+  }
+
   async function openPlaylist(id: string): Promise<void> {
     if (collectionStatus.value === "loading") return;
+    activePlaylistProvider.value = resolvePlaylistProvider(id);
     collectionError.value = "";
     activePlaylistId.value = id;
 
-    const cached = readCollectionCache(provider.value, id);
+    const owner = activePlaylistProvider.value;
+    const cached = readCollectionCache(owner, id);
     if (cached) {
-      collectionTracks.value = cached.tracks.map((info) => toOnlineTrack(provider.value, info));
+      collectionTracks.value = cached.tracks.map((info) => toOnlineTrack(owner, info));
       collectionStatus.value = "ready";
       return;
     }
@@ -308,9 +327,9 @@ export const useOnlineStore = defineStore("online", () => {
     collectionTracks.value = [];
     collectionStatus.value = "loading";
     try {
-      const { tracks } = await fetchOnlineCollectionTracks(provider.value, id);
-      writeCollectionCache(provider.value, id, tracks);
-      collectionTracks.value = tracks.map((info) => toOnlineTrack(provider.value, info));
+      const { tracks } = await fetchOnlineCollectionTracks(activePlaylistProvider.value, id);
+      writeCollectionCache(activePlaylistProvider.value, id, tracks);
+      collectionTracks.value = tracks.map((info) => toOnlineTrack(activePlaylistProvider.value, info));
       collectionStatus.value = "ready";
     } catch (error) {
       collectionError.value = error instanceof Error ? error.message : "歌单没能读出来";
@@ -324,6 +343,7 @@ export const useOnlineStore = defineStore("online", () => {
    */
   async function refreshPlaylist(id: string): Promise<void> {
     if (collectionStatus.value === "loading") return;
+    activePlaylistProvider.value = resolvePlaylistProvider(id);
     collectionError.value = "";
     activePlaylistId.value = id;
     await loadCollection(id);
@@ -360,10 +380,11 @@ export const useOnlineStore = defineStore("online", () => {
     lastSearchKeyword,
     search,
     // 收藏夹
-    playlists,
-    playlistsStatus,
-    playlistsError,
+    playlistsByProvider,
+    playlistsStatusByProvider,
+    playlistsErrorByProvider,
     loadPlaylists,
+    activePlaylistProvider,
     activePlaylistId,
     activePlaylist,
     collectionTracks,

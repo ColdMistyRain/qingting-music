@@ -446,7 +446,7 @@ async function signOut(): Promise<void> {
       :open="qrOpen"
       :provider="qrProvider"
       @close="qrOpen = false"
-      @logged-in="void online.loadPlaylists(true)"
+      @logged-in="qrProvider === 'qq' ? void online.loadPlaylists('qq', true) : void online.loadPlaylists('netease', true)"
     />
   </section>
 </template>

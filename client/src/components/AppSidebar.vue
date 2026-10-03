@@ -38,16 +38,33 @@ onMounted(() => {
   if (canUsePlaylists.value) void online.loadAccount();
 });
 
-// 所选音源登录后把它的歌单拉下来（loadPlaylists 自带 ready 守卫，与在线页的触发互不打架）；
-// 切音源或另一边登录态变化时跟着换（v6.57：侧栏歌单跟随音源）
-const sidebarProviderSection = computed(() =>
-  online.provider === "qq" ? online.qqLoggedIn : online.loggedIn,
+// 每个已登录平台一个歌单分区、同时展示（v6.57 补 6，需求方定）：
+// 与搜索用哪个音源无关；登录态变化时拉对应平台的歌单（loadPlaylists 自带守卫）
+const playlistSections = computed(() =>
+  [
+    {
+      provider: "netease" as const,
+      title: "网易云歌单",
+      visible: online.loggedIn,
+      lists: online.playlistsByProvider.netease,
+      status: online.playlistsStatusByProvider.netease,
+      error: online.playlistsErrorByProvider.netease,
+    },
+    {
+      provider: "qq" as const,
+      title: "QQ 音乐歌单",
+      visible: online.qqLoggedIn,
+      lists: online.playlistsByProvider.qq,
+      status: online.playlistsStatusByProvider.qq,
+      error: online.playlistsErrorByProvider.qq,
+    },
+  ].filter((section) => section.visible),
 );
-const providerSectionTitle = computed(() => (online.provider === "qq" ? "QQ 音乐歌单" : "网易云歌单"));
 watch(
-  () => [online.provider, online.loggedIn, online.qqLoggedIn] as const,
-  ([provider, neteaseLoggedIn, qqLoggedIn]) => {
-    if (provider === "qq" ? qqLoggedIn : neteaseLoggedIn) void online.loadPlaylists(true);
+  () => [online.loggedIn, online.qqLoggedIn] as const,
+  ([neteaseLoggedIn, qqLoggedIn]) => {
+    if (neteaseLoggedIn) void online.loadPlaylists("netease", true);
+    if (qqLoggedIn) void online.loadPlaylists("qq", true);
   },
   { immediate: true },
 );
@@ -177,47 +194,44 @@ function dismissPlaylistError(): void {
           </ul>
         </div>
 
-        <!-- 音源歌单（ON-10 / v6.57）：登录后把该音源的歌单列在这里，点击即到「在线搜索」打开。
-             分区跟随所选音源（标题随音源变）；会话存各浏览器自己手里（v6.31），
-             所以这份列表跟着登录那台浏览器走。 -->
-        <template v-if="sidebarProviderSection">
+        <!-- 音源歌单（ON-10 / v6.57 补 6，需求方："不管选择那个音源，已经登录的平台
+             所收藏的歌单都应该展示出来"）：每个已登录平台各一个分区、同时展示，
+             与搜索用哪个音源无关；会话存各浏览器自己手里（v6.31）。 -->
+        <template v-for="section in playlistSections" :key="section.provider">
           <div class="sb-sep" />
           <div class="sb-section">
             <div class="sb-section-head">
-              <span class="lbl">{{ providerSectionTitle }}</span>
+              <span class="lbl">{{ section.title }}</span>
               <!-- 刷新整份歌单列表（v6.35 补 2，需求方圈了分区头右侧）：
                    手动刷新期间旧列表保持可见（闪一下再回来很难受） -->
-              <AppTooltip label="刷新音源歌单" :disabled="!props.collapsed" side="right" :side-offset="10">
+              <AppTooltip :label="`刷新${section.title}`" :disabled="!props.collapsed" side="right" :side-offset="10">
                 <button
                   class="sb-refresh"
-                  :class="{ 'is-loading': online.playlistsStatus === 'loading' }"
-                  :disabled="online.playlistsStatus === 'loading'"
-                  @click="void online.loadPlaylists(true)"
+                  :class="{ 'is-loading': section.status === 'loading' }"
+                  :disabled="section.status === 'loading'"
+                  @click="void online.loadPlaylists(section.provider, true)"
                 >
                   <IconArrowsClockwise class="icon" />
                 </button>
               </AppTooltip>
             </div>
 
-            <p
-              v-if="online.playlists.length === 0 && online.playlistsStatus === 'loading'"
-              class="sb-hint lbl"
-            >
+            <p v-if="section.lists.length === 0 && section.status === 'loading'" class="sb-hint lbl">
               读取中…
             </p>
             <p
-              v-else-if="online.playlists.length === 0 && online.playlistsStatus === 'error'"
+              v-else-if="section.lists.length === 0 && section.status === 'error'"
               class="sb-hint lbl"
               role="alert"
             >
-              {{ online.playlistsError }}
+              {{ section.error }}
             </p>
-            <p v-else-if="online.playlists.length === 0" class="sb-hint lbl">
+            <p v-else-if="section.lists.length === 0" class="sb-hint lbl">
               这个账号还没有歌单
             </p>
 
             <ul v-else class="sb-lists">
-              <li v-for="entry in online.playlists" :key="entry.id">
+              <li v-for="entry in section.lists" :key="entry.id">
                 <button
                   class="nav-item"
                   :class="{ active: online.activePlaylistId === entry.id && route.name === 'online' }"

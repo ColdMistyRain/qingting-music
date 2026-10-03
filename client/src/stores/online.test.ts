@@ -155,7 +155,7 @@ describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
     expect(logoutOnline).toHaveBeenCalledWith("netease");
     expect(online.loggedIn).toBe(false);
     expect(storage.has("qt-online-session:netease")).toBe(false);
-    expect(online.playlists).toEqual([]);
+    expect(online.playlistsByProvider.netease).toEqual([]);
   });
 });
 
@@ -169,7 +169,7 @@ describe("online store · 收藏夹（ON-10）", () => {
     vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });
 
     const online = useOnlineStore();
-    await online.loadPlaylists();
+    await online.loadPlaylists("netease");
     await online.openPlaylist("100");
 
     expect(online.activePlaylistId).toBe("100");
@@ -194,7 +194,7 @@ describe("online store · 收藏夹（ON-10）", () => {
     vi.mocked(fetchOnlineCollectionTracks).mockClear();
     vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });
     const online = useOnlineStore();
-    await online.loadPlaylists();
+    await online.loadPlaylists("netease");
     await online.openPlaylist("100"); // 第一遍：无缓存，正常拉取并写缓存
     expect(fetchOnlineCollectionTracks).toHaveBeenCalledTimes(1);
 
@@ -221,7 +221,7 @@ describe("online store · 收藏夹（ON-10）", () => {
     vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
     vi.mocked(fetchOnlineCollectionTracks).mockResolvedValueOnce({ tracks: [TRACK] });
     const online = useOnlineStore();
-    await online.loadPlaylists();
+    await online.loadPlaylists("netease");
     await online.openPlaylist("100");
     expect(online.collectionTracks).toHaveLength(1);
 
@@ -278,7 +278,7 @@ describe("online store · 收藏夹（ON-10）", () => {
     vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
     vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });
     const online = useOnlineStore();
-    await online.loadPlaylists();
+    await online.loadPlaylists("netease");
     await online.openPlaylist("100");
 
     online.closePlaylist();
@@ -292,9 +292,9 @@ describe("online store · 收藏夹（ON-10）", () => {
       new ApiError(401, 401, "还没有登录这个音源的账号"),
     );
     const online = useOnlineStore();
-    await online.loadPlaylists();
+    await online.loadPlaylists("netease");
 
-    expect(online.playlistsStatus).toBe("error");
-    expect(online.playlistsError).toBe("还没有登录网易云账号");
+    expect(online.playlistsStatusByProvider.netease).toBe("error");
+    expect(online.playlistsErrorByProvider.netease).toBe("还没有登录网易云账号");
   });
 });

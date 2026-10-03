@@ -42,6 +42,10 @@ const activeIndex = computed(() => currentLineIndex(props.lines, props.time));
 /* ---------- 间奏点（v6.44，AMLL 的 interlude dots）：长间奏时渲染呼吸点 ---------- */
 const interludes = computed(() => findInterludes(props.lines));
 
+/** 带翻译 / 音译数据的行数（音/译按钮跟随当前歌曲的数据有无，v6.48） */
+const translationCount = computed(() => props.translations?.length ?? 0);
+const romanCount = computed(() => props.romans?.length ?? 0);
+
 /** 当前时间所在间奏（无则 null） */
 const activeInterlude = computed<LyricInterlude | null>(() => {
   const now = props.time;
@@ -568,7 +572,7 @@ onBeforeUnmount(() => {
                “我们目前的歌词都是普通的 lrc 格式…参照设计应该降级到逐行高亮”）。 -->
           <span v-else class="txt">{{ line.text }}</span>
           <!-- 翻译（v6.40）与音译（v6.46）：原文下方的小字，音译排在翻译之下；
-              各自受右侧「译 / 音」按钮独立开关 -->
+              显隐由右侧「译 / 音」钮的开关决定 -->
           <span
             v-if="store.translationVisible && translationOf(line.time)"
             class="tr"
@@ -601,10 +605,11 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 音/译快捷开关（v6.46；v6.47 起常驻——需求方："音译和翻译应该常驻"）：
-         常驻让按钮位置稳定可盲操作；这首歌没有对应数据时点了没有可见变化，属预期 -->
+    <!-- 音/译快捷开关（v6.46；v6.48 按需求方定调跟随数据：有音译出「音」、
+         有翻译出「译」，两有都出，没有不出） -->
     <div class="ly-flags">
       <button
+        v-if="romanCount > 0"
         class="ly-flag"
         :class="{ on: store.romanVisible }"
         title="音译"
@@ -614,6 +619,7 @@ onBeforeUnmount(() => {
         音
       </button>
       <button
+        v-if="translationCount > 0"
         class="ly-flag"
         :class="{ on: store.translationVisible }"
         title="翻译"

@@ -82,17 +82,16 @@ const lines = computed(() => parseLyrics(player.lyricsSource).lines);
  * 翻译歌词（v6.40，网易 tlyric）：与原文同时间轴的 LRC，按时间对齐到原文行。
  * 只在歌词来自在线音源时有值；按毫秒取整做键，浮点相等性不掺运气。
  */
+/**
+ * 翻译/音译行（v6.40/v6.43）：**不过滤**地传给 LyricsView ——
+ * 显隐由 LyricsView 按右侧「译 / 音」钮渲染（v6.48）；这里过滤的话，
+ * 关掉开关按钮也会跟着消失，就再也打不开了。
+ */
 const translationLines = computed(() =>
-  player.translationVisible && player.lyricsTranslation
-    ? parseLyrics(player.lyricsTranslation).lines
-    : [],
+  player.lyricsTranslation ? parseLyrics(player.lyricsTranslation).lines : [],
 );
-
-/** 音译行（v6.43）：与翻译同一显示开关（都是"辅助跟唱"信息） */
 const romanLines = computed(() =>
-  player.translationVisible && player.lyricsRoman
-    ? parseLyrics(player.lyricsRoman).lines
-    : [],
+  player.lyricsRoman ? parseLyrics(player.lyricsRoman).lines : [],
 );
 
 /**

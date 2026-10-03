@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
 import type { Track } from "@qingting/shared";
 import TrackRow from "@/components/TrackRow.vue";
+import { useVirtualList } from "@/composables/useVirtualList";
 
 /**
  * 曲目列表（v4.45，v4.90 简化）。
@@ -12,8 +14,12 @@ import TrackRow from "@/components/TrackRow.vue";
  * 元素常驻，宽屏（列展开）看得见，≤1024px（专辑列收起）由 CSS 隐掉；
  * v4.92 又对齐了设备像素：**行距与“线到上一行”都取 4 的倍数**（76 / 4），
  * 否则 125% 缩放下 1px 线的相位会循环，出现“有的细线粗有的细”（见 `global.css`）。
+ *
+ * v6.27 起长列表走**虚拟滚动**（LB-08）：超过阈值的份只把看得见的十几行放进 DOM，
+ * 上下用垫片把其余行占住 —— 行距是量出来的（`composables/useVirtualList`），
+ * 所以垫片、细线、滚动条长度与全量渲染逐像素一致。宿主（音乐库 / 本地列表）什么都不用改。
  */
-withDefaults(
+const props = withDefaults(
   defineProps<{
     tracks: readonly Track[];
     /** 正在播的那首用 id 判定：列表被搜索/排序后索引会错位 */
@@ -38,16 +44,29 @@ defineEmits<{
   remove: [index: number];
   toggleFavorite: [index: number];
 }>();
+
+const listEl = ref<HTMLElement | null>(null);
+const { start, end, padTop, padBottom } = useVirtualList({
+  list: listEl,
+  rowSelector: ".row",
+  count: () => props.tracks.length,
+});
+
+/** 交给模板的只有窗口里那几行；对外发的事件仍用**全量列表里的下标**（`start + i`） */
+const windowTracks = computed(() => props.tracks.slice(start.value, end.value));
 </script>
 
 <template>
-  <div class="row-list">
-    <template v-for="(track, index) in tracks" :key="track.id">
-      <!-- 宽屏可见、窄屏由 CSS 隐掉（v4.91）；归属明确是做成元素而不是伪元素的原因 -->
-      <div v-if="index > 0" class="row-sep" aria-hidden="true" />
+  <div ref="listEl" class="row-list">
+    <div v-if="padTop > 0" class="row-pad" :style="{ height: `${padTop}px` }" aria-hidden="true" />
+    <template v-for="(track, i) in windowTracks" :key="track.id">
+      <!-- 宽屏可见、窄屏由 CSS 隐掉（v4.91）；归属明确是做成元素而不是伪元素的原因。
+           判据用**窗口内的局部下标**：分隔线属于“渲染出来的相邻两行之间”，
+           窗口顶那一行上面那条由垫片占着（v6.27）。 -->
+      <div v-if="i > 0" class="row-sep" aria-hidden="true" />
       <TrackRow
         :track="track"
-        :index="index"
+        :index="start + i"
         :active="activeId === track.id"
         :removable="removable"
         :show-favorite="showFavorite"
@@ -57,5 +76,11 @@ defineEmits<{
         @toggle-favorite="$emit('toggleFavorite', $event)"
       />
     </template>
+    <div
+      v-if="padBottom > 0"
+      class="row-pad"
+      :style="{ height: `${padBottom}px` }"
+      aria-hidden="true"
+    />
   </div>
 </template>

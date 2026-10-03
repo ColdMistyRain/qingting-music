@@ -509,6 +509,13 @@ select {
   gap: var(--row-list-gap);
 }
 
+/* 虚拟滚动的上下垫片（v6.27 / LB-08）：没渲染的行由它俩占住地方，滚动条长度与滚动位置
+   才跟全量渲染一致。**高度一律内联给**（`composables/useVirtualList` 算出来），
+   这里只保证它不会被 flex 压扁（容器高度确定时 flex 子元素默认会被压缩）。 */
+.row-pad {
+  flex: none;
+}
+
 /* 行分隔线：独立的 1px 元素，由列表容器（TrackList）插在行与行之间。
    为什么做成元素而不是行的 `border-top` / 伪元素：行有 12px 圆角，`border-top` 会
    沿圆角拐下去、两端各留一小段弧；而伪元素不管挂后一行（`top: 0`，会变成“后一行的

@@ -13,6 +13,7 @@ import AppTooltip from "@/components/AppTooltip.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import SongMetaDialog from "@/components/SongMetaDialog.vue";
 import AppSelect from "@/components/AppSelect.vue";
+import { useVirtualList } from "@/composables/useVirtualList";
 import { useLibraryStore } from "@/stores/library";
 import { confirmAction } from "@/utils/confirm";
 import { debounce } from "@/utils/debounce";
@@ -56,6 +57,20 @@ const actionError = ref("");
 const rows = computed(() =>
   sortSongs(filterSongs(library.songs, query.value), sortKey.value, direction.value),
 );
+
+/**
+ * 长列表虚拟滚动（LB-08，v6.27）：这一页没有独立的列表容器 —— 曲目行就是滚动区的
+ * 直接子元素，所以把滚动区自己当列表（垫片插在它里面，列表顶自然在滚动原点）。
+ * 排序与过滤仍在这份**全量数据**上做（LB-04 / LB-07），只是渲染收窄到看得见的那几行。
+ */
+const scrollerEl = ref<HTMLElement | null>(null);
+const { start, end, padTop, padBottom } = useVirtualList({
+  list: scrollerEl,
+  rowSelector: ".sg",
+  count: () => rows.value.length,
+});
+/** 交给模板的是窗口里那一段；行还是原来那些行（选中态按 id 认，与下标无关） */
+const windowRows = computed(() => rows.value.slice(start.value, end.value));
 
 /** 结果数只在“确实在筛”时才报（v5.97）：没筛时它就等于页头那个总数，没必要说两遍 */
 const isFiltering = computed(() => query.value.trim().length > 0);
@@ -258,10 +273,16 @@ async function removeSelected(): Promise<void> {
         <span></span>
       </div>
 
-      <div class="page-frame__scroll">
+      <div ref="scrollerEl" class="page-frame__scroll">
+        <div
+          v-if="padTop > 0"
+          class="row-pad"
+          :style="{ height: `${padTop}px` }"
+          aria-hidden="true"
+        />
         <p v-if="rows.length === 0" class="note">没有匹配的歌曲，换个关键词试试。</p>
 
-        <div v-for="song in rows" :key="song.id" class="sg">
+        <div v-for="song in windowRows" :key="song.id" class="sg">
           <label class="sg__check">
             <input
               type="checkbox"
@@ -297,6 +318,13 @@ async function removeSelected(): Promise<void> {
             </AppTooltip>
           </div>
         </div>
+
+        <div
+          v-if="padBottom > 0"
+          class="row-pad"
+          :style="{ height: `${padBottom}px` }"
+          aria-hidden="true"
+        />
       </div>
     </div>
 

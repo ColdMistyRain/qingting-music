@@ -98,9 +98,13 @@ function submit(): void {
 
 const collectionMode = computed(() => online.activePlaylistId !== null);
 
+/** 「没选歌单」的哨兵值：Reka 的 SelectItem **不接受空串 value**（内容会静默渲染失败），
+    而网易云歌单 id 是纯数字，`:none` 不会撞上任何真实 id */
+const NO_PLAYLIST = ":none";
+
 const pickerOptions = computed(() => [
   {
-    value: "",
+    value: NO_PLAYLIST,
     label: online.activePlaylistId ? "收起歌单，回到搜索" : "打开我的网易云歌单…",
   },
   ...online.playlists.map((entry) => ({
@@ -110,7 +114,7 @@ const pickerOptions = computed(() => [
 ]);
 
 function onPickerChange(value: string): void {
-  if (value === "") {
+  if (value === NO_PLAYLIST) {
     online.closePlaylist();
     return;
   }
@@ -210,7 +214,7 @@ function toggleFavorite(index: number): void {
       <div v-if="online.loggedIn" class="collect-bar">
         <div class="collect-bar__picker">
           <AppSelect
-            :model-value="online.activePlaylistId ?? ''"
+            :model-value="online.activePlaylistId ?? NO_PLAYLIST"
             :options="pickerOptions"
             label="我的网易云歌单"
             @update:model-value="onPickerChange"

@@ -100,10 +100,16 @@ const refSetters = computed<VNodeRef[]>(() =>
   props.lines.map((_, index) => (el) => setLineRef(el as Element | null, index)),
 );
 /**
- * 翻译数据的签名（v6.41）：进 v-memo 依赖 —— 不加的话，暂停中切"显示/隐藏翻译"
- * 时被 memo 住的行子树不会重渲染，翻译残留（坑 30 的 v-memo 家族）。
+ * 翻译/音译的 v-memo 签名：**显隐状态 + 数据行数**都要进（v6.41 定下"数据要进"，
+ * v6.49 补"显隐也要进"—— 只盯行数的话，切开关时被 memo 住的行子树不重渲染，
+ * .tr/.rom 残留导致行高错乱、测量踩空，歌词整个跳起来，坑 30 的 v-memo 家族）。
  */
-const translationsKey = computed(() => props.translations?.length ?? 0);
+const translationsKey = computed(
+  () => `${store.translationVisible ? 1 : 0}-${props.translations?.length ?? 0}`,
+);
+const romansKey = computed(
+  () => `${store.romanVisible ? 1 : 0}-${props.romans?.length ?? 0}`,
+);
 /**
  * `v-memo` 的第 4 个依赖：**只让当前行**在逐字进度变化时重渲染。
  *
@@ -550,6 +556,7 @@ onBeforeUnmount(() => {
               depths[i],
               i === activeIndex ? fillKey : '',
               translationsKey,
+              romansKey,
             ]"
           :ref="refSetters[i]"
           type="button"

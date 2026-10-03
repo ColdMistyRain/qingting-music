@@ -23,10 +23,10 @@ describe("GET /api/health", () => {
 });
 
 describe("GET /api/config", () => {
-  it("未配置音源时 onlineEnabled = false（ON-04），并给出上传上限（LB-02）", async () => {
+  it("未配置外接音源时也在线可用（v6.29 内嵌默认启用），并给出上传上限（LB-02）", async () => {
     const res = await request(createApp(testConfig({ maxUploadSize: 1024 }))).get("/api/config");
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ onlineEnabled: false, maxUploadSize: 1024 });
+    expect(res.body.data).toEqual({ onlineEnabled: true, maxUploadSize: 1024 });
   });
 
   it("配置音源后 onlineEnabled = true", async () => {

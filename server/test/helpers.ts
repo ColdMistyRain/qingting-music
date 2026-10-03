@@ -24,7 +24,8 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // 默认不信任任何代理：要测“按 X-Forwarded-For 取 IP”的用例自己传 1
     trustProxy: 0,
     neteaseApiBase: null,
-    onlineEnabled: false,
+    // v6.29：音源内嵌默认可用（生产里 loadConfig 恒真；要测外接就显式传 neteaseApiBase）
+    onlineEnabled: true,
     // 默认 null：不让集成测试去发真实的 client/dist（要测托管就显式给一个临时目录）
     staticDir: null,
     ...overrides,

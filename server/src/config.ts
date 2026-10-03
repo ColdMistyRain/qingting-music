@@ -50,9 +50,13 @@ export interface AppConfig {
    * 确实放在 Nginx 后面时，把跳数设成真实代理层数（常见 1）。
    */
   trustProxy: number;
-  /** 网易云 API 服务地址；未配置为 null */
+  /**
+   * 外接网易云 API 服务的地址；未配置为 null = 走**内嵌库**
+   * （`@neteasecloudmusicapienhanced/api`，MIT，v6.29 起默认内嵌、部署零配置）。
+   * 配了就改走外接自部署服务（docker 版 / 换增强分支 / 隔离版本时用）。
+   */
   neteaseApiBase: string | null;
-  /** 在线音源功能开关（ON-04） */
+  /** 在线音源功能开关（ON-04）。v6.29 起内嵌音源默认可用，恒为 true；上游只在真正搜索/点播时才被请求 */
   onlineEnabled: boolean;
   /**
    * 前端静态产物目录（生产托管）：`STATIC_DIR` 指向 vite 的 `client/dist`，
@@ -149,7 +153,8 @@ export function loadConfig(env: EnvSource): AppConfig {
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     authEnabled: describeAuthMode(userPassword, adminPassword) !== "closed",
     neteaseApiBase,
-    onlineEnabled: neteaseApiBase !== null,
+    // v6.29：音源以内嵌库形态随 server 安装，默认可用；NETEASE_API_BASE 只是"改走外接服务"的开关
+    onlineEnabled: true,
     staticDir: path.resolve(readString(env.STATIC_DIR) ?? defaultStaticDir()),
   };
 }

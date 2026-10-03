@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { createNeteaseProvider } from "../src/services/online/netease.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createNeteaseProvider, setNeteaseLib } from "../src/services/online/netease.js";
 import { UpstreamError } from "../src/services/online/provider.js";
 
 /** 桩 fetch：记录请求，按路径前缀回罐头响应 */
@@ -200,5 +200,79 @@ describe("网易云适配器 · 上游故障", () => {
       }) as unknown as typeof fetch,
     });
     await expect(slow.search("x")).rejects.toBeInstanceOf(UpstreamError);
+  });
+});
+
+describe("网易云适配器 · 内嵌库传输（v6.29 默认）", () => {
+  afterEach(() => setNeteaseLib(null));
+
+  /** createNeteaseProvider({}) = 内嵌模式：库从 setNeteaseLib 注入 */
+  function makeEmbedded(lib: Record<string, unknown>) {
+    setNeteaseLib(lib as never);
+    return createNeteaseProvider({});
+  }
+
+  it("搜索走库的 cloudsearch 模块，映射规则与 HTTP 相同（含数字 id）", async () => {
+    const calls: Array<[string, Record<string, unknown>]> = [];
+    const provider = makeEmbedded({
+      cloudsearch: async (params: Record<string, unknown>) => {
+        calls.push(["cloudsearch", params]);
+        return {
+          status: 200,
+          body: {
+            result: {
+              songs: [{ id: 186016, name: "夜曲", fee: 8, dt: 226000, ar: [{ name: "周杰伦" }] }],
+            },
+          },
+        };
+      },
+    });
+
+    const tracks = await provider.search("夜曲");
+
+    expect(calls[0]?.[0]).toBe("cloudsearch");
+    expect(calls[0]?.[1]).toMatchObject({ keywords: "夜曲", type: 1, limit: 30 });
+    expect(tracks).toEqual([
+      {
+        id: "186016",
+        title: "夜曲",
+        artist: "周杰伦",
+        album: "未知专辑",
+        duration: 226,
+        cover: null,
+        vipOnly: false,
+      },
+    ]);
+  });
+
+  it("直链与歌词同样走模块调用；status 非 2xx 按 UpstreamError 处理", async () => {
+    const ok = makeEmbedded({
+      song_url_v1: async () => ({
+        status: 200,
+        body: { data: [{ url: "http://m701.music.126.net/a.mp3" }] },
+      }),
+      lyric_new: async () => ({ status: 200, body: { lrc: { lyric: "[00:01.17]糖" } } }),
+    });
+    expect(await ok.getStreamUrl("186016")).toBe("https://m701.music.126.net/a.mp3");
+    expect(await ok.getLyrics("186016")).toBe("[00:01.17]糖");
+
+    const err = makeEmbedded({
+      song_url_v1: async () => ({ status: 502, body: { code: 502 } }),
+    });
+    await expect(err.getStreamUrl("1")).rejects.toMatchObject({
+      name: "UpstreamError",
+      status: 502,
+    });
+  });
+
+  it("模块缺失归 UpstreamError（路由层回 502 说实话）", async () => {
+    const missing = makeEmbedded({});
+    await expect(missing.search("x")).rejects.toBeInstanceOf(UpstreamError);
+  });
+
+  it("内嵌调用卡住时按超时收口（不把请求永远挂着）", async () => {
+    setNeteaseLib({ cloudsearch: () => new Promise(() => undefined) } as never);
+    const fast = createNeteaseProvider({ timeoutMs: 10 });
+    await expect(fast.search("x")).rejects.toMatchObject({ name: "UpstreamError" });
   });
 });

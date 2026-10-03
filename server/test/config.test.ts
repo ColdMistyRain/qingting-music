@@ -52,7 +52,9 @@ describe("loadConfig", () => {
     expect(config.maxUploadSize).toBe(300 * MB);
     expect(config.authTtlMs).toBe(30 * DAY);
     expect(config.authEnabled).toBe(false);
-    expect(config.onlineEnabled).toBe(false);
+    // v6.29：音源内嵌默认可用（NETEASE_API_BASE 只是"改走外接服务"的开关）
+    expect(config.onlineEnabled).toBe(true);
+    expect(config.neteaseApiBase).toBeNull();
     expect(config.userPassword).toBeNull();
     expect(config.adminPassword).toBeNull();
   });
@@ -60,7 +62,9 @@ describe("loadConfig", () => {
   it("空白字符串视为未配置（避免 .env 里留空导致门禁被误开）", () => {
     const config = loadConfig({ USER_PASSWORD: "   ", NETEASE_API_BASE: "" });
     expect(config.authEnabled).toBe(false);
-    expect(config.onlineEnabled).toBe(false);
+    // 空白外接地址视为未配置 → 仍走内嵌，在线功能照样可用
+    expect(config.neteaseApiBase).toBeNull();
+    expect(config.onlineEnabled).toBe(true);
   });
 
   it("配置密码后启用门禁，配置音源后开启在线功能", () => {

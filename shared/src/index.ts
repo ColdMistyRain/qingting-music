@@ -160,7 +160,10 @@ export interface AuthStatus {
 
 /** GET /api/config 的返回：前端功能开关 */
 export interface AppConfig {
-  /** 在线音源是否可用（未配置 NETEASE_API_BASE 时为 false，ON-04） */
+  /**
+   * 在线音源是否可用（ON-04）。v6.29 起音源以内嵌库随 server 安装、默认可用（恒 true）；
+   * `NETEASE_API_BASE` 只是"改走外接自部署服务"的可选覆盖。字段保留：前端据此渲染在线页入口。
+   */
   onlineEnabled: boolean;
   /** 单文件上传上限（字节，LB-02）：上传页据此提示；旧后端未返回时前端用兑底值 */
   maxUploadSize?: number;

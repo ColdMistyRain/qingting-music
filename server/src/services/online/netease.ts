@@ -1,21 +1,26 @@
 import { UNKNOWN_ALBUM, UNKNOWN_ARTIST, type OnlineTrack } from "@qingting/shared";
+import { createRequire } from "node:module";
 import { UpstreamError, type OnlineProvider } from "./provider.js";
 
 /**
- * 网易云适配器（ON-02/03/05）：对接**自部署**的 NeteaseCloudMusicApi。
+ * 网易云适配器（ON-02/03/05）。上游有两种接法，映射逻辑完全共用：
  *
- * 为什么走自部署服务而不是直连网易云网页接口：PRD 5.1 选型表定的是
- * "后端透传代理：网易云（NeteaseCloudMusicApi / api-enhanced）"——
- * 签名、Cookie、匿名 token 那些事都由那个服务包掉，我们只做"HTTP → 统一格式"的映射。
+ * 1. **内嵌库（默认，v6.29）**：直接以库形态调用 `@neteasecloudmusicapienhanced/api`
+ *    （MIT，原 NeteaseCloudMusicApi 的活跃续作）—— 部署者**零配置**，`npm install` 即含音源，
+ *    不用再单独起一个自部署服务。库的每个接口是一个函数
+ *    `(params) => Promise<{ status, body }>`（请求层见它的 util/request.js）。
+ * 2. **外接自部署服务（可选）**：配 `NETEASE_API_BASE` 指向一个已部署的
+ *    NeteaseCloudMusicApi / api-enhanced HTTP 服务（签名、Cookie、匿名 token 那些事由它包掉），
+ *    我们只做 "HTTP → 统一格式" 的映射。想换增强分支、想隔离版本时用这条。
  *
- * 依赖自部署服务的哪些接口（都是匿名可用）：
- * - `GET /cloudsearch`   搜索（比 /search 多给 `al.picUrl` 封面与 `ar[]` 歌手数组）
- * - `GET /song/url/v1`   播放直链（`level=standard` 匿名可取；VIP/无版权返回 `url: null`）
- * - `GET /lyric/new`     歌词（有逐字 yrc 时在 `yrc` 字段；旧版服务没有这个接口，回落 `/lyric`）
+ * 依赖上游的哪些接口（都是匿名可用）：
+ * - `cloudsearch`    搜索（比 /search 多给 `al.picUrl` 封面与 `ar[]` 歌手数组）
+ * - `song_url_v1`    播放直链（`level=standard` 匿名可取；VIP/无版权返回 `url: null`）
+ * - `lyric_new`      歌词（有逐字 yrc 时在 `yrc` 字段；旧版服务没有这个接口，回落 `lyric`）
  * - 封面：`https?://(p\d\.)?music\.126\.net/...`，客户端不直连（取色要 same-origin），
  *   走我们的 `/api/online/netease/cover` 转发，白名单在 `canProxyCover`。
  *
- * `fetchImpl` 是注入点：单测用桩函数，不发真网络请求（PRD 11.2）。
+ * `fetchImpl` / `lib` 是注入点：单测用桩，不发真网络请求（PRD 11.2）。
  */
 
 /** 上游请求超时：音源卡住时不能把我们的请求也挂着 */
@@ -23,10 +28,131 @@ const UPSTREAM_TIMEOUT_MS = 8000;
 /** 单次搜索返回条数：整份当队列（与曲库页同一交互），一页 30 首够翻着听 */
 const SEARCH_LIMIT = 30;
 
-export interface NeteaseProviderOptions {
+/** 上游的一手回应：status 是 HTTP 语义（内嵌库把它从 body.code 归一出来） */
+export interface NeteaseUpstreamResponse {
+  status: number;
+  body: unknown;
+}
+
+/**
+ * 传输层：给一个**模块名**（如 `cloudsearch` / `song_url_v1`）与参数，拿回回应。
+ * HTTP 与内嵌两种接法都归一成这个形状，下面的映射代码对两者无感。
+ */
+export type NeteaseTransport = (
+  moduleName: string,
+  params: Record<string, unknown>,
+) => Promise<NeteaseUpstreamResponse>;
+
+/** 内嵌库的形状（只用得到这四个模块；`require` 拿到的远不止，收窄到我们用的） */
+export interface NeteaseLib {
+  [module: string]:
+    | ((params: Record<string, unknown>) => Promise<{
+        status: number;
+        body: unknown;
+        cookie?: unknown;
+      }>)
+    | undefined;
+}
+
+let cachedLib: NeteaseLib | null = null;
+
+/** 测试注入点：塞一个桩库，内嵌模式就不会发真网络请求 */
+export function setNeteaseLib(lib: NeteaseLib | null): void {
+  cachedLib = lib;
+}
+
+/** 懒加载内嵌库（CJS 包在 ESM 里走 createRequire）；装坏了在调用时以 UpstreamError 暴露 */
+function loadNeteaseLib(): NeteaseLib {
+  if (cachedLib) return cachedLib;
+  try {
+    const require = createRequire(import.meta.url);
+    cachedLib = require("@neteasecloudmusicapienhanced/api") as NeteaseLib;
+    return cachedLib;
+  } catch (cause) {
+    throw new UpstreamError(`内嵌网易云音源没装好：${cause instanceof Error ? cause.message : cause}`);
+  }
+}
+
+/** 外接自部署服务：模块名 → 路径（`song_url_v1` → `/song/url/v1`），参数进查询串 */
+function createHttpTransport(options: {
   baseUrl: string;
   fetchImpl?: typeof fetch;
-  timeoutMs?: number;
+  timeoutMs: number;
+}): NeteaseTransport {
+  const baseUrl = options.baseUrl.replace(/\/+$/, "");
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const timeoutMs = options.timeoutMs;
+
+  return async (moduleName, params) => {
+    if (typeof fetchImpl !== "function") {
+      throw new UpstreamError("当前环境没有可用的 fetch");
+    }
+    const query = new URLSearchParams(
+      Object.entries(params).map(([key, value]) => [key, String(value)]),
+    ).toString();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res: Response;
+    try {
+      res = await fetchImpl(`${baseUrl}/${moduleName.replace(/_/g, "/")}?${query}`, {
+        signal: controller.signal,
+      });
+    } catch (cause) {
+      throw new UpstreamError(`音源请求失败：${cause instanceof Error ? cause.message : cause}`);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) {
+      throw new UpstreamError(`音源返回 HTTP ${res.status}`, res.status);
+    }
+    try {
+      return { status: res.status, body: await res.json() };
+    } catch {
+      throw new UpstreamError("音源返回的不是 JSON", res.status);
+    }
+  };
+}
+
+/** 内嵌库：直接函数调用；没有的模块 / 非 2xx 一律按上游故障处理（与 HTTP 同一口径） */
+function createEmbeddedTransport(options: { timeoutMs: number }): NeteaseTransport {
+  return async (moduleName, params) => {
+    const lib = loadNeteaseLib();
+    const fn = lib[moduleName];
+    if (typeof fn !== "function") {
+      throw new UpstreamError(`内嵌网易云音源没有 ${moduleName} 这个模块`);
+    }
+    let result: { status: number; body: unknown };
+    try {
+      result = await withTimeout(
+        Promise.resolve().then(() => fn(params)),
+        options.timeoutMs,
+        "内嵌网易云音源请求超时",
+      );
+    } catch (cause) {
+      if (cause instanceof UpstreamError) throw cause;
+      throw new UpstreamError(`音源请求失败：${cause instanceof Error ? cause.message : cause}`);
+    }
+    if (!Number.isInteger(result.status) || result.status < 200 || result.status > 299) {
+      throw new UpstreamError(`音源返回 HTTP ${result.status}`, result.status);
+    }
+    return { status: result.status, body: result.body };
+  };
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new UpstreamError(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (cause) => {
+        clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
 }
 
 /** cloudsearch 的一条结果里我们关心的字段（其余忽略） */
@@ -75,34 +201,28 @@ function isVipOnly(fee: unknown): boolean {
   return fee === 1;
 }
 
-export function createNeteaseProvider(options: NeteaseProviderOptions): OnlineProvider {
-  const baseUrl = options.baseUrl.replace(/\/+$/, "");
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const timeoutMs = options.timeoutMs ?? UPSTREAM_TIMEOUT_MS;
+export interface NeteaseProviderOptions {
+  /** 外接自部署服务的地址；不传就走内嵌库（默认） */
+  baseUrl?: string;
+  /** 直接注入传输层（单测用）；优先于 baseUrl / 内嵌 */
+  transport?: NeteaseTransport;
+  /** baseUrl 模式下的 fetch 注入点（单测用） */
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}
 
-  /** 请求上游并解析 JSON；网络错 / 超时 / 非 2xx / 非 JSON 一律抛 UpstreamError */
-  async function requestJson<T>(path: string): Promise<T> {
-    if (typeof fetchImpl !== "function") {
-      throw new UpstreamError("当前环境没有可用的 fetch");
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let res: Response;
-    try {
-      res = await fetchImpl(`${baseUrl}${path}`, { signal: controller.signal });
-    } catch (cause) {
-      throw new UpstreamError(`音源请求失败：${cause instanceof Error ? cause.message : cause}`);
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res.ok) {
-      throw new UpstreamError(`音源返回 HTTP ${res.status}`);
-    }
-    try {
-      return (await res.json()) as T;
-    } catch {
-      throw new UpstreamError("音源返回的不是 JSON");
-    }
+export function createNeteaseProvider(options: NeteaseProviderOptions): OnlineProvider {
+  const timeoutMs = options.timeoutMs ?? UPSTREAM_TIMEOUT_MS;
+  const transport: NeteaseTransport =
+    options.transport ??
+    (options.baseUrl
+      ? createHttpTransport({ baseUrl: options.baseUrl, fetchImpl: options.fetchImpl, timeoutMs })
+      : createEmbeddedTransport({ timeoutMs }));
+
+  /** 调一个上游模块并把 body 归一成对象（HTTP 那条已在 transport 里解析过 JSON） */
+  async function call(moduleName: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const { body } = await transport(moduleName, params);
+    return body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   }
 
   function mapSong(raw: NeteaseSearchSong): OnlineTrack | null {
@@ -126,10 +246,13 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
     id: "netease",
 
     async search(keyword) {
-      const payload = await requestJson<{
-        result?: { songs?: NeteaseSearchSong[] } | undefined;
-      }>(`/cloudsearch?keywords=${encodeURIComponent(keyword)}&type=1&limit=${SEARCH_LIMIT}`);
-      const songs = payload.result?.songs ?? [];
+      const payload = await call("cloudsearch", {
+        keywords: keyword,
+        type: 1,
+        limit: SEARCH_LIMIT,
+      });
+      const result = payload.result as { songs?: NeteaseSearchSong[] } | undefined;
+      const songs = result?.songs ?? [];
       // 单条缺 id/名字就跳过那一行，别让一条脏数据把整个搜索搞挂
       return songs.map(mapSong).filter((track): track is OnlineTrack => track !== null);
     },
@@ -137,10 +260,9 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
     async getStreamUrl(id) {
       // randomCNIP：部分受限曲目用国内 IP 形状请求成功率更高；https=true：让上游直接给
       // https 直链（参考 Folia 的接入实践）。旧的 API 分支不认这两个参数也无妨。
-      const payload = await requestJson<{ data?: Array<{ url?: unknown }> | undefined }>(
-        `/song/url/v1?id=${encodeURIComponent(id)}&level=standard&randomCNIP=true&https=true`,
-      );
-      const url = asString(payload.data?.[0]?.url).trim();
+      const payload = await call("song_url_v1", { id, level: "standard", randomCNIP: true, https: true });
+      const data = payload.data as Array<{ url?: unknown }> | undefined;
+      const url = asString(data?.[0]?.url).trim();
       if (!url) return null;
       // 上游仍给 http:// 时（旧版服务）本地再升一次 https：HTTPS 部署下浏览器会把
       // http 直链当混合内容拦掉，而这套 CDN 的签名路径在 https 下同样有效
@@ -148,23 +270,22 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
     },
 
     async getLyrics(id) {
-      // /lyric/new 才带逐字 yrc（v6.25 留白清单里"待定"的 TTML 不在此列）；旧版服务没有它
+      // lyric_new 才带逐字 yrc；旧版服务没有它（404）就回落 lyric
       try {
-        const payload = await requestJson<{ yrc?: { lyric?: unknown }; lrc?: { lyric?: unknown } }>(
-          `/lyric/new?id=${encodeURIComponent(id)}`,
-        );
-        const text = asString(payload.yrc?.lyric).trim() || asString(payload.lrc?.lyric).trim();
+        const payload = await call("lyric_new", { id });
+        const yrc = payload.yrc as { lyric?: unknown } | undefined;
+        const lrc = payload.lrc as { lyric?: unknown } | undefined;
+        const text = asString(yrc?.lyric).trim() || asString(lrc?.lyric).trim();
         return text || null;
       } catch (error) {
         // 只有"这个接口不存在"才值得回落；上游真断了就让 502 说实话
-        if (!(error instanceof UpstreamError && error.message.includes("HTTP 404"))) {
+        if (!(error instanceof UpstreamError && error.status === 404)) {
           throw error;
         }
       }
-      const payload = await requestJson<{ lrc?: { lyric?: unknown } }>(
-        `/lyric?id=${encodeURIComponent(id)}&lv=-1&kv=-1&tv=-1&rv=-1`,
-      );
-      const text = asString(payload.lrc?.lyric).trim();
+      const payload = await call("lyric", { id, lv: -1, kv: -1, tv: -1, rv: -1 });
+      const lrc = payload.lrc as { lyric?: unknown } | undefined;
+      const text = asString(lrc?.lyric).trim();
       return text || null;
     },
 

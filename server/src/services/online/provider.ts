@@ -31,23 +31,31 @@ export interface OnlineProvider {
 /**
  * 上游音源不可达 / 回应不成形（超时、非 JSON、HTTP 5xx、缺关键字段）。
  * 路由层据此回 502 —— 与"音源没配"（404）和"没这首歌的地址"（业务 null）区分开。
+ * `status` 带上游的 HTTP 状态（内嵌库从 body.code 归一出来），给"接口不存在回落"这类判断用。
  */
 export class UpstreamError extends Error {
-  constructor(message: string) {
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
     super(message);
     this.name = "UpstreamError";
+    this.status = status;
   }
 }
 
 /**
- * 按路由段找到音源实例；没这个 provider、或它需要的上游地址没配置（ON-04）都返回 `null`，
- * 路由层统一回 404。所有 provider 的创建都收在这一处：加新音源只改这个函数。
+ * 按路由段找到音源实例；没这个 provider 返回 `null`，路由层统一回 404。
+ * 所有 provider 的创建都收在这一处：加新音源只改这个函数。
+ *
+ * 网易云（v6.29 起）**默认走内嵌库**（`@neteasecloudmusicapienhanced/api`，MIT）——
+ * 部署零配置；配了 `NETEASE_API_BASE` 则改走外接自部署服务（想用 docker 版 /
+ * 换增强分支 / 隔离版本时用），两种接法共享同一套映射。
  */
 export function resolveProvider(config: AppConfig, id: string): OnlineProvider | null {
   if (id === "netease") {
-    // 未配置 NETEASE_API_BASE 就没有网易云这个音源（前端靠 /api/config 隐藏入口，这里兜底）
-    if (!config.neteaseApiBase) return null;
-    return createNeteaseProvider({ baseUrl: config.neteaseApiBase });
+    return config.neteaseApiBase
+      ? createNeteaseProvider({ baseUrl: config.neteaseApiBase })
+      : createNeteaseProvider({});
   }
   return null;
 }

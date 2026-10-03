@@ -1,6 +1,7 @@
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
+import { setNeteaseLib } from "../src/services/online/netease.js";
 import { tempDirs, testConfig } from "./helpers.js";
 
 /**
@@ -48,7 +49,23 @@ async function setup(overrides: Record<string, unknown> = {}, upstream: Upstream
   return { app: createApp(config), config, fetchMock };
 }
 
+/** 内嵌库的桩：v6.29 起未配置外接地址时路由走内嵌库 —— 用桩避免真网络 */
+const STUB_LIB = {
+  cloudsearch: async (params: Record<string, unknown>) => ({
+    status: 200,
+    body: { result: { songs: [{ id: 186016, name: "夜曲", dt: 226000 }] } },
+    params,
+  }),
+  song_url_v1: async () => ({
+    status: 200,
+    body: { data: [{ url: "http://m701.music.126.net/abc.mp3" }] },
+  }),
+  lyric_new: async () => ({ status: 200, body: { lrc: { lyric: "[00:01.17]夜曲" } } }),
+};
+
+beforeEach(() => setNeteaseLib(STUB_LIB));
 afterEach(() => {
+  setNeteaseLib(null);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -65,15 +82,18 @@ describe("在线音源路由 · 搜索（ON-02）", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/cloudsearch");
   });
 
-  it("关键词为空 400；没这个音源 404；音源未配置（ON-04）同样 404", async () => {
+  it("关键词为空 400；没这个音源 404", async () => {
     const { app } = await setup();
     expect((await request(app).get("/api/online/netease/search?keywords=%20%20")).status).toBe(400);
     expect((await request(app).get("/api/online/qq/search?keywords=x")).status).toBe(404);
+  });
 
-    const unconfigured = await setup({ neteaseApiBase: null, onlineEnabled: false });
-    expect((await request(unconfigured.app).get("/api/online/netease/search?keywords=x")).status).toBe(
-      404,
-    );
+  it("未配置外接地址（ON-04）时走内嵌库：同样出结果，部署零配置（v6.29）", async () => {
+    const { app } = await setup({ neteaseApiBase: null });
+    const res = await request(app).get("/api/online/netease/search?keywords=夜曲");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.tracks[0]).toMatchObject({ id: "186016", title: "夜曲" });
   });
 
   it("上游故障 502（与「没有这个音源」的 404 分开）", async () => {

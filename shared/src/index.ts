@@ -89,7 +89,10 @@ export interface OnlineProfile {
   avatarUrl: string | null;
 }
 
-/** GET /api/online/:provider/login 的返回：这个 server 记着的音源账号 */
+/**
+ * GET /api/online/:provider/login 的返回：**校验请求头里那个会话**的结果（无状态）。
+ * 客户端把存着的会话带上来，服务端向音源验一下是否仍有效。
+ */
 export interface OnlineAccountInfo {
   loggedIn: boolean;
   profile: OnlineProfile | null;
@@ -107,7 +110,12 @@ export type OnlineQrState = "waiting" | "scanned" | "success" | "expired";
 /** GET /api/online/:provider/login/check 的返回 */
 export interface OnlineQrCheck {
   state: OnlineQrState;
-  /** success 时顺带把账号资料带回来（服务端已把会话存下） */
+  /**
+   * success 时**把会话原样交给扫码的那台浏览器**（v6.31 起会话存前端 localStorage，
+   * 不落服务端 —— 多人各自扫码互不串号）；其余状态为空数组。
+   */
+  cookie: string[];
+  /** success 时顺带把账号资料带回来 */
   profile: OnlineProfile | null;
 }
 

@@ -47,9 +47,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   );
 }
 
-/** GET 请求，直接返回 data 部分 */
-export function apiGet<T>(path: string): Promise<T> {
-  return request<T>(path);
+/** GET 请求，直接返回 data 部分（`init` 供带自定义头的接口使用，如在线音源会话） */
+export function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, init);
 }
 
 /** POST JSON 请求，直接返回 data 部分 */
@@ -80,6 +80,6 @@ export function apiPutForm<T>(path: string, body: FormData): Promise<T> {
 }
 
 /** DELETE 请求，直接返回 data 部分 */
-export function apiDelete<T>(path: string): Promise<T> {
-  return request<T>(path, { method: "DELETE" });
+export function apiDelete<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, { method: "DELETE", ...init });
 }

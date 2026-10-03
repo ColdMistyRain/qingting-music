@@ -2,7 +2,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OnlinePlaylistInfo, OnlineTrack } from "@qingting/shared";
 
-// store 的动作只经 api/online 这一层：桩掉它，测“拉没拉、什么时候拉、装没装进状态”
+// store 的动作只经 api/online 这一层：桩掉它，测"拉没拉、什么时候拉、装没装进状态"
 vi.mock("@/api/online", () => ({
   fetchOnlineAccount: vi.fn(),
   createOnlineQrLogin: vi.fn(),
@@ -13,11 +13,28 @@ vi.mock("@/api/online", () => ({
 }));
 
 import {
+  checkOnlineQrLogin,
   fetchOnlineAccount,
   fetchOnlineCollectionTracks,
   fetchOnlineCollections,
+  logoutOnline,
 } from "@/api/online";
 import { useOnlineStore } from "./online";
+
+/** node 环境没有 localStorage：会话就存在这里，测试直接看它的内容 */
+const storage = new Map<string, string>();
+
+beforeEach(() => {
+  setActivePinia(createPinia());
+  storage.clear();
+  vi.clearAllMocks();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => void storage.set(key, value),
+    removeItem: (key: string) => void storage.delete(key),
+  });
+  vi.mocked(fetchOnlineAccount).mockResolvedValue({ loggedIn: false, profile: null });
+});
 
 const TRACK: OnlineTrack = {
   id: "186016",
@@ -29,32 +46,96 @@ const TRACK: OnlineTrack = {
   vipOnly: false,
 };
 
-vi.mocked(fetchOnlineAccount).mockResolvedValue({
-  loggedIn: true,
-  profile: { userId: "77", nickname: "夜行客", avatarUrl: null },
-});
+describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
+  it("扫码成功：会话写进本浏览器的 localStorage，界面即刻已登录", async () => {
+    vi.mocked(checkOnlineQrLogin).mockResolvedValue({
+      state: "success",
+      cookie: ["MUSIC_U=abc", "__csrf_token=x"],
+      profile: { userId: "77", nickname: "夜行客", avatarUrl: null },
+    });
+    const online = useOnlineStore();
+    await online.checkLogin("KEY");
 
-beforeEach(() => {
-  setActivePinia(createPinia());
-  vi.clearAllMocks();
-});
+    expect(online.loggedIn).toBe(true);
+    expect(online.profile?.nickname).toBe("夜行客");
 
-describe("online store · 账号（ON-10）", () => {
-  it("loadAccount 拉账号态；成功后 loggedIn / profile 可用", async () => {
+    const stored = JSON.parse(storage.get("qt-online-session:netease")!);
+    expect(stored.cookie).toEqual(["MUSIC_U=abc", "__csrf_token=x"]);
+    expect(stored.provider).toBe("netease");
+    expect(stored.loggedInAt).toBeTruthy();
+  });
+
+  it("扫码失败（未确认/过期）：不写任何会话，仍是未登录", async () => {
+    vi.mocked(checkOnlineQrLogin).mockResolvedValue({
+      state: "expired",
+      cookie: [],
+      profile: null,
+    });
+    const online = useOnlineStore();
+    await online.checkLogin("KEY");
+
+    expect(online.loggedIn).toBe(false);
+    expect(storage.has("qt-online-session:netease")).toBe(false);
+  });
+
+  it("启动校验：音源说会话失效 → 清掉本地（界面回未登录，不拿死会话装已登录）", async () => {
+    storage.set(
+      "qt-online-session:netease",
+      JSON.stringify({
+        provider: "netease",
+        cookie: ["MUSIC_U=dead"],
+        profile: { userId: "1", nickname: "旧会话", avatarUrl: null },
+        loggedInAt: "2026-10-01T00:00:00.000Z",
+      }),
+    );
+    vi.mocked(fetchOnlineAccount).mockResolvedValue({ loggedIn: false, profile: null });
+
+    const online = useOnlineStore();
+    await online.loadAccount();
+
+    expect(online.loggedIn).toBe(false);
+    expect(storage.has("qt-online-session:netease")).toBe(false);
+  });
+
+  it("启动校验：会话仍有效 → 保持登录，并把最新资料回写（昵称改了也跟得上）", async () => {
+    storage.set(
+      "qt-online-session:netease",
+      JSON.stringify({
+        provider: "netease",
+        cookie: ["MUSIC_U=live"],
+        profile: { userId: "77", nickname: "旧昵称", avatarUrl: null },
+        loggedInAt: "2026-10-01T00:00:00.000Z",
+      }),
+    );
+    vi.mocked(fetchOnlineAccount).mockResolvedValue({
+      loggedIn: true,
+      profile: { userId: "77", nickname: "新昵称", avatarUrl: null },
+    });
+
     const online = useOnlineStore();
     await online.loadAccount();
 
     expect(online.loggedIn).toBe(true);
-    expect(online.profile?.nickname).toBe("夜行客");
+    expect(online.profile?.nickname).toBe("新昵称");
+    const stored = JSON.parse(storage.get("qt-online-session:netease")!);
+    expect(stored.profile.nickname).toBe("新昵称");
   });
 
-  it("拉取失败只记错误态，不打断页面", async () => {
-    vi.mocked(fetchOnlineAccount).mockRejectedValueOnce(new Error("后端断了"));
+  it("退出登录：先让上游注销这个会话，再清本地（清完回未登录、歌单缓存也没了）", async () => {
+    vi.mocked(checkOnlineQrLogin).mockResolvedValue({
+      state: "success",
+      cookie: ["MUSIC_U=abc"],
+      profile: { userId: "77", nickname: "夜行客", avatarUrl: null },
+    });
     const online = useOnlineStore();
-    await online.loadAccount();
+    await online.checkLogin("KEY");
 
-    expect(online.accountStatus).toBe("error");
+    await online.logout();
+
+    expect(logoutOnline).toHaveBeenCalledWith("netease");
     expect(online.loggedIn).toBe(false);
+    expect(storage.has("qt-online-session:netease")).toBe(false);
+    expect(online.playlists).toEqual([]);
   });
 });
 

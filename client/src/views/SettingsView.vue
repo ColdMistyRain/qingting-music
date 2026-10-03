@@ -305,8 +305,8 @@ async function signOut(): Promise<void> {
             </button>
           </div>
           <div class="set-note">
-            登录后可以在「在线搜索」里打开这个账号收藏的歌单（含 VIP
-            曲目）。登录是这个服务器共享的一份，会话只存在部署者自己的服务器上。
+            登录后可以在「在线搜索」里打开这个账号收藏的歌单。会话保存在这台浏览器里，
+            不与其他浏览器或设备共享 —— 各自扫码、互不影响；清除浏览器数据会退出登录。
           </div>
         </div>
         <div class="set-card card">

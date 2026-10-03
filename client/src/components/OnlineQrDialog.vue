@@ -154,7 +154,7 @@ onBeforeUnmount(() => {
       <DialogContent class="qr-card" force-mount @open-auto-focus="onOpenAutoFocus">
         <DialogTitle class="qr-title">登录网易云账号</DialogTitle>
         <DialogDescription class="qr-desc">
-          登录后可以听这个账号收藏的歌（含 VIP 曲目）。会话只存在你自己服务器上。
+          登录后可以听这个账号收藏的歌。登录保存在这台浏览器里，换浏览器需要重新扫码。
         </DialogDescription>
 
         <div class="qr-stage">

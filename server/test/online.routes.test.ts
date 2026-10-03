@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
@@ -178,16 +176,18 @@ describe("在线音源路由 · 播放地址与歌词（ON-03 / ON-05）", () =>
   });
 });
 
-describe("在线音源路由 · 账号与收藏夹（ON-10）", () => {
-  it("扫码登录全流程：取二维码 → 轮询 803 落盘会话 → 状态已登录 → 退出清掉", async () => {
-    // 内嵌模式（不配外接地址）+ 桩库
-    const { app, config } = await setup({ neteaseApiBase: null });
+describe("在线音源路由 · 账号与收藏夹（ON-10，会话存前端 v6.31）", () => {
+  /** 会话经 X-Online-Auth 头随请求走；服务端不落盘 */
+  const AUTH = { "X-Online-Auth": "MUSIC_U=from-qr; __csrf_token=x" };
+
+  it("扫码全流程：取二维码 → 轮询 803 把会话**原样交给浏览器** → 带头可验真 → 退出注销", async () => {
+    const { app } = await setup({ neteaseApiBase: null });
 
     const qr = await request(app).post("/api/online/netease/login/qr");
     expect(qr.status).toBe(200);
     expect(qr.body.data).toEqual({ key: "KEY123", qrDataUrl: "data:image/png;base64,xx" });
 
-    // 轮询前：未登录
+    // 轮询前：不带会话头就是未登录（且不打扰上游）
     expect((await request(app).get("/api/online/netease/login")).body.data).toEqual({
       loggedIn: false,
       profile: null,
@@ -195,38 +195,57 @@ describe("在线音源路由 · 账号与收藏夹（ON-10）", () => {
 
     const check = await request(app).get("/api/online/netease/login/check?key=KEY123");
     expect(check.status).toBe(200);
-    expect(check.body.data).toEqual({
-      state: "success",
-      profile: { userId: "77", nickname: "夜行客", avatarUrl: "https://p1.music.126.net/a.jpg" },
+    // 会话在响应体里交给扫码的浏览器；服务端不留副本
+    expect(check.body.data.cookie).toEqual(["MUSIC_U=from-qr"]);
+    expect(check.body.data.profile).toEqual({
+      userId: "77",
+      nickname: "夜行客",
+      avatarUrl: "https://p1.music.126.net/a.jpg",
     });
 
-    // 会话已落盘（data/online-auth.json），状态接口随之翻面
-    const after = await request(app).get("/api/online/netease/login");
+    // 浏览器存下会话后带头来验：仍有效
+    const after = await request(app).get("/api/online/netease/login").set(AUTH);
     expect(after.body.data.loggedIn).toBe(true);
     expect(after.body.data.profile?.nickname).toBe("夜行客");
-    const persisted = JSON.parse(
-      await readFile(join(config.dataDir, "online-auth.json"), "utf8"),
-    );
-    expect(persisted.providers.netease.cookie).toEqual(["MUSIC_U=from-qr"]);
 
-    const logout = await request(app).delete("/api/online/netease/login");
+    const logout = await request(app).delete("/api/online/netease/login").set(AUTH);
     expect(logout.status).toBe(200);
-    expect((await request(app).get("/api/online/netease/login")).body.data.loggedIn).toBe(false);
   });
 
-  it("收藏夹：未登录 401；登录后给歌单列表与曲目（曲目带 VIP 标记）", async () => {
+  it("登录态校验：会话失效时音源说不算 → loggedIn false（客户端据此清掉本地会话）", async () => {
+    // neteaseApiBase: null 走内嵌库路径 —— 失效场景改桩库的 login_status
+    setNeteaseLib({
+      ...STUB_LIB,
+      login_status: async () => ({ status: 200, body: { data: { code: 301, profile: null } } }),
+    });
+    const { app } = await setup({ neteaseApiBase: null });
+    const res = await request(app).get("/api/online/netease/login").set(AUTH);
+    expect(res.body.data).toEqual({ loggedIn: false, profile: null });
+  });
+
+  it("收藏夹：不带会话 401；带着失效会话也 401；带有效会话给歌单与曲目", async () => {
     const { app } = await setup({ neteaseApiBase: null });
     expect((await request(app).get("/api/online/netease/collections")).status).toBe(401);
 
-    await request(app).get("/api/online/netease/login/check?key=KEY123");
+    // 失效会话（login_status 不认）→ 401，提示重新扫码
+    setNeteaseLib({
+      ...STUB_LIB,
+      login_status: async () => ({ status: 200, body: { data: { code: 301, profile: null } } }),
+    });
+    const broken = await setup({ neteaseApiBase: null });
+    expect(
+      (await request(broken.app).get("/api/online/netease/collections").set(AUTH)).status,
+    ).toBe(401);
 
-    const list = await request(app).get("/api/online/netease/collections");
+    // 恢复有效桩再验“带有效会话”
+    setNeteaseLib(STUB_LIB);
+    const list = await request(app).get("/api/online/netease/collections").set(AUTH);
     expect(list.status).toBe(200);
     expect(list.body.data.playlists).toEqual([
       { id: "100", name: "我喜欢的音乐", cover: "https://p1.music.126.net/c.jpg", trackCount: 1 },
     ]);
 
-    const tracks = await request(app).get("/api/online/netease/collections/100");
+    const tracks = await request(app).get("/api/online/netease/collections/100").set(AUTH);
     expect(tracks.status).toBe(200);
     expect(tracks.body.data.tracks).toEqual([
       {

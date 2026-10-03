@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import type { OnlineAccountInfo, OnlinePlaylistInfo, Track } from "@qingting/shared";
+import type { OnlinePlaylistInfo, Track } from "@qingting/shared";
 import {
   createOnlineQrLogin,
   checkOnlineQrLogin,
@@ -9,14 +9,22 @@ import {
   fetchOnlineCollections,
   logoutOnline,
 } from "@/api/online";
+import {
+  clearOnlineSession,
+  readOnlineSession,
+  writeOnlineSession,
+  type OnlineSession,
+} from "@/utils/onlineSession";
 import { toOnlineTrack } from "@/utils/onlineTracks";
 import { ApiError } from "@/api/http";
 
 /**
- * 在线音源账号与收藏夹（ON-10 / v6.30）。
+ * 在线音源账号与收藏夹（ON-10；v6.31 起会话**存各浏览器自己的 localStorage**）。
  *
- * 登录是**全 server 共享一份**的（会话存服务端 data/online-auth.json）：
- * 部署者扫一次码，这个部署里的所有人都能听这个账号收藏的歌。
+ * 为什么不存服务端（需求方定）：服务端单槽会话下，两个人先后扫码会互相覆盖 —— 账号就串了。
+ * 现在的模型与普通网站一致：扫码成功后会话交给**扫码的那台浏览器**，本 store 负责
+ * 存取（`utils/onlineSession`）与验证（每次启动向后端验一次是否仍有效），后端全程无状态。
+ * 代价：换浏览器/清浏览器数据要重新扫码。
  *
  * 收藏夹的曲目放在 store 里而不是页面里：从在线页跳去沉浸页再回来，
  * 选中的歌单还在（搜索结果是页面状态、不留 —— 见 OnlineView 的注释）。
@@ -29,16 +37,34 @@ export type AccountProvider = (typeof ACCOUNT_PROVIDERS)[number];
 export type OnlineStatus = "idle" | "loading" | "ready" | "error";
 
 export const useOnlineStore = defineStore("online", () => {
-  /* ---------- 账号 ---------- */
-  const account = ref<OnlineAccountInfo | null>(null);
+  /* ---------- 账号（会话在本浏览器）---------- */
+  const session = ref<OnlineSession | null>(readOnlineSession("netease"));
   const accountStatus = ref<OnlineStatus>("idle");
 
+  /**
+   * 启动时校验一遍本地会话：向音源验真（后端无状态，验证经它转手）。
+   * 音源说失效了就清掉本地 —— 界面回到未登录，不会拿着死会话装作已登录。
+   */
   async function loadAccount(force = false): Promise<void> {
     if (accountStatus.value === "loading") return;
     if (accountStatus.value === "ready" && !force) return;
     accountStatus.value = "loading";
+    const stored = readOnlineSession("netease");
+    if (!stored) {
+      session.value = null;
+      accountStatus.value = "ready";
+      return;
+    }
     try {
-      account.value = await fetchOnlineAccount("netease");
+      const info = await fetchOnlineAccount("netease");
+      if (info.loggedIn) {
+        // 验证顺带把最新资料带回（改过昵称/头像也能跟上）
+        session.value = { ...stored, profile: info.profile };
+        writeOnlineSession(session.value);
+      } else {
+        clearOnlineSession("netease");
+        session.value = null;
+      }
       accountStatus.value = "ready";
     } catch {
       accountStatus.value = "error";
@@ -55,24 +81,37 @@ export const useOnlineStore = defineStore("online", () => {
 
   async function checkLogin(key: string): Promise<{ state: string; profile: unknown }> {
     const result = await checkOnlineQrLogin("netease", key);
-    if (result.state === "success") {
-      // 会话已在服务端落盘：把本地账号态刷成新的一份
-      await loadAccount(true);
+    if (result.state === "success" && result.cookie.length > 0) {
+      // 会话交给这台浏览器：存下，界面即刻变已登录
+      const next: OnlineSession = {
+        provider: "netease",
+        cookie: result.cookie,
+        profile: (result.profile as OnlineSession["profile"]) ?? null,
+        loggedInAt: new Date().toISOString(),
+      };
+      writeOnlineSession(next);
+      session.value = next;
     }
     return result;
   }
 
   async function logout(): Promise<void> {
-    await logoutOnline("netease");
-    account.value = { loggedIn: false, profile: null };
+    // 上游注销尽力而为：本地一定清（就算上游没响应，死会话下次启动验真时也会被清）
+    try {
+      await logoutOnline("netease");
+    } catch {
+      // 网络不通也照常清本地
+    }
+    clearOnlineSession("netease");
+    session.value = null;
     playlists.value = [];
     activePlaylistId.value = null;
     collectionTracks.value = [];
     collectionStatus.value = "idle";
   }
 
-  const loggedIn = computed(() => account.value?.loggedIn ?? false);
-  const profile = computed(() => account.value?.profile ?? null);
+  const loggedIn = computed(() => session.value !== null);
+  const profile = computed(() => session.value?.profile ?? null);
 
   /* ---------- 收藏夹（歌单）---------- */
   const playlists = ref<OnlinePlaylistInfo[]>([]);
@@ -132,7 +171,6 @@ export const useOnlineStore = defineStore("online", () => {
 
   return {
     // 账号
-    account,
     accountStatus,
     loggedIn,
     profile,

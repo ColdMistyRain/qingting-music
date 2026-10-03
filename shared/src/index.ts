@@ -36,6 +36,50 @@ export interface Track {
   hasLyrics?: boolean;
 }
 
+/* ---------- 在线音源（PRD 3.5，ON-01~05）：统一曲目抽象 ---------- */
+/**
+ * 音源适配层（ON-01）的统一结果格式：`/api/online/:provider/search` 每条结果的形状。
+ * 播放器与页面不感知具体音源——各适配器都把自家响应映射成这一份。
+ */
+export interface OnlineTrack {
+  /**
+   * 音源内的**原生 id**（网易云是数字串）。完整引用键在外面拼：
+   * `provider:id`（铁律 4，歌单 / 收藏 / 最近播放同一套口径）。
+   */
+  id: string;
+  title: string;
+  /** 多名歌手用 " / " 连接（网易云 `ar[]` 是数组） */
+  artist: string;
+  album: string;
+  /** 秒；解析不出为 null（网易云给的是毫秒，换算发生在适配器里） */
+  duration: number | null;
+  /** 封面直链（第三方 CDN）。客户端展示与取色走 `/api/online/:provider/cover` 代理 */
+  cover: string | null;
+  /**
+   * 音源侧标记“要 VIP 才能听”。仅供参考（不登录时这类曲目大概率没有播放地址），
+   * **能不能播永远以 stream 接口的返回为准**——不可用就是 `url: null`（ON-03）。
+   */
+  vipOnly: boolean;
+}
+
+/** GET /api/online/:provider/search 的返回（ON-02） */
+export interface OnlineSearchResult {
+  provider: string;
+  /** 原样带回（回显搜索框、判断“结果是不是这份关键词的”） */
+  keyword: string;
+  tracks: OnlineTrack[];
+}
+
+/** GET /api/online/:provider/stream 的返回（ON-03）：`url` 为 null = 暂无可用音源（VIP / 无版权） */
+export interface OnlineStreamInfo {
+  url: string | null;
+}
+
+/** GET /api/online/:provider/lyrics 的返回（ON-05）：原文（LRC / yrc），没有就是 null */
+export interface OnlineLyricsInfo {
+  lyrics: string | null;
+}
+
 /** 服务端曲目记录（data/songs.json 的一条） */
 export interface Song {
   id: string;

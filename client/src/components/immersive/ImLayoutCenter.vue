@@ -18,6 +18,8 @@ defineProps<{
   lines: LyricLine[];
   /** 翻译歌词行（v6.40，网易 tlyric）：与 lines 同时间轴，可为空数组 */
   translations?: LyricLine[];
+  /** 音译歌词行（v6.43）：罗马音/拼音，与翻译同机制 */
+  romans?: LyricLine[];
   time: number;
   playing: boolean;
 }>();
@@ -32,6 +34,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
       class="ly"
       :lines="lines"
       :translations="translations"
+      :romans="romans"
       :time="time"
       @seek="emit('seek', $event)"
     />

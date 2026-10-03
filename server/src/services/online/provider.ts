@@ -49,7 +49,11 @@ export interface OnlineProvider {
   getLyrics(
     id: string,
     cookie?: string[],
-  ): Promise<{ lyrics: string | null; translation: string | null }>;
+  ): Promise<{
+    lyrics: string | null;
+    translation: string | null;
+    roman: string | null;
+  }>;
   /**
    * 封面代理白名单（SSRF 防线）：`/api/online/:provider/cover` 只转发**这里放行**的 URL。
    * 音源返回的封面地址都在它自家 CDN 上，按 host 后缀放行即可；别写成"任意 URL 都转发"。

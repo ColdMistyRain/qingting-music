@@ -402,13 +402,19 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
         const yrc = body.yrc as { lyric?: unknown } | undefined;
         const lrc = body.lrc as { lyric?: unknown } | undefined;
         const tlyric = body.tlyric as { lyric?: unknown } | undefined;
+        const romalrc = body.romalrc as { lyric?: unknown } | undefined;
         const text =
           normalizeNeteaseLyric(asString(yrc?.lyric).trim()) ||
           normalizeNeteaseLyric(asString(lrc?.lyric).trim());
-        // 翻译（tlyric，LRC 格式、与原文同时间轴）：有正文才有翻译
+        // 翻译（tlyric）与音译（romalrc），LRC 格式、与原文同时间轴：有正文才带
         const translation =
           normalizeNeteaseLyric(asString(tlyric?.lyric).trim()) || null;
-        return { lyrics: text || null, translation: text ? translation : null };
+        const roman = normalizeNeteaseLyric(asString(romalrc?.lyric).trim()) || null;
+        return {
+          lyrics: text || null,
+          translation: text ? translation : null,
+          roman: text ? roman : null,
+        };
       } catch (error) {
         // 只有"这个接口不存在"才值得回落；上游真断了就让 502 说实话
         if (!(error instanceof UpstreamError && error.status === 404)) {
@@ -418,11 +424,14 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
       const { body } = await call("lyric", { id, lv: -1, kv: -1, tv: -1, rv: -1 }, cookie);
       const lrc = body.lrc as { lyric?: unknown } | undefined;
       const tlyric = body.tlyric as { lyric?: unknown } | undefined;
+      const romalrc = body.romalrc as { lyric?: unknown } | undefined;
       const text = normalizeNeteaseLyric(asString(lrc?.lyric).trim());
       const translation = normalizeNeteaseLyric(asString(tlyric?.lyric).trim());
+      const roman = normalizeNeteaseLyric(asString(romalrc?.lyric).trim());
       return {
         lyrics: text || null,
         translation: text ? translation || null : null,
+        roman: text ? roman || null : null,
       };
     },
 

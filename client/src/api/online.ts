@@ -50,11 +50,15 @@ export function fetchOnlineStreamUrl(provider: string, nativeId: string): Promis
 export function fetchOnlineLyrics(
   provider: string,
   nativeId: string,
-): Promise<{ lyrics: string | null; translation: string | null }> {
+): Promise<{ lyrics: string | null; translation: string | null; roman: string | null }> {
   return apiGet<OnlineLyricsInfo>(
     `/api/online/${encodeURIComponent(provider)}/lyrics?id=${encodeURIComponent(nativeId)}`,
     withSession(),
-  ).then((info) => ({ lyrics: info.lyrics, translation: info.translation ?? null }));
+  ).then((info) => ({
+    lyrics: info.lyrics,
+    translation: info.translation ?? null,
+    roman: info.roman ?? null,
+  }));
 }
 
 /* ---------- 账号（ON-10：扫码登录，听自己在音源收的歌）---------- */

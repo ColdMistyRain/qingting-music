@@ -91,6 +91,11 @@ export const usePlayerStore = defineStore("player", () => {
    */
   const lyricsTranslation = ref("");
   /**
+   * 当前曲目的**音译歌词**原文（v6.43，网易 romalrc；罗马音/拼音）。
+   * 与翻译同机制：只有在线来源带；切歌即清。
+   */
+  const lyricsRoman = ref("");
+  /**
    * 翻译显示开关（v6.41，需求方："建议加一个按钮让用户选择是否展示翻译"）：
    * 默认开；偏好存 localStorage（轻量显示偏好，与手动歌词库同一域）。
    */
@@ -248,6 +253,7 @@ export const usePlayerStore = defineStore("player", () => {
   watch(currentIndex, () => {
     lyricsText.value = "";
     lyricsTranslation.value = "";
+    lyricsRoman.value = "";
   });
 
   /* ---------- 云端曲目的内嵌歌词（LR-02）：开播时按需拉一次 ---------- */
@@ -279,11 +285,17 @@ export const usePlayerStore = defineStore("player", () => {
    * 拉到过的歌词按曲目存一份（会话级、有上限）：`lyricsText` 在切歌时会被清空，
    * 不缓存的话“切走再切回”就得重新发请求，来回听歌的体验是歌词时有时无。
    */
-  const onlineLyricsCache = new Map<string, { lyrics: string; translation: string }>();
+  const onlineLyricsCache = new Map<
+    string,
+    { lyrics: string; translation: string; roman: string }
+  >();
   /** 上限的理由与手动歌词库一致：歌词很小，但架不住攒得多 */
   const ONLINE_LYRICS_CACHE_LIMIT = 30;
 
-  function cacheOnlineLyrics(id: string, entry: { lyrics: string; translation: string }): void {
+  function cacheOnlineLyrics(
+    id: string,
+    entry: { lyrics: string; translation: string; roman: string },
+  ): void {
     if (onlineLyricsCache.has(id)) onlineLyricsCache.delete(id);
     onlineLyricsCache.set(id, entry);
     while (onlineLyricsCache.size > ONLINE_LYRICS_CACHE_LIMIT) {
@@ -308,18 +320,20 @@ export const usePlayerStore = defineStore("player", () => {
     if (cached !== undefined) {
       lyricsText.value = cached.lyrics;
       lyricsTranslation.value = cached.translation;
+      lyricsRoman.value = cached.roman;
       return;
     }
     if (askedOnlineLyrics.has(track.id)) return;
 
     try {
-      const { lyrics, translation } = await fetchOnlineLyrics(parsed.provider, parsed.nativeId);
+      const { lyrics, translation, roman } = await fetchOnlineLyrics(parsed.provider, parsed.nativeId);
       // 请求回来时可能已经切歌：歌词永远属于当前曲目
       if (currentTrack.value?.id !== track.id) return;
-      if (lyrics) cacheOnlineLyrics(track.id, { lyrics, translation: translation ?? "" });
+      if (lyrics) cacheOnlineLyrics(track.id, { lyrics, translation: translation ?? "", roman: roman ?? "" });
       else askedOnlineLyrics.add(track.id);
       lyricsText.value = lyrics ?? "";
       lyricsTranslation.value = translation ?? "";
+      lyricsRoman.value = roman ?? "";
     } catch {
       // 音源不可用就不给歌词，不影响播放与手动导入；下次切回还会再试
     }
@@ -898,6 +912,7 @@ export const usePlayerStore = defineStore("player", () => {
     displayRatio,
     lyricsText,
     lyricsTranslation,
+    lyricsRoman,
     translationVisible,
     toggleTranslation,
     importedLyrics,

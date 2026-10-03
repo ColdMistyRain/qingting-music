@@ -25,6 +25,8 @@ const props = defineProps<{
   lines: LyricLine[];
   /** 翻译歌词行（v6.40）：与 lines 同时间轴的 LRC 行；空数组/不传 = 没有翻译 */
   translations?: LyricLine[];
+  /** 音译歌词行（v6.43）：罗马音/拼音，与翻译同机制；空数组/不传 = 没有 */
+  romans?: LyricLine[];
   /** 当前播放时间（秒）。由父级用 rAF 采样注入：timeupdate 只有 ~4Hz，逐字填充会卡顿 */
   time: number;
 }>();
@@ -36,6 +38,14 @@ const activeIndex = computed(() => currentLineIndex(props.lines, props.time));
 /** 翻译行按时间对齐到原文行（毫秒取整做键；网易 tlyric 与原文同轴） */
 function translationOf(time: number): string {
   const line = props.translations?.find(
+    (l) => Math.round(l.time * 1000) === Math.round(time * 1000),
+  );
+  return line?.text ?? "";
+}
+
+/** 音译行同机制对齐（v6.43） */
+function romanOf(time: number): string {
+  const line = props.romans?.find(
     (l) => Math.round(l.time * 1000) === Math.round(time * 1000),
   );
   return line?.text ?? "";
@@ -537,8 +547,9 @@ onBeforeUnmount(() => {
                LRC 里没有字级时间，“自左向右渐亮”只能编一个速度出来（需求方 v6.19：
                “我们目前的歌词都是普通的 lrc 格式…参照设计应该降级到逐行高亮”）。 -->
           <span v-else class="txt">{{ line.text }}</span>
-          <!-- 翻译（v6.40）：原文下方一行小字 -->
+          <!-- 翻译（v6.40）与音译（v6.43）：原文下方的小字，音译排在翻译之下 -->
           <span v-if="translationOf(line.time)" class="tr">{{ translationOf(line.time) }}</span>
+          <span v-if="romanOf(line.time)" class="tr">{{ romanOf(line.time) }}</span>
         </button>
       </div>
     </div>

@@ -96,6 +96,11 @@ export interface OnlineLyricsInfo {
    * 沉浸页在原文下方渲染。没有就是 null。
    */
   translation?: string | null;
+  /**
+   * 音译歌词（v6.43）：罗马音/拼音 LRC（网易 romalrc），与翻译同机制同位置
+   * （AMLL 的 romanLyric 同款概念）。没有就是 null。
+   */
+  roman?: string | null;
 }
 
 /* ---------- 音源账号（ON-10，v6.30：扫码登录，听自己收藏的歌）---------- */

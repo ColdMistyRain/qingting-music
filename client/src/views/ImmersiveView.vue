@@ -88,6 +88,13 @@ const translationLines = computed(() =>
     : [],
 );
 
+/** 音译行（v6.43）：与翻译同一显示开关（都是"辅助跟唱"信息） */
+const romanLines = computed(() =>
+  player.translationVisible && player.lyricsRoman
+    ? parseLyrics(player.lyricsRoman).lines
+    : [],
+);
+
 /**
  * 时间采样：timeupdate 只有 ~4Hz，直接喂给逐字填充会一跳一跳。
  * 播放中用 rAF 每帧向 store 取一次"此刻真实时间"；暂停时用 store 的展示值兜住（拖进度条也能更新）。
@@ -251,6 +258,7 @@ onBeforeUnmount(() => {
           :cover-url="coverUrl"
           :lines="lines"
           :translations="translationLines"
+          :romans="romanLines"
           :time="now"
           :playing="player.playing"
           @seek="player.seekTo($event)"

@@ -223,24 +223,32 @@ describe("网易云适配器 · 歌词（ON-05）", () => {
     );
   });
 
-  it("翻译 tlyric 随正文带出（v6.40）；正文为空时不给孤立的翻译", async () => {
+  it("翻译 tlyric 与音译 romalrc 随正文带出（v6.40/v6.43）；正文为空时不给孤立副线", async () => {
     const withTrans = makeProvider({
       "/lyric/new": {
         body: {
           lrc: { lyric: "[00:01.00]한국어 가사" },
           tlyric: { lyric: "[00:01.00]韩国歌词" },
+          romalrc: { lyric: "[00:01.00]hanguk gasa" },
         },
       },
     });
     expect(await withTrans.provider.getLyrics("1")).toEqual({
       lyrics: "[00:01.00]한국어 가사",
       translation: "[00:01.00]韩国歌词",
+      roman: "[00:01.00]hanguk gasa",
     });
 
     const noText = makeProvider({
-      "/lyric/new": { body: { tlyric: { lyric: "[00:01.00]孤立的翻译" } } },
+      "/lyric/new": {
+        body: { tlyric: { lyric: "[00:01.00]孤立的翻译" }, romalrc: { lyric: "[00:01.00]x" } },
+      },
     });
-    expect(await noText.provider.getLyrics("1")).toEqual({ lyrics: null, translation: null });
+    expect(await noText.provider.getLyrics("1")).toEqual({
+      lyrics: null,
+      translation: null,
+      roman: null,
+    });
   });
 
   it("两边都是空歌词 → null；上游 5xx 抛 UpstreamError（不回落）", async () => {

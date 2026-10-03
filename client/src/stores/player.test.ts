@@ -18,7 +18,7 @@ vi.mock("@/api/songs", () => ({
 // 在线音源（ON-03/05）：直链解析与歌词都走这里，单测里按用例改返回值
 vi.mock("@/api/online", () => ({
   fetchOnlineStreamUrl: vi.fn(async () => "https://cdn.example.test/stream.mp3"),
-  fetchOnlineLyrics: vi.fn(async () => ({ lyrics: null, translation: null })),
+  fetchOnlineLyrics: vi.fn(async () => ({ lyrics: null, translation: null, roman: null })),
 }));
 
 /** 队列里的曲目：用 https 地址，避免单测触碰 Blob URL 释放（那是浏览器行为） */
@@ -775,7 +775,7 @@ describe("在线曲目（ON-03/05）", () => {
     vi.mocked(fetchOnlineStreamUrl).mockClear();
     vi.mocked(fetchOnlineStreamUrl).mockResolvedValue("https://cdn.example.test/stream.mp3");
     vi.mocked(fetchOnlineLyrics).mockClear();
-    vi.mocked(fetchOnlineLyrics).mockResolvedValue({ lyrics: null, translation: null });
+    vi.mocked(fetchOnlineLyrics).mockResolvedValue({ lyrics: null, translation: null, roman: null });
   });
 
   afterEach(() => {
@@ -860,6 +860,7 @@ describe("在线曲目（ON-03/05）", () => {
     vi.mocked(fetchOnlineLyrics).mockResolvedValue({
       lyrics: "[00:01.17]夜曲",
       translation: "[00:01.00]Night Song",
+      roman: "[00:01.00]Yeokkyeong",
     });
     const player = usePlayerStore();
     player.addTracks([onlineTrack("netease:1"), onlineTrack("netease:2")]);
@@ -929,6 +930,7 @@ describe("在线曲目（ON-03/05）", () => {
     vi.mocked(fetchOnlineLyrics).mockResolvedValue({
       lyrics: "[00:01.17]한국어 가사",
       translation: "[00:01.00]韩国歌词",
+      roman: "[00:01.00]hangugeo gasa",
     });
     const player = usePlayerStore();
     player.addTracks([onlineTrack("netease:1")]);
@@ -952,7 +954,7 @@ describe("在线曲目（ON-03/05）", () => {
   });
 
   it("在线歌词拉不到时安静退场：lyricsText 留空，也不打扰播放", async () => {
-    vi.mocked(fetchOnlineLyrics).mockResolvedValue({ lyrics: null, translation: null });
+    vi.mocked(fetchOnlineLyrics).mockResolvedValue({ lyrics: null, translation: null, roman: null });
     const player = usePlayerStore();
     player.addTracks([onlineTrack("netease:1")]);
     player.playAt(0);

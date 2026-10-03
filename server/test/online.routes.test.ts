@@ -165,6 +165,7 @@ describe("在线音源路由 · 播放地址与歌词（ON-03 / ON-05）", () =>
     expect(res.body.data).toEqual({
       lyrics: "[00:01.17]夜曲",
       translation: "[00:01.17]Night Song",
+      roman: null,
     });
     expect((await request(app).get("/api/online/netease/lyrics?id=../etc")).status).toBe(400);
     expect((await request(app).get("/api/online/netease/stream?id=")).status).toBe(400);

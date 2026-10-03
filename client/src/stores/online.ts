@@ -38,7 +38,7 @@ import { ApiError } from "@/api/http";
  */
 
 /** 账号能力的提供方（P1 只有网易云；QQ/酷狗接入后在这里加） */
-export const ACCOUNT_PROVIDERS = ["netease"] as const;
+export const ACCOUNT_PROVIDERS = ["netease", "qq"] as const;
 export type AccountProvider = (typeof ACCOUNT_PROVIDERS)[number];
 
 export type OnlineStatus = "idle" | "loading" | "ready" | "error";
@@ -46,6 +46,8 @@ export type OnlineStatus = "idle" | "loading" | "ready" | "error";
 export const useOnlineStore = defineStore("online", () => {
   /* ---------- 账号（会话在本浏览器）---------- */
   const session = ref<OnlineSession | null>(readOnlineSession("netease"));
+  /** QQ 音乐的会话（v6.57，ON-06）：与网易云同槽模型，各存各的 localStorage 键 */
+  const qqSession = ref<OnlineSession | null>(readOnlineSession("qq"));
   const accountStatus = ref<OnlineStatus>("idle");
 
   /**
@@ -85,25 +87,59 @@ export const useOnlineStore = defineStore("online", () => {
   }
 
   /**
+   * QQ 会话验真（v6.57）：与网易云同一套 —— 失效即清并说清楚。
+   * QQ 的入口就是扫码（搜索匿名不可用），死会话留着会让人对着空结果发懵。
+   */
+  async function loadQqAccount(force = false): Promise<void> {
+    if (accountStatus.value === "loading") return;
+    if (accountStatus.value === "ready" && !force) return;
+    accountStatus.value = "loading";
+    const stored = readOnlineSession("qq");
+    if (!stored) {
+      qqSession.value = null;
+      accountStatus.value = "ready";
+      return;
+    }
+    try {
+      const info = await fetchOnlineAccount("qq");
+      if (info.loggedIn) {
+        qqSession.value = { ...stored, profile: info.profile };
+        writeOnlineSession(qqSession.value);
+      } else {
+        clearOnlineSession("qq");
+        qqSession.value = null;
+        showToast({ title: "QQ 音乐登录已失效", description: "请重新扫码登录" });
+      }
+      accountStatus.value = "ready";
+    } catch {
+      accountStatus.value = "error";
+    }
+  }
+
+  /**
    * 扫码轮询的**一次性驱动**（轮询节奏归调用方/弹窗组件管，store 只出两步动作）：
    * 生成二维码；按 key 问一次状态。
    */
-  async function createLogin(): Promise<{ key: string; qrDataUrl: string }> {
-    return createOnlineQrLogin("netease");
+  async function startQrLogin(provider: AccountProvider): Promise<{ key: string; qrDataUrl: string }> {
+    return createOnlineQrLogin(provider);
   }
 
-  async function checkLogin(key: string): Promise<{ state: string; profile: unknown }> {
-    const result = await checkOnlineQrLogin("netease", key);
+  async function checkQrLogin(
+    provider: AccountProvider,
+    key: string,
+  ): Promise<{ state: string; profile: unknown }> {
+    const result = await checkOnlineQrLogin(provider, key);
     if (result.state === "success" && result.cookie.length > 0) {
       // 会话交给这台浏览器：存下，界面即刻变已登录
       const next: OnlineSession = {
-        provider: "netease",
+        provider,
         cookie: result.cookie,
         profile: (result.profile as OnlineSession["profile"]) ?? null,
         loggedInAt: new Date().toISOString(),
       };
       writeOnlineSession(next);
-      session.value = next;
+      if (provider === "netease") session.value = next;
+      else qqSession.value = next;
     }
     return result;
   }
@@ -123,6 +159,17 @@ export const useOnlineStore = defineStore("online", () => {
     activePlaylistId.value = null;
     collectionTracks.value = [];
     collectionStatus.value = "idle";
+  }
+
+  /** QQ 退出（v6.57）：上游注销尽力而为，本地一定清 */
+  async function logoutQq(): Promise<void> {
+    try {
+      await logoutOnline("qq");
+    } catch {
+      // 网络不通也照常清本地
+    }
+    clearOnlineSession("qq");
+    qqSession.value = null;
   }
 
   const loggedIn = computed(() => session.value !== null);
@@ -150,6 +197,31 @@ export const useOnlineStore = defineStore("online", () => {
     }
   }
 
+  /* ---------- 音源选择（v6.57，ON-06：网易云 / QQ 音乐）---------- */
+  const PROVIDER_STORAGE_KEY = "qt-online-provider";
+  const provider = ref<AccountProvider>(
+    typeof localStorage !== "undefined" && localStorage.getItem(PROVIDER_STORAGE_KEY) === "qq"
+      ? "qq"
+      : "netease",
+  );
+  function setProvider(next: AccountProvider): void {
+    if (provider.value === next) return;
+    provider.value = next;
+    try {
+      localStorage.setItem(PROVIDER_STORAGE_KEY, next);
+    } catch {
+      // 存不上就算了：这次会话内仍然有效
+    }
+    // 切源 = 换语境：搜索结果与打开中的歌单（网易云的）都清掉
+    closePlaylist();
+    searchKeyword.value = "";
+    searchStatus.value = "idle";
+    searchError.value = "";
+    searchTracks.value = [];
+    lastSearchKeyword.value = "";
+    searchSeq += 1;
+  }
+
   /* ---------- 搜索（ON-02）：结果跨页保留（v6.45，需求方连点"继续"后我把
      页面局部状态搬进 store —— 跳去沉浸页再回来，搜索结果不再丢失）---------- */
   const searchKeyword = ref("");
@@ -171,7 +243,7 @@ export const useOnlineStore = defineStore("online", () => {
     lastSearchKeyword.value = text;
 
     try {
-      const result = await fetchOnlineSearch("netease", text);
+      const result = await fetchOnlineSearch(provider.value, text);
       if (seq !== searchSeq) return;
       searchTracks.value = result.tracks.map((info: OnlineTrack) =>
         toOnlineTrack(result.provider, info),
@@ -260,8 +332,14 @@ export const useOnlineStore = defineStore("online", () => {
     loggedIn,
     profile,
     loadAccount,
-    createLogin,
-    checkLogin,
+    loadQqAccount,
+    qqSession,
+    qqLoggedIn: computed(() => qqSession.value !== null),
+    startQrLogin,
+    checkQrLogin,
+    provider,
+    setProvider,
+    logoutQq,
     logout,
     // 搜索
     searchKeyword,

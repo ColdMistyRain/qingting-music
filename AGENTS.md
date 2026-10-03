@@ -97,6 +97,7 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
                           audioReactive（节奏起伏：低频**峰值** → 包络 → 相对常态归一，纯函数 - v5.91）、
                           audioSpectrum（频谱频段：对数分布 40Hz~16kHz，划分式取 bin 不双计，纯函数 —— **留库未接线** v6.55）、
+                          qq（QQ 音乐适配器：内嵌 @yakult-green-tea/qq-music-api（MIT）以进程内 HTTP 服务随 server 起；搜索必须带登录态（微信扫码，会话密封 token 存浏览器）；微信 QQ App 双通道 —— VS-05 同目录 - ON-06/v6.57）、
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
                           spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）、

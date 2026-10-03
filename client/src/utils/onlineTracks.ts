@@ -40,6 +40,7 @@ export function toOnlineTrack(provider: string, info: OnlineTrack): Track {
 /** 音源的显示名（来源列等处用）；没收录的音源直接显示它的 id */
 const PROVIDER_LABELS: Record<string, string> = {
   netease: "网易云",
+  qq: "QQ 音乐",
 };
 
 /**

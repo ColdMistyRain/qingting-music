@@ -16,8 +16,8 @@ import { readOnlineSession, sessionHeaderValue } from "@/utils/onlineSession";
  * 后端转交给音源（服务端不留副本）。没有登录就是空头 —— 上游按匿名处理。
  * 封面代理除外：它是 <img> 的 src 带不了自定义头，封面本来就是公开 CDN 资源。
  */
-function withSession(init: RequestInit = {}): RequestInit {
-  const value = sessionHeaderValue(readOnlineSession("netease"));
+function withSession(provider: string, init: RequestInit = {}): RequestInit {
+  const value = sessionHeaderValue(readOnlineSession(provider));
   if (!value) return init;
   return {
     ...init,
@@ -34,7 +34,7 @@ function withSession(init: RequestInit = {}): RequestInit {
 export function fetchOnlineSearch(provider: string, keyword: string): Promise<OnlineSearchResult> {
   return apiGet<OnlineSearchResult>(
     `/api/online/${encodeURIComponent(provider)}/search?keywords=${encodeURIComponent(keyword)}`,
-    withSession(),
+    withSession(provider),
   );
 }
 
@@ -42,7 +42,7 @@ export function fetchOnlineSearch(provider: string, keyword: string): Promise<On
 export function fetchOnlineStreamUrl(provider: string, nativeId: string): Promise<string | null> {
   return apiGet<OnlineStreamInfo>(
     `/api/online/${encodeURIComponent(provider)}/stream?id=${encodeURIComponent(nativeId)}`,
-    withSession(),
+    withSession(provider),
   ).then((info) => info.url);
 }
 
@@ -53,7 +53,7 @@ export function fetchOnlineLyrics(
 ): Promise<{ lyrics: string | null; translation: string | null; roman: string | null }> {
   return apiGet<OnlineLyricsInfo>(
     `/api/online/${encodeURIComponent(provider)}/lyrics?id=${encodeURIComponent(nativeId)}`,
-    withSession(),
+    withSession(provider),
   ).then((info) => ({
     lyrics: info.lyrics,
     translation: info.translation ?? null,
@@ -65,7 +65,7 @@ export function fetchOnlineLyrics(
 
 /** 这个 server 记着的音源账号（登录状态 + 资料） */
 export function fetchOnlineAccount(provider: string): Promise<OnlineAccountInfo> {
-  return apiGet<OnlineAccountInfo>(`/api/online/${encodeURIComponent(provider)}/login`, withSession());
+  return apiGet<OnlineAccountInfo>(`/api/online/${encodeURIComponent(provider)}/login`, withSession(provider));
 }
 
 /** 生成一次扫码登录的二维码 */
@@ -77,19 +77,20 @@ export function createOnlineQrLogin(provider: string): Promise<OnlineQrLogin> {
 export function checkOnlineQrLogin(provider: string, key: string): Promise<OnlineQrCheck> {
   return apiGet<OnlineQrCheck>(
     `/api/online/${encodeURIComponent(provider)}/login/check?key=${encodeURIComponent(key)}`,
+    withSession(provider),
   );
 }
 
 /** 退出登录（上游注销 + 清本服务器的凭据） */
 export function logoutOnline(provider: string): Promise<void> {
-  return apiDelete(`/api/online/${encodeURIComponent(provider)}/login`, withSession());
+  return apiDelete(`/api/online/${encodeURIComponent(provider)}/login`, withSession(provider));
 }
 
 /** 账号在音源里的歌单（收藏夹） */
 export function fetchOnlineCollections(provider: string): Promise<OnlineCollectionsInfo> {
   return apiGet<OnlineCollectionsInfo>(
     `/api/online/${encodeURIComponent(provider)}/collections`,
-    withSession(),
+    withSession(provider),
   );
 }
 
@@ -100,6 +101,6 @@ export function fetchOnlineCollectionTracks(
 ): Promise<OnlinePlaylistTracks> {
   return apiGet<OnlinePlaylistTracks>(
     `/api/online/${encodeURIComponent(provider)}/collections/${encodeURIComponent(playlistId)}`,
-    withSession(),
+    withSession(provider),
   );
 }

@@ -64,8 +64,11 @@ const sourceLabel = computed(() => {
  *   （需求方："加上vip标识说明播放这个需要vip"），与网易云自家列表一致。
  */
 const online = useOnlineStore();
-/** 观看者是否网易云会员（会话里的 profile.vip）：VIP 曲目的标记语义随它变 */
-const viewerVip = computed(() => online.profile?.vip === true);
+/** 观看者是否网易云会员（会话里的 profile.vip）：VIP 曲目的标记语义随它变。
+    只对网易云的曲目生效 —— QQ 曲目的会员语义是另一套（v6.57），不混用 */
+const viewerVip = computed(
+  () => online.provider === "netease" && online.profile?.vip === true,
+);
 
 const rowFlags = computed<{ label: string; title: string }[]>(() => {
   if (props.track.source !== "online") return [];
@@ -73,9 +76,11 @@ const rowFlags = computed<{ label: string; title: string }[]>(() => {
     return [{ label: "无版权", title: "音源标注暂无版权，无法播放" }];
   }
   if (props.track.vipOnly === true) {
-    // 会员看 VIP 曲目是「VIP」（能完整播）；非会员才是「VIP + 试听」（v6.37）
-    return viewerVip.value
-      ? [{ label: "VIP", title: "VIP 专享曲目，会员可完整播放" }]
+    // 会员看 VIP 曲目是「VIP」（能完整播）；非会员才是「VIP + 试听」（v6.37）。
+    // QQ 曲目（v6.57）：会员语义还没接（扫码后上游按 Cookie 给直链），只标「VIP」
+    const isQq = props.track.id.startsWith("qq:");
+    return viewerVip.value || isQq
+      ? [{ label: "VIP", title: "VIP 专享曲目，登录后可完整播放" }]
       : [
           { label: "VIP", title: "VIP 专享曲目，播放需要会员" },
           { label: "试听", title: "非会员账号只能试听片段" },

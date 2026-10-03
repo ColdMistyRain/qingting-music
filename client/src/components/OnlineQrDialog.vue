@@ -27,10 +27,19 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  * 的过渡两个方向分开写，坑 19）、Esc 归 topLayer 最上层（坑 14/24）、过渡**只做透明度**
  * （面板带 blur，动 transform 每帧重算模糊，真机上“卡一下”，v5.54）。
  */
-const props = defineProps<{ open: boolean }>();
+const props = withDefaults(defineProps<{ open: boolean; provider?: "netease" | "qq" }>(), {
+  provider: "netease",
+});
 const emit = defineEmits<{ close: []; loggedIn: [] }>();
 
 const online = useOnlineStore();
+
+/** 文案随音源走（QQ 走微信通道扫码） */
+const PROVIDER_TEXT: Record<"netease" | "qq", { title: string; scan: string; app: string }> = {
+  netease: { title: "登录网易云账号", scan: "用网易云音乐 App 扫一扫", app: "网易云账号" },
+  qq: { title: "登录 QQ 音乐", scan: "用微信扫一扫", app: "QQ 音乐账号" },
+};
+const providerText = () => PROVIDER_TEXT[props.provider];
 
 type Phase = "loading" | "ready" | "expired" | "success" | "error";
 const phase = ref<Phase>("loading");
@@ -43,7 +52,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const PHASE_TEXT: Record<Phase, string> = {
   loading: "正在取二维码…",
-  ready: "用网易云音乐 App 扫一扫",
+  ready: "",
   expired: "二维码已过期",
   success: "登录成功",
   error: "出了点问题",
@@ -63,7 +72,7 @@ async function start(): Promise<void> {
   scanned.value = false;
   errorText.value = "";
   try {
-    const login = await online.createLogin();
+    const login = await online.startQrLogin(props.provider);
     key.value = login.key;
     shownQr.value = login.qrDataUrl;
     phase.value = "ready";
@@ -77,7 +86,7 @@ async function start(): Promise<void> {
 async function poll(): Promise<void> {
   if (!key.value) return;
   try {
-    const result = await online.checkLogin(key.value);
+    const result = await online.checkQrLogin(props.provider, key.value);
     if (result.state === "scanned") scanned.value = true;
     if (result.state === "expired") {
       stopPolling();
@@ -130,7 +139,11 @@ function onOpenAutoFocus(event: Event): void {
 
 function finish(): void {
   if (phase.value === "success") {
-    showToast({ title: `已登录 ${online.profile?.nickname ?? "网易云账号"}` });
+    const nickname =
+      props.provider === "qq"
+        ? (online.qqSession?.profile?.nickname ?? "QQ 音乐账号")
+        : (online.profile?.nickname ?? "网易云账号");
+    showToast({ title: `已登录 ${nickname}` });
   }
   emit("close");
 }
@@ -152,9 +165,9 @@ onBeforeUnmount(() => {
       <!-- force-mount：常驻 DOM 才能播收起动画；关闭态的可见性与点击全由 CSS 拿走 -->
       <DialogOverlay class="qr-scrim" force-mount />
       <DialogContent class="qr-card" force-mount @open-auto-focus="onOpenAutoFocus">
-        <DialogTitle class="qr-title">登录网易云账号</DialogTitle>
+        <DialogTitle class="qr-title">{{ providerText().title }}</DialogTitle>
         <DialogDescription class="qr-desc">
-          登录后可以听这个账号收藏的歌。登录保存在这台浏览器里，换浏览器需要重新扫码。
+          登录后可以听这个账号能听的歌。登录保存在这台浏览器里，换浏览器需要重新扫码。
         </DialogDescription>
 
         <div class="qr-stage">
@@ -163,7 +176,7 @@ onBeforeUnmount(() => {
             class="qr-img"
             :class="{ 'qr-img--done': phase === 'success' }"
             :src="shownQr"
-            alt="网易云音乐登录二维码"
+            :alt="`${providerText().title}二维码`"
           />
           <div v-else-if="phase === 'loading'" class="qr-holding">
             <IconQrCode class="icon" />
@@ -178,7 +191,13 @@ onBeforeUnmount(() => {
         </div>
 
         <p class="qr-state" aria-live="polite">
-          {{ scanned && phase === "ready" ? "已扫码，请在手机上确认" : PHASE_TEXT[phase] }}
+          {{
+            scanned && phase === "ready"
+              ? "已扫码，请在手机上确认"
+              : phase === "ready"
+                ? providerText().scan
+                : PHASE_TEXT[phase]
+          }}
         </p>
 
         <div class="qr-actions">

@@ -24,15 +24,27 @@ const theme = useThemeStore();
 const online = useOnlineStore();
 const router = useRouter();
 
-/* ---------- 网易云账号（ON-10）：扫码登录 / 退出 ---------- */
+/* ---------- 音源账号（ON-10 网易云 / ON-06 QQ）：扫码登录 / 退出 ---------- */
 const qrOpen = ref(false);
+/** 这一轮弹的是哪个音源的码（v6.57：QQ 与网易云共用一枚弹窗） */
+const qrProvider = ref<"netease" | "qq">("netease");
 
 function openQr(): void {
+  qrProvider.value = "netease";
+  qrOpen.value = true;
+}
+
+function openQrQq(): void {
+  qrProvider.value = "qq";
   qrOpen.value = true;
 }
 
 async function logoutNetease(): Promise<void> {
   await online.logout();
+}
+
+async function logoutQq(): Promise<void> {
+  await online.logoutQq();
 }
 
 interface SettingsTab {
@@ -326,9 +338,54 @@ async function signOut(): Promise<void> {
             各自扫码、互不影响；清除浏览器数据会退出登录。
           </div>
         </div>
+        <!-- QQ 音乐（v6.57，ON-06）：与网易云同款账号卡 —— 扫码统一在这里（需求方："统一在这页面登陆"） -->
         <div class="set-card card">
-          <b>QQ 音乐 / 酷狗</b>
-          <div class="set-note">还在计划中，接入后同样在这里扫码登录。</div>
+          <div class="net-head">
+            <b>QQ 音乐</b>
+            <span class="badge badge--accent">可用</span>
+          </div>
+
+          <div class="net-account">
+            <img
+              v-if="online.qqLoggedIn && online.qqSession?.profile?.avatarUrl"
+              class="net-avatar"
+              :src="online.qqSession.profile.avatarUrl"
+              alt=""
+            />
+            <span v-else class="net-avatar net-avatar--ph">
+              <IconUserCircle class="icon" />
+            </span>
+            <div class="net-id">
+              <div class="net-name">
+                <template v-if="online.qqLoggedIn">
+                  {{ online.qqSession?.profile?.nickname ?? "QQ 音乐账号" }}
+                  <span v-if="online.qqSession?.profile?.vip" class="vip-tag">VIP</span>
+                </template>
+                <template v-else>未登录</template>
+              </div>
+              <div class="net-sub">
+                {{
+                  online.qqLoggedIn
+                    ? online.qqSession?.profile?.vip
+                      ? "QQ 音乐会员 · 会员曲目可完整播放"
+                      : "登录后按账号权限给播放直链"
+                    : "QQ 的搜索与播放都需要登录：用微信扫码登录 QQ 音乐"
+                }}
+              </div>
+            </div>
+            <button v-if="!online.qqLoggedIn" class="btn btn-primary" @click="openQrQq">
+              <IconSignIn class="icon" />
+              扫码登录
+            </button>
+            <button v-else class="btn" @click="logoutQq">
+              <IconSignOut class="icon" />
+              退出登录
+            </button>
+          </div>
+
+          <div class="set-note">
+            会话只保存在这台浏览器里（与网易云互相独立）；清除浏览器数据会退出登录。
+          </div>
         </div>
       </TabsContent>
 
@@ -383,6 +440,7 @@ async function signOut(): Promise<void> {
     <!-- 扫码登录弹窗（页面级一份；成功后把歌单缓存刷掉，下次进在线页重新拉） -->
     <OnlineQrDialog
       :open="qrOpen"
+      :provider="qrProvider"
       @close="qrOpen = false"
       @logged-in="void online.loadPlaylists(true)"
     />

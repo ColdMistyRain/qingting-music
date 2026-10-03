@@ -16,6 +16,7 @@
   "dependencies": {
     "@neteasecloudmusicapienhanced/api": "^4.40.1",
     "@qingting/shared": "*",
+    "@yakult-green-tea/qq-music-api": "^3.1.2",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",

@@ -1,6 +1,7 @@
 import type { OnlinePlaylistInfo, OnlineProfile, OnlineTrack } from "@qingting/shared";
 import type { AppConfig } from "../../config.js";
 import { createNeteaseProvider } from "./netease.js";
+import { createQqProvider } from "./qq.js";
 
 /**
  * 音源适配层（ON-01）：统一 Provider 接口。
@@ -93,6 +94,11 @@ export function resolveProvider(config: AppConfig, id: string): OnlineProvider |
     return config.neteaseApiBase
       ? createNeteaseProvider({ baseUrl: config.neteaseApiBase })
       : createNeteaseProvider({});
+  }
+  // QQ 音乐（ON-06，v6.57）：内嵌 `@yakult-green-tea/qq-music-api`（MIT）以进程内 HTTP
+  // 服务形态随 server 起，部署零配置 —— 与网易云内嵌库同一策略
+  if (id === "qq") {
+    return createQqProvider({ dataDir: config.dataDir });
   }
   return null;
 }

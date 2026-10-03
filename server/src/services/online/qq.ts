@@ -1,0 +1,330 @@
+import { createServer } from "node:net";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { createRequire } from "node:module";
+import type { OnlineTrack } from "@qingting/shared";
+import { UpstreamError, type OnlineProvider } from "./provider.js";
+
+/**
+ * QQ 音乐适配器（ON-06，v6.57）。
+ *
+ * 依赖 `@yakult-green-tea/qq-music-api`（**MIT**，Folia 同款方案的维护分支 —— 此前卡住的
+ * "npm 上 qq-music-api 无 license 字段" 指的是旧包，这个分支在 README 明确 MIT 并可 npm 嵌入）。
+ *
+ * 嵌入形态：包根入口在 import 时就 `app.listen()`（Electron 式进程内嵌，README 明确保留）——
+ * 这里以**进程内 HTTP 服务**的形态用它：设 `PORT=0`（临时端口）+ `QQ_SESSION_SECRET`
+ * （登录路由需要；持久化在 `data/qq-session-secret`，重启后会话密封 token 仍可解）+
+ * `LOG_LEVEL=silent`（包的逐请求日志太吵）→ require → 等 `listening` → 拿实际端口。
+ * exports 的深路径被挡（只有 `.` / `./serverless` / `./mqtt`），而 serverless 入口没有
+ * search/lyric 路由，所以走根入口是唯一能拿到全部目录路由的形态。
+ *
+ * 会话模型与网易云同款（v6.31）：微信扫码成功后 check 响应里带**密封会话 token**
+ * （`qqmusic_session=...`），原样交给扫码的浏览器存 localStorage（`qt-online-session:qq`），
+ * 每次请求经 `X-Online-Auth` 带回，适配器拼成包约定的 `cookie` query 传回去 —— 服务端不留副本。
+ *
+ * 实测边界（v6.57）：**QQ 的搜索必须带登录 Cookie**（匿名调老接口 500、新接口 500003）；
+ * 歌词免登录可用；播放直链免登录基本拿不到（VIP 歌必然要登录）—— 所以 QQ 的入口是先扫码。
+ */
+
+/** 搜索结果里的一首（上游字段：client_search_cp 的 list 项） */
+interface QqSong {
+  songmid?: string;
+  songname?: string;
+  name?: string;
+  singer?: { name?: string }[];
+  albumname?: string;
+  album?: { name?: string; mid?: string };
+  interval?: number;
+  fee?: number;
+}
+
+/** 与 netease.ts 同一招：包是 CJS，ESM 里走 createRequire；类型只声明用到的部分 */
+interface QqMusicLib {
+  server: import("node:http").Server | null;
+}
+
+/** 传输缝：生产 = fetch 进程内服务；测试注入 stub（vitest 下包不监听，见 app.js isTestEnv） */
+export interface QqTransport {
+  get(pathname: string): Promise<unknown>;
+}
+
+/**
+ * 内嵌服务的端口：从 `QQ_MUSIC_PORT`（默认 39213）起找第一个空闲的。
+ * 为什么不用 listen(0)（随机端口）：包的配置校验要求 port **正整数**（zod `.positive()`），
+ * 0 会被拒 —— 而它校验失败的处理是 `process.exit(1)`，会把我们整个后端带走（v6.57 实测）。
+ * 预检找空闲口有一个微小的 TOCTOU 窗口，私有部署单进程下可接受。
+ */
+const QQ_PORT_BASE = Number(process.env.QQ_MUSIC_PORT || 39213);
+
+function findFreePort(start: number, tries = 10): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let port = start;
+    const tryOnce = (): void => {
+      const probe = createServer();
+      probe.once("error", () => {
+        probe.close(() => undefined);
+        port += 1;
+        if (port - start >= tries) reject(new UpstreamError("找不到空闲端口给 QQ 音乐内嵌服务"));
+        else tryOnce();
+      });
+      probe.once("listening", () => {
+        probe.close(() => resolve(port));
+      });
+      probe.listen(port, "127.0.0.1");
+    };
+    tryOnce();
+  });
+}
+
+let serviceBaseUrl: Promise<string> | null = null;
+
+/** 会话密封密钥：登录路由需要（没有它 /login 全回 501）。生成一次、持久化在 data/ */
+function sessionSecretPath(dataDir: string): string {
+  return path.join(dataDir, "qq-session-secret");
+}
+
+function ensureSessionSecret(dataDir: string): string {
+  const file = sessionSecretPath(dataDir);
+  try {
+    const existing = readFileSync(file, "utf-8").trim();
+    if (existing) return existing;
+  } catch {
+    // 还没有：下面生成
+  }
+  const secret = randomBytes(32).toString("hex");
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(file, secret, { mode: 0o600 });
+  return secret;
+}
+
+/** 起（或复用）进程内嵌的 QQ 音乐服务，解析出它的 base URL */
+function ensureQqService(dataDir: string): Promise<string> {
+  if (!serviceBaseUrl) {
+    serviceBaseUrl = boot(dataDir).catch((error) => {
+      serviceBaseUrl = null; // 失败可重试：下次调用再起一遍
+      throw error;
+    });
+  }
+  return serviceBaseUrl;
+}
+
+async function boot(dataDir: string): Promise<string> {
+  // 包在 import 时读这三个环境变量；设完就恢复，避免污染进程其余部分
+  const port = await findFreePort(QQ_PORT_BASE);
+  const previous = {
+    PORT: process.env.PORT,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    QQ_SESSION_SECRET: process.env.QQ_SESSION_SECRET,
+  };
+  process.env.PORT = String(port);
+  process.env.LOG_LEVEL = "silent";
+  process.env.QQ_SESSION_SECRET = ensureSessionSecret(dataDir);
+
+  let lib: QqMusicLib;
+  try {
+    const require = createRequire(import.meta.url);
+    lib = require("@yakult-green-tea/qq-music-api") as QqMusicLib;
+  } finally {
+    if (previous.PORT === undefined) delete process.env.PORT;
+    else process.env.PORT = previous.PORT;
+    if (previous.LOG_LEVEL === undefined) delete process.env.LOG_LEVEL;
+    else process.env.LOG_LEVEL = previous.LOG_LEVEL;
+    if (previous.QQ_SESSION_SECRET === undefined) delete process.env.QQ_SESSION_SECRET;
+    else process.env.QQ_SESSION_SECRET = previous.QQ_SESSION_SECRET;
+  }
+
+  const server = lib.server;
+  if (!server) {
+    throw new UpstreamError("QQ 音乐内嵌服务没能启动（server 句柄为空）");
+  }
+  return new Promise<string>((resolve, reject) => {
+    const onError = (error: Error): void => reject(new UpstreamError(`QQ 音乐内嵌服务启动失败：${error.message}`));
+    server.once("error", onError);
+    server.once("listening", () => {
+      server.off("error", onError);
+      resolve(`http://127.0.0.1:${port}`);
+    });
+  });
+}
+
+function decodeMaybeBase64(value: string): string {
+  const trimmed = value.trim();
+  // LRC 里有 [ ] : 空格，都不在 base64 字符集里 —— 正则过了才当它是 base64
+  if (!trimmed || trimmed.length % 4 !== 0 || !/^[A-Za-z0-9+/=]+$/.test(trimmed)) return value;
+  try {
+    const decoded = Buffer.from(trimmed, "base64").toString("utf-8");
+    return decoded.includes("\uFFFD") ? value : decoded; // 解出乱码就当不是 base64
+  } catch {
+    return value;
+  }
+}
+
+/** 适配器工厂。`baseUrl` 给测试注入（vitest 下包不监听）；生产传 config 自己起内嵌服务 */
+export function createQqProvider(options: { baseUrl?: string; dataDir?: string }): OnlineProvider {
+  const cookieQuery = (cookie?: string[]): string =>
+    cookie && cookie.length > 0 ? `&cookie=${encodeURIComponent(cookie.join("; "))}` : "";
+
+  async function get(baseUrl: string, pathname: string): Promise<unknown> {
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}${pathname}`);
+    } catch (error) {
+      throw new UpstreamError(`QQ 音乐服务连不上：${error instanceof Error ? error.message : String(error)}`);
+    }
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new UpstreamError("QQ 音乐服务回了不成形的响应", response.status);
+    }
+    if (!response.ok) {
+      throw new UpstreamError(`QQ 音乐服务出错（${response.status}）`, response.status);
+    }
+    return body;
+  }
+
+  async function call(pathname: string): Promise<unknown> {
+    if (options.baseUrl) return get(options.baseUrl, pathname);
+    const baseUrl = await ensureQqService(options.dataDir ?? "./data");
+    return get(baseUrl, pathname);
+  }
+
+  /** 从搜索应答的多种形状里把歌曲列表捞出来（上游直通，形状随接口版本漂） */
+  function songListOf(body: unknown): QqSong[] {
+    const root = body as Record<string, unknown> | null;
+    const data = root?.data as Record<string, unknown> | undefined;
+    const direct = data?.list;
+    if (Array.isArray(direct)) return direct as QqSong[];
+    const bodyOfData = data?.body as Record<string, unknown> | undefined;
+    const nested = (bodyOfData?.song as Record<string, unknown> | undefined)?.list as unknown[] | undefined;
+    if (Array.isArray(nested)) return nested as QqSong[];
+    const response = (root?.response as Record<string, unknown> | undefined)?.data as
+      | Record<string, unknown>
+      | undefined;
+    const inResponse = (response?.song as Record<string, unknown> | undefined)?.list as unknown[] | undefined;
+    if (Array.isArray(inResponse)) return inResponse as QqSong[];
+    return [];
+  }
+
+  function mapSong(song: QqSong): OnlineTrack | null {
+    const id = song.songmid;
+    const title = song.songname ?? song.name;
+    if (!id || !title) return null;
+    const albumMid = song.album?.mid;
+    return {
+      id,
+      title,
+      artist: (song.singer ?? []).map((s) => s.name ?? "").filter(Boolean).join(" / "),
+      album: song.albumname ?? song.album?.name ?? "",
+      // QQ 的 interval 本来就是秒（网易才是毫秒）
+      duration: typeof song.interval === "number" && song.interval > 0 ? song.interval : null,
+      cover: albumMid ? `https://y.gtimg.cn/music/photo_new/T002R500x500M000${albumMid}.jpg` : null,
+      // fee=1 是 VIP 专享（仅供参考，能不能播以 stream 接口为准 —— ON-03 的口径）
+      vipOnly: song.fee === 1,
+    };
+  }
+
+  return {
+    id: "qq",
+
+    async search(keyword, cookie) {
+      const body = await call(
+        `/getSearchByKey?key=${encodeURIComponent(keyword)}&limit=30&page=1${cookieQuery(cookie)}`,
+      );
+      return songListOf(body)
+        .map(mapSong)
+        .filter((track): track is OnlineTrack => track !== null);
+    },
+
+    async getStreamUrl(id, cookie) {
+      const body = (await call(`/getMusicPlay?songmid=${encodeURIComponent(id)}${cookieQuery(cookie)}`)) as {
+        data?: { playUrl?: Record<string, { url?: string; error?: string }> };
+      };
+      const entry = body.data?.playUrl?.[id];
+      const url = typeof entry?.url === "string" ? entry.url : "";
+      // 空 url / 带 error 都是"这首歌给不出地址"（VIP / 区域限制）—— 业务 null，不抛错
+      return url || null;
+    },
+
+    async getLyrics(id, cookie) {
+      const body = (await call(`/getLyric?songmid=${encodeURIComponent(id)}${cookieQuery(cookie)}`)) as {
+        response?: { lyric?: string; trans?: string };
+      };
+      const raw = body.response?.lyric ?? "";
+      const lyrics = raw ? decodeMaybeBase64(raw) : "";
+      const trans = body.response?.trans ?? "";
+      return {
+        lyrics: lyrics || null,
+        translation: trans ? decodeMaybeBase64(trans) || null : null,
+        roman: null, // QQ 没有音译轨道（qrc 是加密的逐字稿，不在本适配器范围）
+      };
+    },
+
+    canProxyCover(url: string): boolean {
+      try {
+        const host = new URL(url).hostname;
+        return host === "y.gtimg.cn" || host.endsWith(".gtimg.cn");
+      } catch {
+        return false;
+      }
+    },
+
+    account: {
+      async createLogin() {
+        const keyBody = (await call("/login/qr/key")) as { data?: { unikey?: string } };
+        const key = keyBody.data?.unikey;
+        if (!key) throw new UpstreamError("QQ 音乐扫码 key 没拿到");
+        const qrBody = (await call(`/login/qr/create?key=${encodeURIComponent(key)}`)) as {
+          data?: { qrimg?: string };
+        };
+        const qrimg = qrBody.data?.qrimg;
+        if (!qrimg) throw new UpstreamError("QQ 音乐二维码没生成出来");
+        return { key, qrDataUrl: qrimg };
+      },
+
+      async checkLogin(key) {
+        const body = (await call(`/login/qr/check?key=${encodeURIComponent(key)}`)) as {
+          code?: number;
+          cookie?: string;
+        };
+        // 与网易云同一套码值：801 等待 / 802 已扫 / 803 成功 / 800 过期
+        const code = body.code ?? 801;
+        const state =
+          code === 803 ? "success" : code === 802 ? "scanned" : code === 800 ? "expired" : "waiting";
+        return {
+          state,
+          cookie: state === "success" && body.cookie ? [body.cookie] : [],
+        };
+      },
+
+      async getProfile(cookie) {
+        const body = (await call(`/user/detail?${cookieQuery(cookie).slice(1)}`)) as {
+          data?: Record<string, unknown>;
+          profile?: Record<string, unknown>;
+        };
+        const raw = (body.data ?? body.profile ?? null) as Record<string, unknown> | null;
+        if (!raw) return null;
+        const nickname = typeof raw.nickname === "string" ? raw.nickname : "";
+        const userId = String(raw.uin ?? raw.userid ?? raw.encuin ?? "");
+        if (!nickname && !userId) return null;
+        const avatarUrl =
+          typeof raw.avatar === "string"
+            ? raw.avatar
+            : typeof raw.faceurl === "string"
+              ? raw.faceurl
+              : null;
+        return {
+          userId: userId || "unknown",
+          nickname: nickname || "QQ 音乐用户",
+          avatarUrl,
+          vip: raw.vip === true || raw.is_vip === 1,
+        };
+      },
+
+      async logout(cookie) {
+        await call(`/logout?${cookieQuery(cookie).slice(1)}`); // 尽力而为：上游失败不中断退出
+      },
+    },
+  };
+}

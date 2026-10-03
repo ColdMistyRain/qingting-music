@@ -9,6 +9,8 @@ import IconMagnifyingGlass from "~icons/ph/magnifying-glass";
 import IconPlugsConnected from "~icons/ph/plugs-connected";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import EmptyState from "@/components/EmptyState.vue";
+import AppSelect from "@/components/AppSelect.vue";
+import IconQrCode from "~icons/ph/qr-code";
 import TrackList from "@/components/TrackList.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
 import { debounce } from "@/utils/debounce";
@@ -40,7 +42,18 @@ onMounted(() => {
   // 行尾那枚收藏键要知道“收没收藏”，而收藏数据在服务端（PS-05）
   void listening.load();
   void online.loadAccount();
+  // QQ 会话验真（v6.57）：失效即清，界面回未登录
+  void online.loadQqAccount();
 });
+
+/* ---------- 音源选择（v6.57，ON-06）---------- */
+const sourceOptions = [
+  { value: "netease", label: "网易云" },
+  { value: "qq", label: "QQ 音乐" },
+] as const;
+/** QQ 的搜索必须带登录 Cookie（匿名上游直接拒绝，v6.57 实测）：
+    未登录时不给搜索框，先引导扫码 */
+const qqNeedsLogin = computed(() => online.provider === "qq" && !online.qqLoggedIn);
 
 // 登录态就绪后把歌单列表备好（一次轻请求；未登录时这步自动失败、静默）
 watch(
@@ -117,7 +130,7 @@ const pageTitle = computed(() =>
   collectionMode.value ? (activePlaylist.value?.name ?? "网易云歌单") : "在线搜索",
 );
 const pageSubtitle = computed(() => {
-  if (!collectionMode.value) return "音源：网易云";
+  if (!collectionMode.value) return online.provider === "qq" ? "音源：QQ 音乐" : "音源：网易云";
   const total = activePlaylist.value?.trackCount ?? online.collectionTracks.length;
   return `网易云歌单 · ${total} 首`;
 });
@@ -183,7 +196,16 @@ function toggleFavorite(index: number): void {
     />
 
     <template v-else>
-      <div class="toolbar">
+      <div v-if="!qqNeedsLogin" class="toolbar">
+        <!-- 坑 33：AppSelect 根是 fragment，class 透传不生效 —— 宿主包一层 div 承载版式 -->
+        <div v-if="!collectionMode" class="source-select">
+          <AppSelect
+            :model-value="online.provider"
+            :options="sourceOptions"
+            label="音源"
+            @update:model-value="(value) => online.setProvider(value as 'netease' | 'qq')"
+          />
+        </div>
         <label class="search">
           <IconMagnifyingGlass class="icon" />
           <!-- enterkeyhint：手机键盘回车键显示成“搜索”（RT-05 触屏可达性同一件事） -->
@@ -214,6 +236,21 @@ function toggleFavorite(index: number): void {
         </span>
       </div>
 
+      <!-- QQ 未登录：搜索必须带登录态（v6.57 实测匿名全被拒），先引导扫码 -->
+      <EmptyState
+        v-if="qqNeedsLogin"
+        :icon="IconQrCode"
+        title="先扫码登录 QQ 音乐"
+        desc="QQ 的搜索与播放都要登录态。登录保存在这台浏览器里，换浏览器需要重新扫码。"
+        fill
+      >
+        <RouterLink class="btn btn-primary" to="/settings">
+          <IconQrCode class="icon" />
+          去 设置 › 在线音源 扫码登录
+        </RouterLink>
+      </EmptyState>
+
+      <template v-else>
       <!-- 刷新失败但手上还有上一份结果：保留列表，只在上面给一条提示（不要白屏） -->
       <div v-if="listStatus === 'error' && hasResults === false && listError" class="strip">
         <IconWarningCircle class="icon" />
@@ -314,11 +351,19 @@ function toggleFavorite(index: number): void {
           </EmptyState>
         </div>
       </div>
+      </template>
     </template>
   </section>
 </template>
 
 <style scoped>
+/* 音源选择器：窄一档（两个选项），与搜索框同一行 */
+.source-select {
+  flex: none;
+  width: 128px;
+  display: flex;
+}
+
 .count {
   font-size: 12px;
   color: var(--text-3);

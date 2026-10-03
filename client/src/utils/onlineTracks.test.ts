@@ -68,7 +68,9 @@ describe("onlineProviderLabel（来源列的音源显示名，v6.35 补 3）", (
   });
 
   it("没收录的音源显示它的 id；形状不对给 null（调用方退回「在线」）", () => {
-    expect(onlineProviderLabel("qq:1")).toBe("qq");
+    // qq 在 v6.57 已收录（ON-06）；"未收录"用从未登记过的 id
+    expect(onlineProviderLabel("qq:1")).toBe("QQ 音乐");
+    expect(onlineProviderLabel("kugou:1")).toBe("kugou");
     expect(onlineProviderLabel("bad-shape")).toBeNull();
   });
 });

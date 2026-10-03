@@ -74,7 +74,7 @@ describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
       profile: { userId: "77", nickname: "夜行客", avatarUrl: null },
     });
     const online = useOnlineStore();
-    await online.checkLogin("KEY");
+    await online.checkQrLogin("netease", "KEY");
 
     expect(online.loggedIn).toBe(true);
     expect(online.profile?.nickname).toBe("夜行客");
@@ -92,7 +92,7 @@ describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
       profile: null,
     });
     const online = useOnlineStore();
-    await online.checkLogin("KEY");
+    await online.checkQrLogin("netease", "KEY");
 
     expect(online.loggedIn).toBe(false);
     expect(storage.has("qt-online-session:netease")).toBe(false);
@@ -148,7 +148,7 @@ describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
       profile: { userId: "77", nickname: "夜行客", avatarUrl: null },
     });
     const online = useOnlineStore();
-    await online.checkLogin("KEY");
+    await online.checkQrLogin("netease", "KEY");
 
     await online.logout();
 

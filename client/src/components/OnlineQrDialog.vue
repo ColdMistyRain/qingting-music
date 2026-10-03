@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "reka-ui";
 import IconArrowClockwise from "~icons/ph/arrows-clockwise";
+import IconCheckCircle from "~icons/ph/check-circle-fill";
 import IconQrCode from "~icons/ph/qr-code";
 import { useOnlineStore } from "@/stores/online";
 import { showToast } from "@/utils/toast";
@@ -48,7 +49,14 @@ const errorText = ref("");
 /** 正在展示的那份二维码：关闭动画期间内容不能塌（与 ConfirmDialog 同款副本，坑 18③） */
 const shownQr = shallowRef("");
 const key = ref("");
+/** 登录通道（仅 QQ 卡有：wechat 微信扫 / qq QQ App 扫 —— 需求方参考外部案例定的双通道切换） */
+const channel = ref<"wechat" | "qq">("wechat");
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+function scanHint(): string {
+  if (props.provider === "qq") return channel.value === "qq" ? "用 QQ 音乐 App 扫一扫" : "用微信扫一扫";
+  return "用网易云音乐 App 扫一扫";
+}
 
 const PHASE_TEXT: Record<Phase, string> = {
   loading: "正在取二维码…",
@@ -72,7 +80,10 @@ async function start(): Promise<void> {
   scanned.value = false;
   errorText.value = "";
   try {
-    const login = await online.startQrLogin(props.provider);
+    const login = await online.startQrLogin(
+      props.provider,
+      props.provider === "qq" ? channel.value : undefined,
+    );
     key.value = login.key;
     shownQr.value = login.qrDataUrl;
     phase.value = "ready";
@@ -113,6 +124,7 @@ watch(
   (isOpen) => {
     if (isOpen) {
       if (layerId === null) layerId = pushTopLayer();
+      channel.value = "wechat";
       void start();
       return;
     }
@@ -124,6 +136,11 @@ watch(
     }
   },
 );
+
+// 切通道 = 换二维码：重新取码（unikey 里密封着通道，create/check 自动跟随）
+watch(channel, () => {
+  if (props.open) void start();
+});
 
 function onKeydown(event: KeyboardEvent): void {
   if (!props.open || event.key !== "Escape") return;
@@ -170,6 +187,33 @@ onBeforeUnmount(() => {
           登录后可以听这个账号能听的歌。登录保存在这台浏览器里，换浏览器需要重新扫码。
         </DialogDescription>
 
+        <!-- 登录通道双卡（仅 QQ，v6.57：需求方给的参考案例即此形态）；
+             微信单通道的网易云不出现 -->
+        <div v-if="props.provider === 'qq'" class="qr-chans" role="radiogroup" aria-label="登录方式">
+          <button
+            type="button"
+            class="qr-chan"
+            :class="{ 'is-on': channel === 'qq' }"
+            role="radio"
+            :aria-checked="channel === 'qq'"
+            @click="channel = 'qq'"
+          >
+            <span class="qr-chan__name">QQ 扫码</span>
+            <IconCheckCircle v-if="channel === 'qq'" class="qr-chan__check" />
+          </button>
+          <button
+            type="button"
+            class="qr-chan"
+            :class="{ 'is-on': channel === 'wechat' }"
+            role="radio"
+            :aria-checked="channel === 'wechat'"
+            @click="channel = 'wechat'"
+          >
+            <span class="qr-chan__name">微信扫码</span>
+            <IconCheckCircle v-if="channel === 'wechat'" class="qr-chan__check" />
+          </button>
+        </div>
+
         <div class="qr-stage">
           <img
             v-if="phase === 'ready' || phase === 'success'"
@@ -195,7 +239,7 @@ onBeforeUnmount(() => {
             scanned && phase === "ready"
               ? "已扫码，请在手机上确认"
               : phase === "ready"
-                ? providerText().scan
+                ? scanHint()
                 : PHASE_TEXT[phase]
           }}
         </p>
@@ -233,6 +277,39 @@ onBeforeUnmount(() => {
   transition:
     opacity 0.2s var(--ease-ios),
     visibility 0s;
+}
+
+/* 登录通道双卡（仅 QQ）：两枚等宽按钮，选中 = 主题色描边 + 对勾（参考需求方给的案例形态） */
+.qr-chans {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.qr-chan {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-2);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.qr-chan.is-on {
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.qr-chan__check {
+  width: 15px;
+  height: 15px;
 }
 
 /* 居中不用 transform（与入场动画打架，也与 blur 的重栅格化代价有关）：inset + margin auto */

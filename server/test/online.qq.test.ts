@@ -188,6 +188,20 @@ describe("QQ 音乐适配器 · 账号（微信扫码，ON-06）", () => {
     });
   });
 
+  it("createLogin 的 channel 白名单透传（qq 通道走 QQ App 扫码，v6.57）", async () => {
+    const { provider, stub } = makeProvider({
+      "/login/qr/key": { body: { code: 200, data: { unikey: "k" } } },
+      "/login/qr/create": { body: { code: 200, data: { qrimg: "data:image/png;base64,x" } } },
+    });
+    await provider.account!.createLogin("qq");
+    expect(stub.calls[0]).toBe("/login/qr/key?channel=qq");
+    await provider.account!.createLogin("wechat");
+    expect(stub.calls[2]).toBe("/login/qr/key?channel=wechat");
+    // 陌生通道按微信处理（白名单外不透传）
+    await provider.account!.createLogin("evil");
+    expect(stub.calls[4]).toBe("/login/qr/key?channel=wechat");
+  });
+
   it("checkLogin：码值映射（801 等待 / 802 已扫 / 803 成功带会话 / 800 过期）", async () => {
     const make = (body: { code?: number; cookie?: string }) =>
       makeProvider({ "/login/qr/check": { body } }).provider;

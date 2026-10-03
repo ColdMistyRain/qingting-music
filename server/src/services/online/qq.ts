@@ -271,8 +271,11 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
     },
 
     account: {
-      async createLogin() {
-        const keyBody = (await call("/login/qr/key")) as { data?: { unikey?: string } };
+      async createLogin(channel) {
+        // 通道白名单（包本身支持 wechat 微信扫 / qq QQ App 扫 —— Node 宿主下 qq 走
+        // MQTT 长连接，实测都能出码）；channel 会随 unikey 密封，create/check 自动跟随
+        const ch = channel === "qq" ? "qq" : "wechat";
+        const keyBody = (await call(`/login/qr/key?channel=${ch}`)) as { data?: { unikey?: string } };
         const key = keyBody.data?.unikey;
         if (!key) throw new UpstreamError("QQ 音乐扫码 key 没拿到");
         const qrBody = (await call(`/login/qr/create?key=${encodeURIComponent(key)}`)) as {

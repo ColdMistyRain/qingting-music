@@ -163,7 +163,8 @@ export function createOnlineRouter(config: AppConfig): Router {
         return;
       }
       try {
-        sendOk(res, await provider.account.createLogin());
+        const channel = String((req.body as { channel?: unknown } | undefined)?.channel ?? "");
+        sendOk(res, await provider.account.createLogin(channel || undefined));
       } catch (error) {
         if (error instanceof UpstreamError) {
           sendFail(res, 502, "音源暂时连不上，稍后再试");

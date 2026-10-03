@@ -68,9 +68,14 @@ export function fetchOnlineAccount(provider: string): Promise<OnlineAccountInfo>
   return apiGet<OnlineAccountInfo>(`/api/online/${encodeURIComponent(provider)}/login`, withSession(provider));
 }
 
-/** 生成一次扫码登录的二维码 */
-export function createOnlineQrLogin(provider: string): Promise<OnlineQrLogin> {
-  return apiPost<OnlineQrLogin>(`/api/online/${encodeURIComponent(provider)}/login/qr`);
+/** 生成一次扫码登录的二维码；`channel` 给多通道音源（QQ：wechat / qq） */
+export function createOnlineQrLogin(
+  provider: string,
+  channel?: string,
+): Promise<OnlineQrLogin> {
+  return apiPost<OnlineQrLogin>(`/api/online/${encodeURIComponent(provider)}/login/qr`, {
+    channel: channel ?? null,
+  });
 }
 
 /** 轮询扫码状态（成功时服务端已把会话存下） */

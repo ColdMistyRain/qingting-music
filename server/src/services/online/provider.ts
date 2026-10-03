@@ -12,8 +12,12 @@ import { createQqProvider } from "./qq.js";
  */
 /** 音源内的账号能力（ON-10）。QQ（微信扫码）/ 酷狗接入时实现同一形状 */
 export interface OnlineAccount {
-  /** 生成一次扫码登录：返回轮询 key 与二维码（data URL，客户端直接 <img>） */
-  createLogin(): Promise<{ key: string; qrDataUrl: string }>;
+  /**
+   * 生成一次扫码登录：返回轮询 key 与二维码（data URL，客户端直接 <img>）。
+   * `channel` 给支持多通道的音源（QQ：wechat 微信扫 / qq QQ App 扫，v6.57）；
+   * 单通道音源（网易云）忽略它。
+   */
+  createLogin(channel?: string): Promise<{ key: string; qrDataUrl: string }>;
   /** 轮询扫码状态；`success` 时带回会话 Cookie（服务端落盘） */
   checkLogin(key: string): Promise<{
     state: "waiting" | "scanned" | "success" | "expired";

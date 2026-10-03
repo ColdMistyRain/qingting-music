@@ -120,8 +120,11 @@ export const useOnlineStore = defineStore("online", () => {
    * 扫码轮询的**一次性驱动**（轮询节奏归调用方/弹窗组件管，store 只出两步动作）：
    * 生成二维码；按 key 问一次状态。
    */
-  async function startQrLogin(provider: AccountProvider): Promise<{ key: string; qrDataUrl: string }> {
-    return createOnlineQrLogin(provider);
+  async function startQrLogin(
+    provider: AccountProvider,
+    channel?: string,
+  ): Promise<{ key: string; qrDataUrl: string }> {
+    return createOnlineQrLogin(provider, channel);
   }
 
   async function checkQrLogin(

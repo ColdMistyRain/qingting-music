@@ -153,10 +153,12 @@ export const useOnlineStore = defineStore("online", () => {
   );
 
   /**
-   * 打开一份歌单（v6.34 起带 **stale-while-revalidate 缓存**，需求方："每次点击都会刷新
-   * 一会儿，能不能把列表数据缓存在 localstorage 中"）：
-   * 有缓存 → 立刻把缓存的一份摆出来（秒开），同时后台照常拉最新的一份，到了就替换；
+   * 打开一份歌单（v6.34 起缓存进 localStorage；**v6.35 补 4 起改为纯缓存优先**，
+   * 需求方："为啥点击歌单还是会发送请求？不是会从 localstorage 中加载吗"）：
+   * 有缓存 → 直接摆缓存，**不发任何请求** —— 想跟音源对一遍，点「刷新列表」；
    * 没缓存 → 清掉上一份的曲目、给「加载中」，等网络回来。
+   * （初版是 stale-while-revalidate：缓存照摆、后台再拉一份对音源 —— 显式的
+   *   「刷新列表」按钮出现后，那次自动请求成了多余流量，按需求方的预期收敛。）
    */
   async function openPlaylist(id: string): Promise<void> {
     if (collectionStatus.value === "loading") return;
@@ -167,7 +169,6 @@ export const useOnlineStore = defineStore("online", () => {
     if (cached) {
       collectionTracks.value = cached.tracks.map((info) => toOnlineTrack("netease", info));
       collectionStatus.value = "ready";
-      void refreshCollection(id);
       return;
     }
 
@@ -192,27 +193,14 @@ export const useOnlineStore = defineStore("online", () => {
   }
 
   /**
-   * 强制刷新一份歌单（「刷新列表」按钮，v6.35 补）：**绕过缓存**重新拉取 ——
-   * 点侧栏歌单走缓存秒开，这个按钮才是"跟音源对一遍"的入口。
+   * 强制刷新一份歌单（「刷新列表」按钮）：**绕过缓存**重新拉取 ——
+   * 纯缓存优先（v6.35 补 4）之后，这是"跟音源对一遍"的唯一入口。
    */
   async function refreshPlaylist(id: string): Promise<void> {
     if (collectionStatus.value === "loading") return;
     collectionError.value = "";
     activePlaylistId.value = id;
     await loadCollection(id);
-  }
-
-  /** 后台刷新一份已展示的歌单：有缓存垫底，失败静默（下次再点还会试） */
-  async function refreshCollection(id: string): Promise<void> {
-    try {
-      const { tracks } = await fetchOnlineCollectionTracks("netease", id);
-      writeCollectionCache("netease", id, tracks);
-      // 刷新期间用户可能已切到别的歌单：只更新仍然打开的这一份
-      if (activePlaylistId.value !== id) return;
-      collectionTracks.value = tracks.map((info) => toOnlineTrack("netease", info));
-    } catch {
-      // 缓存还在展示，静默
-    }
   }
 
   /** 收起歌单，回到搜索 */

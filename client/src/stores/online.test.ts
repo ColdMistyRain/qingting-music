@@ -182,40 +182,32 @@ describe("online store · 收藏夹（ON-10）", () => {
     ]);
   });
 
-  it("再次点开有缓存的歌单：缓存秒开（不等网络），后台刷新到了再替换", async () => {
+  it("再次点开有缓存的歌单：纯本地加载，一次请求都不发（v6.35 补 4）", async () => {
     vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
+    vi.mocked(fetchOnlineCollectionTracks).mockClear();
     vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });
     const online = useOnlineStore();
     await online.loadPlaylists();
     await online.openPlaylist("100"); // 第一遍：无缓存，正常拉取并写缓存
+    expect(fetchOnlineCollectionTracks).toHaveBeenCalledTimes(1);
 
-    // 预埋一份"旧缓存"并让网络挂住：点开应当立刻 ready 且展示缓存的曲目
+    // 预埋一份"旧缓存"：再点开必须直接用缓存，不追着音源对一遍
+    // （想跟音源对一遍，有显式的「刷新列表」按钮）
     const STALE = { ...TRACK, id: "1", title: "缓存里的旧版本" };
     writeCollectionCache("netease", "100", [STALE]);
-    let release!: (value: { tracks: OnlineTrack[] }) => void;
-    vi.mocked(fetchOnlineCollectionTracks).mockReturnValue(
-      new Promise((resolve) => {
-        release = resolve;
-      }) as never,
-    );
-    await online.openPlaylist("100");
-    const instant = {
-      status: online.collectionStatus,
-      titles: online.collectionTracks.map((t) => t.title),
-    };
+    vi.mocked(fetchOnlineCollectionTracks).mockClear();
 
-    // 网络回来：后台刷新替换成新数据（缓存同步更新）
-    release({ tracks: [{ ...TRACK, title: "网络上的新版本" }] });
-    await new Promise((r) => setTimeout(r, 50));
-    const refreshed = {
-      titles: online.collectionTracks.map((t) => t.title),
-      stored: JSON.parse(storage.get("qt-online-collection:netease:100")!).tracks[0].title,
-    };
+    await online.openPlaylist("100");
+
+    expect(online.collectionStatus).toBe("ready");
+    expect(online.collectionTracks.map((t) => t.title)).toEqual(["缓存里的旧版本"]);
+    expect(fetchOnlineCollectionTracks).not.toHaveBeenCalled();
+
+    // 显式刷新才会发请求，并更新缓存与列表
+    await online.refreshPlaylist("100");
+    expect(fetchOnlineCollectionTracks).toHaveBeenCalledTimes(1);
+    expect(online.collectionTracks.map((t) => t.title)).toEqual(["夜曲"]);
     void online.closePlaylist();
-    expect(instant.status).toBe("ready");
-    expect(instant.titles).toEqual(["缓存里的旧版本"]);
-    expect(refreshed.titles).toEqual(["网络上的新版本"]);
-    expect(refreshed.stored).toBe("网络上的新版本");
   });
 
   it("无缓存时打开新歌单会清掉上一份的曲目（加载分支才接得住，页面中间给进度）", async () => {

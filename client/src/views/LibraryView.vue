@@ -60,10 +60,18 @@ const albums = computed(() => groupAlbums(library.songs));
 const selectedAlbum = computed(
   () => albums.value.find((g) => g.key === selectedAlbumKey.value) ?? null,
 );
-/** 专辑详情视图的曲目（选中专辑 → 该专辑全部曲目） */
+/** 专辑详情态（页头换标题、正文换曲目列表） */
+const albumDetail = computed(() => selectedAlbum.value !== null);
+/** 专辑详情视图的曲目（选中专辑 → 该专辑全部曲目；搜索词同样过滤专辑内） */
 const albumTracks = computed(() =>
-  selectedAlbum.value ? selectedAlbum.value.tracks.map(songToTrackCached) : [],
+  selectedAlbum.value
+    ? filterSongs(selectedAlbum.value.tracks, query.value).map(songToTrackCached)
+    : [],
 );
+
+/** 当前列表该显示哪份曲目（v6.51 修：详情态此前没接到列表分支上，点卡片只换了页头）：
+    专辑详情 = 这张专辑，否则 = 全库。点播/收藏/计数都用它 —— "眼前这段整份当队列"。 */
+const displayTracks = computed(() => (albumDetail.value ? albumTracks.value : tracks.value));
 
 function openAlbum(key: string): void {
   selectedAlbumKey.value = key;
@@ -73,12 +81,10 @@ function closeAlbum(): void {
 }
 function setViewMode(mode: "list" | "albums"): void {
   viewMode.value = mode;
-  // 切出专辑网格时退出专辑详情（回到全库列表）
-  if (mode === "list") closeAlbum();
+  // 切视图一律退出专辑详情（回到该视图的顶层：列表或全部专辑网格）
+  closeAlbum();
 }
 
-/** 专辑详情态的页头（标题 = 专辑名） */
-const albumDetail = computed(() => selectedAlbum.value !== null);
 const pageTitle = computed(() =>
   albumDetail.value ? (selectedAlbum.value?.name ?? "专辑") : "音乐库",
 );
@@ -95,12 +101,11 @@ const showEmptyState = computed(() => library.status === "ready" && library.song
 const showErrorPanel = computed(() => library.status === "error" && library.songs.length === 0);
 
 function playAt(index: number): void {
-  // 专辑详情视图：队列 = 这张专辑的全部曲目
-  const queue = selectedAlbum.value ? albumTracks.value : tracks.value;
-  const target = queue[index];
+  // 队列 = 眼前这段（专辑详情下就是这张专辑）
+  const target = displayTracks.value[index];
   if (!target) return;
   player.clear();
-  player.addTracks(queue);
+  player.addTracks(displayTracks.value);
   player.playAt(index);
 }
 
@@ -111,9 +116,8 @@ function isFavorite(track: Track): boolean {
 }
 
 function toggleFavorite(index: number): void {
-  // 专辑详情视图下 index 对应专辑曲目
-  const queue = selectedAlbum.value ? albumTracks.value : tracks.value;
-  const target = queue[index];
+  // index 对应眼前这段列表（专辑详情下就是这张专辑）
+  const target = displayTracks.value[index];
   if (target) void listening.toggleFavorite(toPlaylistItem(target));
 }
 </script>
@@ -181,12 +185,15 @@ function toggleFavorite(index: number): void {
         </button>
       </div>
       <!-- 总数只在**页头**说一次（v5.97）：这里只负责**筛选结果**，没搜就不说 -->
-      <span v-if="isSearching" class="toolbar__spacer count">找到 {{ tracks.length }} 首</span>
+      <span v-if="isSearching" class="toolbar__spacer count">找到 {{ displayTracks.length }} 首</span>
     </div>
 
     <!-- 表头 = “说明”：放在滚动区外面（固定层），所以既不用吸顶、也不用底色，
-         标签常驻而列表在它下面滚（v4.41）；专辑网格模式下没有表头（网格即说明） -->
-    <TrackListHead v-if="viewMode === 'list' && tracks.length > 0" />
+         标签常驻而列表在它下面滚（v4.41）；专辑网格模式下没有表头（网格即说明），
+         专辑详情态有表头（它就是一份曲目列表，v6.51） -->
+    <TrackListHead
+      v-if="(viewMode === 'list' || albumDetail) && displayTracks.length > 0"
+    />
 
     <!-- 只有列表滚动：页头与工具条固定在上部（方案 A） -->
     <div class="page-frame__scroll">
@@ -220,12 +227,16 @@ function toggleFavorite(index: number): void {
         </EmptyState>
       </div>
 
-      <p v-else-if="isSearching && tracks.length === 0" class="note">
+      <p v-else-if="isSearching && displayTracks.length === 0" class="note">
         没有匹配的歌曲，换个关键词试试。
       </p>
 
-      <!-- 专辑网格（VS-06）：封面卡 + 专辑名 + 歌手 + 曲目数；点卡片进该专辑曲目 -->
-      <div v-else-if="viewMode === 'albums'" class="album-grid">
+      <!-- 专辑网格（VS-06）：封面卡 + 专辑名 + 歌手 + 曲目数；点卡片进该专辑曲目。
+           详情态（v6.51 修）不再渲染网格 —— 此前点卡片只换了页头、正文还是网格 -->
+      <div
+        v-else-if="viewMode === 'albums' && !albumDetail"
+        class="album-grid"
+      >
         <button v-for="group in albums" :key="group.key" class="album-card" @click="openAlbum(group.key)">
           <img v-if="group.cover" class="album-card__cover" :src="group.cover" alt="" />
           <span v-else class="album-card__cover album-card__cover--ph">
@@ -238,7 +249,7 @@ function toggleFavorite(index: number): void {
 
       <TrackList
         v-else
-        :tracks="tracks"
+        :tracks="displayTracks"
         :active-id="player.currentTrack?.id ?? null"
         :removable="false"
         show-favorite

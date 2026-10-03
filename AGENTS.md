@@ -96,7 +96,7 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           toast（应用内提示条：唯一入口 + 队列，纯函数可测 - v5.72）、
                           coverColor（封面取色：像素→两个原始色源；JS 只写变量，调校在 CSS - VS-02）、
                           audioReactive（节奏起伏：低频**峰值** → 包络 → 相对常态归一，纯函数 - v5.91）、
-                          audioSpectrum（频谱频段：对数分布 40Hz~16kHz，划分式取 bin 不双计，纯函数 - VS-05/v6.54）、
+                          audioSpectrum（频谱频段：对数分布 40Hz~16kHz，划分式取 bin 不双计，纯函数 —— **留库未接线** v6.55）、
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
                           spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）、
@@ -113,7 +113,7 @@ client/src/composables/   usePlayHistory（切歌时记一条最近播放 - PS-0
                           useActiveIndicator（量选中项位置 → CSS 变量，供共享指示条滑动：Tab 下划线 / 分段底板共用）、
                           useMediaQuery（响应式断点：只在“同一处要显示不同内容”时用 - v5.33）、
                           usePlayback（播放控件的共用状态：模式/播放图标与总时长 —— 播放条与沉浸页共用一份 - v6.12）、
-                          useSpectrum（频谱数据管线：全局单 rAF 读 AnalyserNode 广播帧，三态 live/idle/dead，与 useBeat 同一原则 - VS-05/v6.54）、
+                          useSpectrum（频谱数据管线：全局单 rAF 读 AnalyserNode 广播帧，三态 live/idle/dead —— **留库未接线** v6.55）、
                           useNavDrawer（手机抽屉开合状态：按钮在页头、面板在外壳，两处共享 - v5.35）
                           useNavItems（一级导航项：侧栏与手机底栏共用一份 - RT-02）、
                           useMediaSession（把播放器状态接到锁屏/通知栏，挂 App.vue - RT-04）、
@@ -133,7 +133,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           SongMetaDialog（曲目信息弹窗：元信息 + 封面 + 歌词，上传页与曲库管理共用一份 - AD-02 / v5.61 / v6.13）、
                           VolumeControl（PL-04，播放条与沉浸页共用）、SegmentedControl（Reka RadioGroup + 自绘滑动底板）、
                           TrackRow（通用曲目行：**行内不放播放/暂停键**，点行即播；行尾只放对这首歌的动作 - v5.96）、
-                          TrackList（曲目列表容器：行 + 行间细线，**长列表在这里虚拟滚动**（只渲染可见的十几行 + 上下垫片）- LB-08 / v6.27）、SpectrumBars（频谱条：播放条迷你 4 根 + 沉浸页 28 根横幅共用，纯展示，形态归宿主 CSS - VS-05 / v6.54）、EmptyState、
+                          TrackList（曲目列表容器：行 + 行间细线，**长列表在这里虚拟滚动**（只渲染可见的十几行 + 上下垫片）- LB-08 / v6.27）、SpectrumBars（频谱条：纯展示，形态归宿主 CSS —— **留库未接线**，挂载已拆 v6.55）、EmptyState、
                           immersive/{LyricsView,ImTitle,ImControls,LyricsSourceMenu}（沉浸页三布局共享件：歌词壳层（自研）/ 标题＋收藏键 / 控制栏 / 歌词来源菜单）
                           + ImLayoutDuo / ImLayoutCenter / ImLayoutPoster（布局只管自己的版式与专属视觉层 - VS-09）
 client/src/utils/format.ts  formatTime/formatSize/formatDateTime
@@ -162,7 +162,7 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 
 **均衡器（v5.68，PL-13）**：设置 › 音效。音频路径 `<audio>` → MediaElementSource → 10 段 BiquadFilter 链（31Hz~16kHz）→ 整体增益 → 限幅器（防爆音）→ 输出；**懒建图、拿到用户手势才接线**（`AudioContext` 没手势时 suspended，接进挂起的图里就是静音 —— 所以建图 / `resume()` / 接线分三步），**A/B 关闭时真直通**（source 直接连输出），设置存 `localStorage`（每设备一份）。界面的十根竖杆与整体增益用共用的 `components/Slider.vue`（竖/横同一个实现，几何在 `utils/slider.ts` —— 原生 range 旋转拖不动、填充语义也不对，坑 7 / 23），预设用 Reka Select。**在线曲目的音频跨域**（v6.54 修）：直链来自网易 CDN，`<audio>` 不设 `crossOrigin` 时媒体图一接上就是**静音**、AnalyserNode 全 0 —— 现在 ensureAudio 乐观设 `crossOrigin="anonymous"`（CDN 实测允许 CORS，频谱/节奏在线上都有真数据），真不给 CORS 的源加载报错时对同一条直链回退一次无 CORS 直连（频谱自动隐藏，EQ 在该条上静音属既有行为），换新直链在赋 src 处重新乐观。
 
-**频谱可视化（v6.54，VS-05）**：播放条迷你指示（封面旁 4 根）+ 沉浸页大图（走带键上方 28 根横幅）。管线：`utils/audioSpectrum.ts`（对数频段映射 40Hz~16kHz，纯函数）+ `composables/useSpectrum.ts`（全局单 rAF，读均衡器那份 AnalyserNode 广播帧；三态 live / idle（暂停=落地板不藏）/ dead（在播但数据全 0 持续 1s = 拿不到分析数据 → **自动隐藏**，需求原文））+ `components/SpectrumBars.vue`（纯展示，形态全由宿主 CSS 定，条子 scaleY 合成层动画，减动效不订阅=静态刻度）。
+**频谱可视化（VS-05）—— 需求方裁决不上线（v6.55）**：v6.54 曾做出两处挂载（播放条迷你 4 根 + 沉浸页 28 根横幅），需求方看过实机后定调"去掉这个需求吧没意义"——**挂载已拆、组件与管线留库备用**（`SpectrumBars.vue` / `useSpectrum.ts` / `audioSpectrum.ts`，文件头有"留库未接线"注记；接线方式看 git 历史 v6.54）。**v6.54 的 crossOrigin 修复与频谱无关，保留**：它救的是 EQ 与节奏起伏（不设 CORS 模式，媒体图一接在线直链就静音）。
 
 **节奏起伏（v5.91，VS-09 彩胶唱片布局；v5.90 曾用 canvas 加法光）**：外圈柔光从“一张图当遮罩”改成纯 CSS 三团渐变（v5.89），再让它在鼓点上**吞吐**一下 —— 需求方：“我的想法光晕会随着音乐的节奏起伏就好了”（对比过 Houdini Paint Worklet：Firefox / Safari 不支持，不能用）。分析走 `AnalyserNode` 旁路挂在**均衡器那份**音频图上（`createMediaElementSource` 一个元素只能建一次，所以必须复用；`stores/equalizer` 导出 `getAnalyser()`）；算法全在 `utils/audioReactive.ts`（低频峰值 → 快起慢落包络 → 相对常态归一，纯函数 + 20 例单测）；循环只有一份（`composables/useBeat`）—— 它每帧**只写一个 CSS 变量 `--beat`**，缩放与亮度交给 CSS 的 `calc()`（`.glow-pulse` 那层包装元素就是为此加的：里面的 transform / opacity 被自转与呼吸动画占着），**没有音频 / 关开关 / 减动效时 `--beat` 恒为 0 = 纯底光，不需要降级分支**。v5.91 撤掉了 v5.90 那层 canvas（随机甩光斑）：“其他不用做那么多”；也记下第一版的坑：**只把原始强度缩放上去等于没动**（实测 `--beat` 挤在 0.70~0.89、缩放只差 1.3%），所以指标改峰值 + 加一层“相对常态”归一（细节见 PRD v5.91 行）。开关在 设置 › 外观「光晕跟随节奏」（默认开，`qt-glow-beat`）。
 

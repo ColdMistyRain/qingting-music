@@ -3,7 +3,8 @@ import { useEqualizerStore } from "@/stores/equalizer";
 import { usePlayerStore } from "@/stores/player";
 
 /**
- * 频谱可视化（VS-05）的数据管线：全局只有一个 rAF 循环（与 useBeat 同一原则），
+ * 频谱可视化（VS-05）的数据管线：全局只有一个 rAF 循环（与 useBeat 同一原则）。
+ * ⚠️ **留库未接线（v6.55）**：需求方裁决频谱不上线，挂载已拆、管线保留备用（见 SpectrumBars）。
  * 每帧从**均衡器那份** AnalyserNode 读频率直方图，广播给订阅者（播放条迷你指示、
  * 沉浸页大图共用一份）。订阅者拿到原始直方图后各自用 `spectrumBands` 压成自己
  * 要的频段数 —— 循环不关心谁要几根条。

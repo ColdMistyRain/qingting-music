@@ -5,6 +5,9 @@ import { useSpectrum, type SpectrumFrame } from "@/composables/useSpectrum";
 
 /**
  * 频谱条（VS-05）：播放条迷你指示与沉浸页大图共用的一个纯展示件。
+ * ⚠️ **留库未接线（v6.55）**：需求方裁决频谱不上线（"去掉这个需求吧没意义"），
+ * 两处挂载已拆，组件与数据管线（useSpectrum / audioSpectrum）保留 —— 后续可能改了再用；
+ * 接线方式看 git 历史里 v6.54 的 PlayerBar / ImmersiveView。
  * 形态全部由宿主的 CSS 控制（宽高、条色 = currentColor），组件只负责
  * "每帧把 count 根条缩放到对应频段的能量"。
  *

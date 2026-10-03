@@ -179,10 +179,7 @@ function toggleFavorite(index: number): void {
         <button class="btn btn-primary" :disabled="status === 'loading'" @click="submit">
           搜索
         </button>
-        <span v-if="listStatus === 'loading'" class="toolbar__spacer count">
-          {{ collectionMode ? "正在读歌单…" : "搜索中…" }}
-        </span>
-        <span v-else-if="hasResults" class="toolbar__spacer count">
+        <span v-if="hasResults" class="toolbar__spacer count">
           找到 {{ displayTracks.length }} 首
         </span>
       </div>
@@ -206,10 +203,21 @@ function toggleFavorite(index: number): void {
       <TrackListHead v-if="hasResults" />
 
       <div class="page-frame__scroll">
+        <!-- 加载中（v6.34）：提示与进度条放**页面中间**，不再挤在工具栏角落
+             （需求方圈过："还在加载在线列表时，提醒语句应该放在页面中间"） -->
         <div v-if="listStatus === 'loading' && displayTracks.length === 0" class="page-frame__fill">
-          <p class="note">
-            {{ collectionMode ? "正在读取歌单…" : `正在搜索「${lastKeyword}」…` }}
-          </p>
+          <div class="loading">
+            <p class="loading__text">
+              {{ collectionMode ? `正在读取「${online.activePlaylist?.name ?? "歌单"}」…` : `正在搜索「${lastKeyword}」…` }}
+            </p>
+            <div
+              class="loading__track"
+              role="progressbar"
+              :aria-label="collectionMode ? '正在读取歌单' : '正在搜索'"
+            >
+              <div class="loading__bar" />
+            </div>
+          </div>
         </div>
 
         <div v-else-if="listStatus === 'error' && displayTracks.length === 0" class="page-frame__fill">
@@ -252,7 +260,7 @@ function toggleFavorite(index: number): void {
           @toggle-favorite="toggleFavorite"
         />
 
-        <div v-else class="page-frame__fill">
+        <div v-else-if="listStatus === 'idle'" class="page-frame__fill">
           <EmptyState
             :icon="IconGlobe"
             title="搜一首想听的歌"
@@ -273,5 +281,51 @@ function toggleFavorite(index: number): void {
 .count {
   font-size: 12px;
   color: var(--text-3);
+}
+
+/* 加载中（v6.34）：居中的文字 + 细进度条 */
+.loading {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+
+.loading__text {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.loading__track {
+  width: 180px;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
+.loading__bar {
+  width: 40%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: online-loading-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes online-loading-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 减动效：不滑动，静态停在中间（仍是"在加载"的视觉） */
+  .loading__bar {
+    animation: none;
+    transform: translateX(80%);
+  }
 }
 </style>

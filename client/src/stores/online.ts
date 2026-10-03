@@ -15,6 +15,11 @@ import {
   writeOnlineSession,
   type OnlineSession,
 } from "@/utils/onlineSession";
+import {
+  clearCollectionCache,
+  readCollectionCache,
+  writeCollectionCache,
+} from "@/utils/onlineCollectionCache";
 import { toOnlineTrack } from "@/utils/onlineTracks";
 import { ApiError } from "@/api/http";
 
@@ -103,6 +108,8 @@ export const useOnlineStore = defineStore("online", () => {
       // 网络不通也照常清本地
     }
     clearOnlineSession("netease");
+    // 歌单内容缓存也是账号数据：退出一并清（v6.34）
+    clearCollectionCache("netease");
     session.value = null;
     playlists.value = [];
     activePlaylistId.value = null;
@@ -145,19 +152,50 @@ export const useOnlineStore = defineStore("online", () => {
     () => playlists.value.find((entry) => entry.id === activePlaylistId.value) ?? null,
   );
 
-  /** 打开一份歌单：曲目按统一格式进 store（url 空串，开播前由 player store 现解析直链） */
+  /**
+   * 打开一份歌单（v6.34 起带 **stale-while-revalidate 缓存**，需求方："每次点击都会刷新
+   * 一会儿，能不能把列表数据缓存在 localstorage 中"）：
+   * 有缓存 → 立刻把缓存的一份摆出来（秒开），同时后台照常拉最新的一份，到了就替换；
+   * 没缓存 → 清掉上一份的曲目、给「加载中」，等网络回来。
+   */
   async function openPlaylist(id: string): Promise<void> {
     if (collectionStatus.value === "loading") return;
-    collectionStatus.value = "loading";
     collectionError.value = "";
+    activePlaylistId.value = id;
+
+    const cached = readCollectionCache("netease", id);
+    if (cached) {
+      collectionTracks.value = cached.tracks.map((info) => toOnlineTrack("netease", info));
+      collectionStatus.value = "ready";
+      void refreshCollection(id);
+      return;
+    }
+
+    // 没缓存：必须清掉上一份的曲目 —— 否则"加载中"期间页面还摆着旧列表，
+    // 且视图的加载分支（要求列表为空）接不住，会掉进空闲空态（v6.34 实测）
+    collectionTracks.value = [];
+    collectionStatus.value = "loading";
     try {
       const { tracks } = await fetchOnlineCollectionTracks("netease", id);
+      writeCollectionCache("netease", id, tracks);
       collectionTracks.value = tracks.map((info) => toOnlineTrack("netease", info));
-      activePlaylistId.value = id;
       collectionStatus.value = "ready";
     } catch (error) {
       collectionError.value = error instanceof Error ? error.message : "歌单没能读出来";
       collectionStatus.value = "error";
+    }
+  }
+
+  /** 后台刷新一份已展示的歌单：有缓存垫底，失败静默（下次再点还会试） */
+  async function refreshCollection(id: string): Promise<void> {
+    try {
+      const { tracks } = await fetchOnlineCollectionTracks("netease", id);
+      writeCollectionCache("netease", id, tracks);
+      // 刷新期间用户可能已切到别的歌单：只更新仍然打开的这一份
+      if (activePlaylistId.value !== id) return;
+      collectionTracks.value = tracks.map((info) => toOnlineTrack("netease", info));
+    } catch {
+      // 缓存还在展示，静默
     }
   }
 

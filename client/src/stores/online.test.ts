@@ -19,6 +19,7 @@ import {
   fetchOnlineCollections,
   logoutOnline,
 } from "@/api/online";
+import { writeCollectionCache } from "@/utils/onlineCollectionCache";
 import { useOnlineStore } from "./online";
 
 /** node 环境没有 localStorage：会话就存在这里，测试直接看它的内容 */
@@ -27,13 +28,25 @@ const storage = new Map<string, string>();
 beforeEach(() => {
   setActivePinia(createPinia());
   storage.clear();
-  vi.clearAllMocks();
+  // resetAllMocks（而不是 clearAllMocks）：上一个用例挂起的 mockReturnValue 之类
+  // 的实现会跨用例泄漏（clear 只清调用记录、不清实现），把"挂起直到手动 release"
+  // 的实现带进下一个用例就是 5 秒超时 —— 实现全部打掉，每个用例显式给。
+  vi.resetAllMocks();
   vi.stubGlobal("localStorage", {
     getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => void storage.set(key, value),
     removeItem: (key: string) => void storage.delete(key),
+    // clearCollectionCache 靠遍历清掉某音源的全部歌单缓存：桩要有 length 与 key()
+    key: (index: number) => [...storage.keys()][index] ?? null,
+    get length() {
+      return storage.size;
+    },
   });
   vi.mocked(fetchOnlineAccount).mockResolvedValue({ loggedIn: false, profile: null });
+  // 给常用桩一个安全默认值（resetAllMocks 打掉了工厂里的实现）
+  vi.mocked(logoutOnline).mockResolvedValue(undefined);
+  vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: [] });
+  vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [] });
 });
 
 const TRACK: OnlineTrack = {
@@ -167,6 +180,78 @@ describe("online store · 收藏夹（ON-10）", () => {
         vipOnly: false,
       },
     ]);
+  });
+
+  it("再次点开有缓存的歌单：缓存秒开（不等网络），后台刷新到了再替换", async () => {
+    vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
+    vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });
+    const online = useOnlineStore();
+    await online.loadPlaylists();
+    await online.openPlaylist("100"); // 第一遍：无缓存，正常拉取并写缓存
+
+    // 预埋一份"旧缓存"并让网络挂住：点开应当立刻 ready 且展示缓存的曲目
+    const STALE = { ...TRACK, id: "1", title: "缓存里的旧版本" };
+    writeCollectionCache("netease", "100", [STALE]);
+    let release!: (value: { tracks: OnlineTrack[] }) => void;
+    vi.mocked(fetchOnlineCollectionTracks).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }) as never,
+    );
+    await online.openPlaylist("100");
+    const instant = {
+      status: online.collectionStatus,
+      titles: online.collectionTracks.map((t) => t.title),
+    };
+
+    // 网络回来：后台刷新替换成新数据（缓存同步更新）
+    release({ tracks: [{ ...TRACK, title: "网络上的新版本" }] });
+    await new Promise((r) => setTimeout(r, 50));
+    const refreshed = {
+      titles: online.collectionTracks.map((t) => t.title),
+      stored: JSON.parse(storage.get("qt-online-collection:netease:100")!).tracks[0].title,
+    };
+    void online.closePlaylist();
+    expect(instant.status).toBe("ready");
+    expect(instant.titles).toEqual(["缓存里的旧版本"]);
+    expect(refreshed.titles).toEqual(["网络上的新版本"]);
+    expect(refreshed.stored).toBe("网络上的新版本");
+  });
+
+  it("无缓存时打开新歌单会清掉上一份的曲目（加载分支才接得住，页面中间给进度）", async () => {
+    vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
+    vi.mocked(fetchOnlineCollectionTracks).mockResolvedValueOnce({ tracks: [TRACK] });
+    const online = useOnlineStore();
+    await online.loadPlaylists();
+    await online.openPlaylist("100");
+    expect(online.collectionTracks).toHaveLength(1);
+
+    let release!: (value: { tracks: OnlineTrack[] }) => void;
+    vi.mocked(fetchOnlineCollectionTracks).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }) as never,
+    );
+    // 不 await：openPlaylist 要等这份挂起的响应，手动放行后再等状态到位
+    void online.openPlaylist("200");
+    await vi.waitFor(() => expect(online.collectionStatus).toBe("loading"));
+    const during = { status: online.collectionStatus, tracks: online.collectionTracks.length };
+    release({ tracks: [TRACK, TRACK] });
+    await vi.waitFor(() => expect(online.collectionStatus).toBe("ready"));
+    expect(during).toEqual({ status: "loading", tracks: 0 });
+    expect(online.collectionTracks).toHaveLength(2);
+    void online.closePlaylist();
+  });
+
+  it("退出登录时清掉歌单内容缓存（缓存也是账号数据）", async () => {
+    vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
+    vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });
+    const online = useOnlineStore();
+    await online.openPlaylist("100");
+    expect(storage.has("qt-online-collection:netease:100")).toBe(true);
+
+    await online.logout();
+    expect(storage.has("qt-online-collection:netease:100")).toBe(false);
   });
 
   it("closePlaylist 收起歌单：曲目清空、回到搜索态", async () => {

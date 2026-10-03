@@ -717,14 +717,22 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 
-/* 翻译行（v6.40）：原文下方的小字 */
+/* 翻译行（v6.40；v6.41 按 AMLL 的 lyricSubLine 重调）：
+   主行半高（下限 10px）、非当前句 30% 可见，换句时主行先亮、
+   翻译延迟 0.25s 跟进（AMLL 同款节奏）；当前句提升到 75% 保证可读 */
 .lyline .tr {
   display: block;
-  margin-top: 4px;
-  font-size: 0.55em;
-  line-height: 1.4;
+  margin-top: 0.2em;
+  font-size: max(0.5em, 10px);
+  line-height: 1.5;
   letter-spacing: normal;
-  opacity: 0.62;
+  opacity: 0.3;
+  transition: opacity 0.2s 0.25s;
+}
+
+.lyline.current .tr {
+  opacity: 0.75;
+  transition-delay: 0s;
 }
 
 /* 逐字（LR-05；v6.36 补重做为 AMLL 的进度条式扫过）：

@@ -167,7 +167,6 @@ function dismissPlaylistError(): void {
               >
                 <IconPlaylist class="icon" />
                 <span class="lbl">{{ playlist.name }}</span>
-                <span class="sb-count lbl">{{ playlist.items.length }}</span>
               </RouterLink>
             </li>
           </ul>
@@ -222,7 +221,6 @@ function dismissPlaylistError(): void {
                 >
                   <IconPlaylist class="icon" />
                   <span class="lbl">{{ entry.name }}</span>
-                  <span class="sb-count lbl">{{ entry.trackCount }}</span>
                 </button>
               </li>
             </ul>
@@ -478,12 +476,15 @@ function dismissPlaylistError(): void {
   margin: 2px 0 6px;
 }
 
-/* 曲目数徽标（原型 v2.6）：弱一档，不与歌单名抢注意力 */
-.sb-count {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
+/* 歌单名截断（v6.56，需求方："列表名字长了就裁剪一下还有，列表中就不要显示歌曲数量了"）：
+   长名省略号收住（悬停看全名走行上的 title），数量徽标按同一反馈移除 ——
+   名字本身比数字重要，两列信息挤一行只会互相挤。 */
+.nav-item .lbl {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sb-foot {

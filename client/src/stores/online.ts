@@ -1,12 +1,13 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import type { OnlinePlaylistInfo, Track } from "@qingting/shared";
+import type { OnlinePlaylistInfo, OnlineTrack, Track } from "@qingting/shared";
 import {
   createOnlineQrLogin,
   checkOnlineQrLogin,
   fetchOnlineAccount,
   fetchOnlineCollectionTracks,
   fetchOnlineCollections,
+  fetchOnlineSearch,
   logoutOnline,
 } from "@/api/online";
 import {
@@ -149,6 +150,40 @@ export const useOnlineStore = defineStore("online", () => {
     }
   }
 
+  /* ---------- 搜索（ON-02）：结果跨页保留（v6.45，需求方连点"继续"后我把
+     页面局部状态搬进 store —— 跳去沉浸页再回来，搜索结果不再丢失）---------- */
+  const searchKeyword = ref("");
+  const searchStatus = ref<OnlineStatus>("idle");
+  const searchError = ref("");
+  const searchTracks = ref<Track[]>([]);
+  const lastSearchKeyword = ref("");
+  /** 每次搜索自增；响应回来时序号对不上就丢掉（请求本身没法中断，也不必中断） */
+  let searchSeq = 0;
+
+  async function search(raw: string): Promise<void> {
+    const text = raw.trim();
+    if (!text) return;
+    const seq = ++searchSeq;
+    // 搜索是新的意图：收起正在看的歌单
+    closePlaylist();
+    searchStatus.value = "loading";
+    searchError.value = "";
+    lastSearchKeyword.value = text;
+
+    try {
+      const result = await fetchOnlineSearch("netease", text);
+      if (seq !== searchSeq) return;
+      searchTracks.value = result.tracks.map((info: OnlineTrack) =>
+        toOnlineTrack(result.provider, info),
+      );
+      searchStatus.value = "ready";
+    } catch (error) {
+      if (seq !== searchSeq) return;
+      searchStatus.value = "error";
+      searchError.value = error instanceof Error ? error.message : "搜索出了点问题";
+    }
+  }
+
   /* ---------- 当前打开的一份歌单 ---------- */
   const activePlaylistId = ref<string | null>(null);
   const collectionTracks = ref<Track[]>([]);
@@ -228,6 +263,13 @@ export const useOnlineStore = defineStore("online", () => {
     createLogin,
     checkLogin,
     logout,
+    // 搜索
+    searchKeyword,
+    searchStatus,
+    searchError,
+    searchTracks,
+    lastSearchKeyword,
+    search,
     // 收藏夹
     playlists,
     playlistsStatus,

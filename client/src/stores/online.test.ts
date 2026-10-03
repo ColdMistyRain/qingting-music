@@ -10,6 +10,7 @@ vi.mock("@/api/online", () => ({
   logoutOnline: vi.fn(async () => undefined),
   fetchOnlineCollections: vi.fn(),
   fetchOnlineCollectionTracks: vi.fn(),
+  fetchOnlineSearch: vi.fn(),
 }));
 
 import {
@@ -17,6 +18,7 @@ import {
   fetchOnlineAccount,
   fetchOnlineCollectionTracks,
   fetchOnlineCollections,
+  fetchOnlineSearch,
   logoutOnline,
 } from "@/api/online";
 import { writeCollectionCache } from "@/utils/onlineCollectionCache";
@@ -47,6 +49,11 @@ beforeEach(() => {
   vi.mocked(logoutOnline).mockResolvedValue(undefined);
   vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: [] });
   vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [] });
+  vi.mocked(fetchOnlineSearch).mockResolvedValue({
+    provider: "netease",
+    keyword: "x",
+    tracks: [],
+  });
 });
 
 const TRACK: OnlineTrack = {

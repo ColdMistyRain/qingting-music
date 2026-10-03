@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import type { OnlineTrack } from "@qingting/shared";
 import { toPlaylistItem, type Track } from "@qingting/shared";
 import NavToggle from "@/components/NavToggle.vue";
 import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
@@ -12,8 +11,6 @@ import IconWarningCircle from "~icons/ph/warning-circle";
 import EmptyState from "@/components/EmptyState.vue";
 import TrackList from "@/components/TrackList.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
-import { fetchOnlineSearch } from "@/api/online";
-import { toOnlineTrack } from "@/utils/onlineTracks";
 import { debounce } from "@/utils/debounce";
 import { filterSongs } from "@/utils/library";
 import { useConfigStore } from "@/stores/config";
@@ -31,7 +28,8 @@ import { usePlayerStore } from "@/stores/player";
  *   页头给「返回搜索」出口；点侧栏的「在线搜索」同样回到搜索态。
  *
  * 两种态都是"结果整份当队列"（与音乐库同一交互），点播时由 player store 现解析播放直链。
- * 歌单曲目放在 online store 里 —— 跳去沉浸页再回来还在；搜索结果是页面状态、不留。
+ * 搜索与歌单的状态都放在 online store —— 跳去沉浸页再回来都还在
+ * （v6.45 起搜索结果也跨页保留，此前是页面局部状态、切一次路由就得重搜）。
  */
 const config = useConfigStore();
 const listening = useListeningStore();
@@ -53,13 +51,15 @@ watch(
   { immediate: true },
 );
 
-const keyword = ref("");
+/** 输入框绑定 store 的搜索词（v6.45 起搜索状态跨页保留） */
+const keyword = computed({
+  get: () => online.searchKeyword,
+  set: (value: string) => {
+    online.searchKeyword = value;
+  },
+});
 /** 歌单内的过滤词（防抖 150ms，与音乐库同一节奏：输入即时回显、过滤跟随） */
 const query = ref("");
-const status = ref<"idle" | "loading" | "ready" | "error">("idle");
-const errorMessage = ref("");
-const tracks = ref<Track[]>([]);
-const lastKeyword = ref("");
 
 const collectionMode = computed(() => online.activePlaylistId !== null);
 const activePlaylist = computed(() => online.activePlaylist);
@@ -73,31 +73,8 @@ watch(
   },
 );
 
-/** 每次搜索自增；响应回来时序号对不上就丢掉（请求本身没法中断，也不必中断） */
-let searchSeq = 0;
-
-async function search(raw: string): Promise<void> {
-  const text = raw.trim();
-  if (!text || collectionMode.value) return;
-  const seq = ++searchSeq;
-  status.value = "loading";
-  errorMessage.value = "";
-  lastKeyword.value = text;
-
-  try {
-    const result = await fetchOnlineSearch("netease", text);
-    if (seq !== searchSeq) return;
-    tracks.value = result.tracks.map((info: OnlineTrack) => toOnlineTrack(result.provider, info));
-    status.value = "ready";
-  } catch (error) {
-    if (seq !== searchSeq) return;
-    status.value = "error";
-    errorMessage.value = error instanceof Error ? error.message : "搜索出了点问题";
-  }
-}
-
 const applyKeyword = debounce((value: string) => {
-  if (value.trim()) void search(value);
+  if (value.trim()) void online.search(value);
 }, 500);
 /** 歌单内过滤：本地纯函数，150ms 跟随（与音乐库的站内过滤同一节奏） */
 const applyQuery = debounce((value: string) => {
@@ -117,20 +94,22 @@ function submit(): void {
   // 歌单态的过滤是本地的、即时的，回车/按钮不触发远程搜索
   if (collectionMode.value) return;
   applyKeyword.cancel();
-  void search(keyword.value);
+  void online.search(online.searchKeyword);
 }
 
 const isFiltering = computed(() => collectionMode.value && query.value.trim().length > 0);
 
 /** 展示给列表的曲目：歌单态用过滤后的歌单曲目，搜索态用搜索结果 */
 const displayTracks = computed<Track[]>(() =>
-  collectionMode.value ? filterSongs(online.collectionTracks, query.value) : tracks.value,
+  collectionMode.value ? filterSongs(online.collectionTracks, query.value) : online.searchTracks,
 );
 
 const listStatus = computed<"idle" | "loading" | "ready" | "error">(() =>
-  collectionMode.value ? online.collectionStatus : status.value,
+  collectionMode.value ? online.collectionStatus : online.searchStatus,
 );
-const listError = computed(() => (collectionMode.value ? online.collectionError : errorMessage.value));
+const listError = computed(() =>
+  collectionMode.value ? online.collectionError : online.searchError,
+);
 const hasResults = computed(() => listStatus.value === "ready" && displayTracks.value.length > 0);
 const noResults = computed(() => listStatus.value === "ready" && displayTracks.value.length === 0);
 
@@ -219,7 +198,7 @@ function toggleFavorite(index: number): void {
         <button
           v-if="!collectionMode"
           class="btn btn-primary"
-          :disabled="status === 'loading'"
+          :disabled="online.searchStatus === 'loading'"
           @click="submit"
         >
           搜索
@@ -228,10 +207,10 @@ function toggleFavorite(index: number): void {
           找到 {{ displayTracks.length }} 首
         </span>
         <span
-          v-else-if="!collectionMode && status === 'ready' && tracks.length > 0"
+          v-else-if="!collectionMode && online.searchStatus === 'ready' && online.searchTracks.length > 0"
           class="toolbar__spacer count"
         >
-          找到 {{ tracks.length }} 首
+          找到 {{ online.searchTracks.length }} 首
         </span>
       </div>
 
@@ -246,7 +225,11 @@ function toggleFavorite(index: number): void {
         >
           重试
         </button>
-        <button v-else-if="lastKeyword" class="btn btn-quiet" @click="search(lastKeyword)">
+        <button
+          v-else-if="online.lastSearchKeyword"
+          class="btn btn-quiet"
+          @click="online.search(online.lastSearchKeyword)"
+        >
           重试
         </button>
       </div>
@@ -258,7 +241,7 @@ function toggleFavorite(index: number): void {
         <div v-if="listStatus === 'loading' && displayTracks.length === 0" class="page-frame__fill">
           <div class="loading">
             <p class="loading__text">
-              {{ collectionMode ? `正在读取「${online.activePlaylist?.name ?? "歌单"}」…` : `正在搜索「${lastKeyword}」…` }}
+              {{ collectionMode ? `正在读取「${online.activePlaylist?.name ?? "歌单"}」…` : `正在搜索「${online.lastSearchKeyword}」…` }}
             </p>
             <div
               class="loading__track"
@@ -284,7 +267,11 @@ function toggleFavorite(index: number): void {
             >
               重试
             </button>
-            <button v-else-if="lastKeyword" class="btn btn-primary" @click="search(lastKeyword)">
+            <button
+              v-else-if="online.lastSearchKeyword"
+              class="btn btn-primary"
+              @click="online.search(online.lastSearchKeyword)"
+            >
               重试
             </button>
           </div>
@@ -297,7 +284,7 @@ function toggleFavorite(index: number): void {
             :desc="
               collectionMode
                 ? '换个关键词试试；点页头的「返回搜索」可以去搜全网歌曲。'
-                : `换个关键词试试。想找「${lastKeyword}」的翻唱或现场版，可以在关键词里加上这些词。`
+                : `换个关键词试试。想找「${online.lastSearchKeyword}」的翻唱或现场版，可以在关键词里加上这些词。`
             "
             fill
           />

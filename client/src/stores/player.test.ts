@@ -3,6 +3,7 @@ import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Track } from "@qingting/shared";
 import { fetchLyrics } from "@/api/songs";
+import { AUTO_SKIP_DELAY_MS } from "@/utils/playbackFailure";
 import { TOAST_DURATION_MS, TOAST_STICKY_DURATION_MS, resetToasts, toasts } from "@/utils/toast";
 import { usePlayerStore } from "./player";
 
@@ -25,6 +26,21 @@ function track(id: string, duration: number | null = null): Track {
     cover: null,
     duration,
   };
+}
+
+/** 云端曲目：只有 `source: "server"` 才会去问“服务器在不在” */
+function cloudTrack(id: string): Track {
+  return { ...track(id), source: "server", url: `/audio/${id}` };
+}
+
+/** “服务器在不在”探的是全局 fetch（`utils/playbackFailure` 的默认注入点）—— 单测里桩掉它 */
+function stubServer(alive: boolean) {
+  const spy = vi.fn(async () => {
+    if (!alive) throw new TypeError("Failed to fetch");
+    return new Response("{}", { status: 200 });
+  });
+  vi.stubGlobal("fetch", spy);
+  return spy;
 }
 
 beforeEach(() => {
@@ -318,6 +334,8 @@ class FakeAudio {
   style: Record<string, string> = {};
   /** play() 是否应被浏览器拦下（自动播放策略） */
   blockPlay = false;
+  /** 加载失败时浏览器给出的媒体错误（非空 = 这次是“放不出来”，而不是“被拦了”） */
+  error: MediaError | null = null;
 
   private listeners = new Map<string, Set<() => void>>();
 
@@ -336,6 +354,8 @@ class FakeAudio {
   }
 
   async play(): Promise<void> {
+    // 加载失败时浏览器先给元素挂上 `MediaError`，再让 play() 的 promise 被拒
+    if (this.error) throw new Error("NotSupportedError");
     if (this.blockPlay) throw new Error("NotAllowedError");
     this.paused = false;
     this.emit("play");
@@ -352,7 +372,11 @@ class FakeAudio {
   }
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** 让异步的失败收尾跑完（假定时器下也能用）：放掉微任务再推一次定时器 */
+async function settle(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
+  await Promise.resolve();
+}
 
 describe("手动歌词库（LR-02 第三条来源，v4.87）", () => {
   /** node 环境没有 localStorage，给一个够用的内存版 */
@@ -448,10 +472,13 @@ describe("手动歌词库（LR-02 第三条来源，v4.87）", () => {
 describe("与 audio 元素的接线", () => {
   beforeEach(() => {
     FakeAudio.instances = [];
+    // 这一组要验“失败后多久才跳”，用假定时器把 3 秒推过去（`settle()` 负责放微任务）
+    vi.useFakeTimers();
     vi.stubGlobal("Audio", FakeAudio as unknown as typeof Audio);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -459,7 +486,7 @@ describe("与 audio 元素的接线", () => {
     const player = usePlayerStore();
     player.addTracks([track("a", 10)]);
     player.playAt(0);
-    await flush();
+    await settle();
     expect(player.playing).toBe(true);
 
     player.pause();
@@ -470,35 +497,134 @@ describe("与 audio 元素的接线", () => {
     const player = usePlayerStore();
     player.addTracks([track("a", 10)]);
     player.playAt(0);
-    await flush();
+    await settle();
 
     FakeAudio.instances[0]!.blockPlay = true;
     player.pause();
     player.toggle();
-    await flush();
+    await settle();
     expect(player.playing).toBe(false);
     expect(latestToast()?.title).toContain("自动播放");
 
     // 用户再点一次（此时已放行）→ 播放成功，提示应立刻消失
     FakeAudio.instances[0]!.blockPlay = false;
     player.toggle();
-    await flush();
+    await settle();
     expect(player.playing).toBe(true);
     expect(toasts.value).toHaveLength(0);
   });
 
-  it("音频加载失败：提示并自动跳下一首，且这条提示不会被自动跳转清掉（PL-09）", async () => {
+  it("音频加载失败（服务器还在）：3 秒后才跳下一首，这 3 秒里用户能自己换歌", async () => {
+    stubServer(true);
     const player = usePlayerStore();
     player.addTracks([track("a", 10), track("b", 10)]);
     player.playAt(0);
-    await flush();
+    await settle();
 
     FakeAudio.instances[0]!.emit("error");
-    await flush();
-    expect(player.currentTrack?.id).toBe("b");
-    expect(latestToast()?.title).toContain("加载失败");
+    await settle();
+    // 不立刻跳：先让用户看见那句话，也给他换歌的时间
+    expect(player.currentTrack?.id).toBe("a");
+    expect(latestToast()?.title).toContain("3 秒后跳下一首");
     expect(latestToast()?.tone).toBe("danger");
-    expect(player.playing).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS);
+    expect(player.currentTrack?.id).toBe("b");
+  });
+
+  it("这 3 秒里用户点了别的曲目：那次待跳被取消（不会被再跳走一次）", async () => {
+    stubServer(true);
+    const player = usePlayerStore();
+    player.addTracks([track("a", 10), track("b", 10), track("c", 10)]);
+    player.playAt(0);
+    await settle();
+
+    FakeAudio.instances[0]!.emit("error");
+    await settle();
+
+    player.playAt(2); // 用户自己挑了一首
+    await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS * 2);
+    expect(player.currentTrack?.id).toBe("c");
+  });
+
+  it("同一首重复派 error 也只跳一次（不会叠出两次跳）", async () => {
+    stubServer(true);
+    const player = usePlayerStore();
+    player.addTracks([track("a", 10), track("b", 10), track("c", 10)]);
+    player.playAt(0);
+    await settle();
+
+    const element = FakeAudio.instances[0]!;
+    element.emit("error");
+    element.emit("error");
+    await settle();
+    await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS);
+    expect(player.currentTrack?.id).toBe("b");
+  });
+
+  it("服务器断链：不一首首往下跳，而是说清“连接不上服务器”并停下来", async () => {
+    stubServer(false);
+    const player = usePlayerStore();
+    player.addTracks([cloudTrack("a"), cloudTrack("b"), cloudTrack("c")]);
+    player.mode = "list";
+    player.playAt(0);
+    await settle();
+
+    FakeAudio.instances[0]!.emit("error");
+    await settle();
+
+    expect(latestToast()?.title).toContain("连接不上服务器");
+    expect(latestToast()?.tone).toBe("danger");
+    expect(player.playing).toBe(false);
+    // 关键：给足时间也不会自己往下跳（原来就是这样一首首飞快跳完整个列表）
+    await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS * 4);
+    expect(player.currentTrack?.id).toBe("a");
+  });
+
+  it("本地曲目不涉及服务器：一次也不去探测（直接走 3 秒延时那条路）", async () => {
+    const fetchSpy = stubServer(true);
+    const player = usePlayerStore();
+    player.addTracks([track("a", 10), track("b", 10)]);
+    player.playAt(0);
+    await settle();
+
+    FakeAudio.instances[0]!.emit("error");
+    await settle();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(latestToast()?.title).toContain("3 秒后跳下一首");
+  });
+
+  it("单曲循环下坏文件不会原地每 3 秒重试一次（停在原地并说清楚）", async () => {
+    stubServer(true);
+    const player = usePlayerStore();
+    player.addTracks([track("a", 10), track("b", 10)]);
+    player.mode = "one";
+    player.playAt(0);
+    await settle();
+
+    FakeAudio.instances[0]!.emit("error");
+    await settle();
+    expect(latestToast()?.title).toContain("先停在这里");
+
+    await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS * 3);
+    expect(player.currentTrack?.id).toBe("a");
+    expect(toasts.value).toHaveLength(1);
+  });
+
+  it("加载失败不会被说成“浏览器拦住自动播放”（那会把人指到错方向）", async () => {
+    stubServer(true);
+    const player = usePlayerStore();
+    player.addTracks([track("a", 10), track("b", 10)]);
+    player.playAt(0);
+    await settle();
+
+    const element = FakeAudio.instances[0]!;
+    element.error = {} as MediaError;
+    element.emit("error");
+    await settle();
+
+    expect(toasts.value.some((item) => item.title.includes("自动播放"))).toBe(false);
+    expect(latestToast()?.title).toContain("无法播放");
   });
 
   it("音量与静音同步到 audio 元素（PL-04）", () => {

@@ -81,7 +81,8 @@ client/src/router/        路由表 + 守卫（身份决定可达页面）
 client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、
                           listening（收藏与最近播放：数据在服务端 data/listening.json - PS-05）、
                           library、transfer（本地列表→上传页的 File 交接 - LC-07）
-client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息与封面 / 排序下标 - v6.14）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、localFiles（文件名解析/时长探测）、
+client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息与封面 / 排序下标 - v6.14）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、
+                          playbackFailure（播放失败分类：服务器还在不在（轻请求探测）+ 延时可取消的跳歌 - v6.26）、localFiles（文件名解析/时长探测）、
                           concurrency（带并发上限的批量映射：拖入文件夹时用它，别 forEach 裸并行 - v6.10）、debounce（尾部防抖：列表页搜索框用，输入即时 + 过滤防抖 - v6.10）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
                           equalizer（均衡器：10 段频段 / 预设 / 曲线清洗 - PL-13）、
@@ -143,7 +144,7 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 
 **提示（Tooltip，v5.71）**：Reka 的 Tooltip 落地成共用的 `components/AppTooltip.vue`，`App.vue` 挂**一个** `TooltipProvider`（400ms 延迟；连续移到下一枚键不再等；只有键盘聚焦才开；指针离开即收）。**只有图标的按钮用它**（`label` 同时就是 `aria-label` —— 图标键没有可见文字，名字不能丢），有可见文字的控件仍写原生 `title`（截断时看全文）。队列键与歌词来源键的触发键收在壳层组件里（`QueuePopover` / `LyricsSourceMenu`，调用方只传 `label`）；提示挂在这两枚**按钮里面的图标**上（见坑 25）。
 
-**提示条（Toast，v5.72）**：`utils/toast.ts`（唯一入口 `showToast` + 队列）+ `components/AppToast.vue`（Reka Toast，挂 App.vue）。**判据**：与当前操作无关、消失也不影响继续操作的消息走提示条（播放异常、后台任务结果）；绑在控件/表单项上的错误留在原地（表单校验、上传某一行失败、带“重试”的失败面板）。**PL-09 的播放提示已改走它**（`stores/player` 的 `notify()`，出错 `danger` + 10s），播放条里那行红字与 `notice` 状态都已移除。
+**提示条（Toast，v5.72）**：`utils/toast.ts`（唯一入口 `showToast` + 队列）+ `components/AppToast.vue`（Reka Toast，挂 App.vue）。**判据**：与当前操作无关、消失也不影响继续操作的消息走提示条（播放异常、后台任务结果）；绑在控件/表单项上的错误留在原地（表单校验、上传某一行失败、带“重试”的失败面板）。**PL-09 的播放提示已改走它**（`stores/player` 的 `notify()`，出错 `danger` + 10s），播放条里那行红字与 `notice` 状态都已移除。**v6.26 起 PL-09 多一层分类**（见坑 34）：断链只说清楚并停下、坏文件才 3 秒后跳且可被用户取消 —— 判据与探测都在 `utils/playbackFailure.ts`。
 
 **收藏与最近播放（v5.67，PS-05）**：数据在服务端 `data/listening.json`（手机上收藏的、电脑上看得见；清一次浏览器数据不会把它清掉）。接口 `GET /api/listening` + `POST/DELETE /api/listening/favorites` + `POST/DELETE /api/listening/recent`（均访客级，引用口径与歌单同一套身份键）——收藏幂等、最近播放去重置顶并截到 100 条。前端：`stores/listening`（不做乐观更新，一律用服务端返回的那一份回填）+ `composables/usePlayHistory`（挂在 App.vue，切歌时记一条）+ `views/ListeningView`（`/favorites`「我的收藏」与 `/recent`「最近播放」两页共用一份组件，行复用 `TrackRow` 的收藏键；v5.83 从「我的音乐」+ 两页签拆开的 —— 需求方：“这个标题应该叫我的收藏或者我喜欢，其次最近播放列表应该单开一个在侧边栏里面，现在这种布局让你迷惑”）+ 播放条与沉浸页各一枚收藏键（播放条那枚在**队列键左侧**、与队列并列在最右 —— 中间那组键因此对进度条左右对称，实测播放键中心与进度条中心重合；状态色由 `.ctl.is-on` 一条规则给三处共用，v5.70；**v6.5 起这个键不加任何包围它的东西**：点亮＝同一个轮廓的 duotone 款（`ph/heart-straight` → `heart-straight-duotone`），描边 65% 半透明 + 心内 20% 填充，圆盘 / 描边圈 / 常驻光一律不要）；手机上播放条那两枚一起收起（最右那组整组 `display: none`），入口在沉浸页**歌名旁边**（v5.98 从底栏挪过去的：那一排控件数要取奇数，详见 PRD）。
 
@@ -212,6 +213,7 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 31. **自己实现的拖拽必须声明 `touch-action`，且 `pointercancel` ≠ 点击（v6.22 / v6.23）**：① 用 pointer 事件自己推位移的地方（歌词列表、**播放进度条**、播放条滑动区、歌单拖拽、滑杆）如果没写 `touch-action`，真机上手指一动浏览器就接管这次触摸 —— 我们**一个 `pointermove` 都收不到**（只收到 `pointercancel`），表现是“怎么拖都不动”；桌面用鼠标复现不出来（没有触摸仲裁）。仓内先例：`.pb-left { touch-action: pan-y }`；两轴都自己管就写 `none`。② `pointercancel` 只表示“浏览器把触摸收走了”——若把它按“没滑动 = 点一下”处理，滑动就会变成误点（歌词那处会跳到手指下那一句）。③ `setPointerCapture` / `releasePointerCapture` **一律走 `utils/pointer.ts` 的 `togglePointerCapture`**（两边都包 try/catch，四处拖动已统一）：释放那次往往排在“做正事”前面，一抛就把正事吞了（实测歌词那处白点一下、进度条那处 `seeking` 永远挂着）。
 32. **居中不只是 `text-align`：flex 行要用 `justify-content`（v6.24 实测）**：“沉浸歌词”布局写着“标题与歌词都居中”，但标题那一行是 `display: flex`（歌名 + 收藏键）—— `text-align` 对 **flex items** 无效，只有下面的块级歌手行居中，歌名与键就贴在左边缘（实测标题中心 126 / 容器中心 195）。给一行做居中前先看它的 `display`；看一段文字到底居没居中，量的是**元素中心 vs 容器中心**。布局要改共享子组件的版式时用 `:deep()`（VS-09 的既定写法），别把共享组件写成可配置的。
 33. **`SelectRoot` 不渲染元素：组件根是 fragment，透传的 `class` 会被静默丢掉（v6.25 实测）**：`AppSelect.vue` 的根是 `SelectRoot`，而它自己**不产元素**（只把插槽渲染成 `SelectTrigger` + `SelectPortal` 两个兄弟）—— 于是 `<AppSelect class="sort" …>` 的 `class` **既没落到触发器上、也没落到任何东西上**，宿主那条 `.sort :deep(.as-trigger)` 静默失配：**不报错、不警告，只是那条样式从没生效**（我因此白跑了两轮探测）。**判别技巧：先量“那个 class 到底在哪个元素上”** —— `document.querySelectorAll(".as-trigger").length` + 触发器自己的 `className` + 它的 `parentElement.className`，别一上来就怀疑“样式被覆盖了”。修法：宿主外面包一层 `<div class="sort">`，或给组件 `inheritAttrs: false` 后把 `$attrs` 显式绑到触发器上。同族：凡是被当成组件根、而自己又不产元素的第三方 Root，都别指望透传属性生效。
+34. **`<audio>` 的 `error` 事件不说原因，`play()` 的 rejection 也不只有一个原因（v6.26 实测）**：① 文件坏 / 地址 404 / **后端进程没了**，在 `error` 看来都是同一件事 —— 所以**别拿到 `error` 就 `next()`**：服务器一崩会“每一首都立刻失败”，于是后端挂掉被演成“整个列表都坏了”（列表循环下永远停不下来）。先问一句“服务器还在不在”（`serverReachable`：任何 HTTP 响应都算活着，网络层报错才算断），**云端曲目才问**（本地是 Blob、在线是第三方）；断了就停下说清楚，坏了才跳、而且延时 3 秒可取消（用户换歌就撤）。② **`element.play()` 被拒**既可能是自动播放策略，也可能是加载失败 —— 无条件说“浏览器阻止了自动播放”会把人指到错方向；判据是元素有没有拿到 `MediaError`。③ 跳歌前还要认清**单曲循环下 “下一首” 就是本曲**（`resolveNextIndex` 返回同一下标）：不拦住就会每 3 秒重试一次，又成另一种“永远跳不完”。
 
 ## 文档索引
 

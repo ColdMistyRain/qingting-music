@@ -22,6 +22,12 @@ import {
 } from "@/utils/lyricsLibrary";
 import { parseSnapshot, sanitizeSnapshot } from "@/utils/playerState";
 import {
+  AUTO_SKIP_DELAY_MS,
+  createSkipScheduler,
+  isServerTrack,
+  serverReachable,
+} from "@/utils/playbackFailure";
+import {
   TOAST_DURATION_MS,
   TOAST_STICKY_DURATION_MS,
   dismissToast,
@@ -80,6 +86,11 @@ export const usePlayerStore = defineStore("player", () => {
   let transientToastId: number | null = null;
   /** 从存档恢复出来的进度：等元数据加载完才能 seek（设太早会被忽略） */
   let pendingSeconds = 0;
+  /**
+   * 加载失败后的**延时跳过**（v6.26）：等 3 秒再跳，用户在这段时间里自己换了歌就把它取消。
+   * 为什么不是立刻跳：一首歌坏掉时，那 3 秒是用户唯一能“选别的听”的机会。
+   */
+  const autoSkip = createSkipScheduler(AUTO_SKIP_DELAY_MS, () => next());
 
   /**
    * 播放异常 / 状态提示（PL-09）—— 走应用内的**提示条**（v5.72，`utils/toast`）。
@@ -87,11 +98,17 @@ export const usePlayerStore = defineStore("player", () => {
    * 以前它是长在播放条信息区里的一行红字：位置局促、手机上把两行信息挤成三行，而且没有关闭入口。
    * 换成提示条之后，时长 / 悬停暂停 / 点关闭 / 滑动 / Esc 都由 `AppToast` 那套给，播放条一行都不用改。
    *
-   * `sticky`：跨事件的提示（“这首歌加载失败，已自动跳到下一首”）给更长的停留时间 ——
+   * `sticky`：跨事件的提示（“这首歌无法播放，3 秒后跳下一首”）给更长的停留时间 ——
    * 它不能被“播放真的起来了”那句清掉。
    * `tone`：只有**出错**用 `danger`。颜色只表达状态，提示类一律中性色。
+   * `description`：一句话说不完时才用（比如再补一句“该怎么办”）。
    */
-  function notify(text: string, sticky = false, tone: ToastTone = "info"): void {
+  function notify(
+    text: string,
+    sticky = false,
+    tone: ToastTone = "info",
+    description?: string,
+  ): void {
     if (!text) {
       clearTransientNotice();
       return;
@@ -100,6 +117,7 @@ export const usePlayerStore = defineStore("player", () => {
       title: text,
       tone,
       duration: sticky ? TOAST_STICKY_DURATION_MS : TOAST_DURATION_MS,
+      ...(description ? { description } : {}),
     });
     transientToastId = sticky ? null : id;
   }
@@ -275,11 +293,10 @@ export const usePlayerStore = defineStore("player", () => {
     audio.addEventListener("ended", () => {
       handleEnded();
     });
-    // PL-09：加载失败提示并自动跳下一曲，不打断整张列表的播放。
-    // 先跳转再提示——playAt 会重置提示，反过来的话这条提示会被立刻清掉。
+    // PL-09（v6.26 修订）：失败要**先分清“这一首坏了”还是“服务器断了”**，再决定跳不跳。
+    // 服务器断线还一首首往下跳，等于把“后端挂了”演成“整个列表都坏了”（列表循环下永远停不下来）。
     audio.addEventListener("error", () => {
-      next();
-      notify("这首歌加载失败，已自动跳到下一首", true, "danger");
+      void handlePlaybackFailure();
     });
     return audio;
   }
@@ -303,13 +320,63 @@ export const usePlayerStore = defineStore("player", () => {
       // 只清"点一下即可"这类瞬时提示；加载失败的粘性提示要留着让用户看见
       clearTransientNotice();
     } catch {
-      // 浏览器自动播放策略（iOS 尤其严格）：需要一次用户手势
       playing.value = false;
+      // 加载失败（服务器断了 / 文件坏了）也会让这个 promise 被拒：那条路有自己的说法
+      // （`handlePlaybackFailure`），**别把它误报成“浏览器拦住自动播放”** —— 那会把人指到错方向
+      if (element.error) return;
+      // 浏览器自动播放策略（iOS 尤其严格）：需要一次用户手势
       notify("浏览器阻止了自动播放，点一下播放按钮即可");
     }
   }
 
+  /**
+   * 加载失败的收尾（PL-09，v6.26 修订）。
+   *
+   * 两件事：① **分清“这一首坏了”还是“服务器断了”**（云端曲目才问服务器，本地是 Blob 不涉及）；
+   * ② 这一首坏了 → 排一次 **3 秒后**的跳过，把选择权交回用户。
+   */
+  async function handlePlaybackFailure(): Promise<void> {
+    const track = currentTrack.value;
+    if (!track) return;
+    // 加载失败会让 `play()` 的 promise 被拒，那里可能刚弹了一条“浏览器拦住自动播放”——先收掉它
+    clearTransientNotice();
+    // 同一首又失败一次（浏览器会重复派 error）：别重排、也别把提示又叠一遍
+    if (autoSkip.pending()) return;
+
+    if (isServerTrack(track.source) && !(await serverReachable())) {
+      // 探测是异步的，回来时用户可能已经自己换了歌 —— 换了就当这次失败没发生过
+      if (currentTrack.value?.id !== track.id) return;
+      autoSkip.cancel();
+      notify(
+        "连接不上服务器，云端曲目暂时无法播放",
+        true,
+        "danger",
+        "请确认后端已启动；恢复后点一下播放就能接着听",
+      );
+      pause();
+      return;
+    }
+    if (currentTrack.value?.id !== track.id) return;
+    scheduleAutoSkip();
+  }
+
+  /** 这一首坏了：等 3 秒再跳（这 3 秒是用户换歌的机会） */
+  function scheduleAutoSkip(): void {
+    const index = resolveNextIndex(queue.value.length, currentIndex.value, mode.value);
+    // `-1` = 顺序播到末尾；**等于当前下标** = 单曲循环（那里的“下一首”就是本曲）——
+    // 两种都没有别的可跳，否则坏文件会每 3 秒重试一次，又成了另一种“永远跳不完”
+    if (index < 0 || index === currentIndex.value) {
+      notify("这首歌无法播放，先停在这里", true, "danger", "可以点列表里别的曲目，或换个播放模式");
+      pause();
+      return;
+    }
+    notify("这首歌无法播放，3 秒后跳下一首", true, "danger", "想听别的，现在点列表里那一首就行");
+    autoSkip.schedule();
+  }
+
   function pause(): void {
+    // 用户按了暂停 = 他自己接管了：把那个“3 秒后跳下一首”撤销（否则刚暂停就被跳走）
+    autoSkip.cancel();
     if (audio) audio.pause();
     playing.value = false;
   }
@@ -327,6 +394,8 @@ export const usePlayerStore = defineStore("player", () => {
   function playAt(index: number, autoplay = true): void {
     const track = queue.value[index];
     if (!track) return;
+    // 用户自己点了某一首（也可能就是自动跳过自己）：无论哪种，先前那个待跳都不再需要
+    autoSkip.cancel();
     currentIndex.value = index;
     progress.value = 0;
     duration.value = track.duration ?? 0;

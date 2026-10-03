@@ -3,6 +3,7 @@ import {
   centerShift,
   clampManualShift,
   currentLineIndex,
+  findInterludes,
   parseLyrics,
   wordFillProgress,
 } from "./lyrics";
@@ -149,6 +150,26 @@ describe("parseLyrics（增强型 LRC：行内词级标签，v4.87）", () => {
 
   it("只有时间标签、没有文字的增强行不产生空行（也不把标签当正文）", () => {
     expect(parseLyrics("[00:10.00]<00:10.00><00:10.40>").lines).toEqual([]);
+  });
+});
+
+describe("findInterludes（v6.44 间奏点）", () => {
+  it("相邻行起点间隔 ≥ 阈值视为间奏，afterIndex 指向前一行", () => {
+    const { lines } = parseLyrics("[00:02.00]前\n[00:24.00]后");
+    const interludes = findInterludes(lines);
+    expect(interludes).toEqual([{ afterIndex: 0, startTime: 2, endTime: 24 }]);
+  });
+
+  it("按阈值筛选：短间隔不算，长间隔算", () => {
+    const { lines } = parseLyrics("[00:00.00]一\n[00:03.00]二\n[00:20.00]三");
+    expect(findInterludes(lines, 8)).toEqual([{ afterIndex: 1, startTime: 3, endTime: 20 }]);
+    expect(findInterludes(lines, 25)).toEqual([]);
+  });
+
+  it("空歌词 / 单行：无间奏", () => {
+    expect(findInterludes([])).toEqual([]);
+    const { lines } = parseLyrics("[00:01.00]只有一行");
+    expect(findInterludes(lines)).toEqual([]);
   });
 });
 

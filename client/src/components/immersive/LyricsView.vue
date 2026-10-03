@@ -6,6 +6,8 @@ import {
   clampManualShift,
   currentLineIndex,
   wordFillProgress,
+  findInterludes,
+  type LyricInterlude,
   type LyricLine,
 } from "@/utils/lyrics";
 import { emphasisKeyframes, emphasisParams } from "@/utils/lyricEmphasis";
@@ -34,6 +36,23 @@ const props = defineProps<{
 const emit = defineEmits<{ seek: [seconds: number] }>();
 
 const activeIndex = computed(() => currentLineIndex(props.lines, props.time));
+
+/* ---------- 间奏点（v6.44，AMLL 的 interlude dots）：长间奏时渲染呼吸点 ---------- */
+const interludes = computed(() => findInterludes(props.lines));
+
+/** 当前时间所在间奏（无则 null） */
+const activeInterlude = computed<LyricInterlude | null>(() => {
+  const now = props.time;
+  return interludes.value.find((s) => now >= s.startTime && now < s.endTime) ?? null;
+});
+
+/** 间奏进度拆到 3 颗点：每颗在它的三分之一区间内 0→1 */
+function dotFill(index: number): number {
+  const seg = activeInterlude.value;
+  if (!seg) return 0;
+  const progress = (props.time - seg.startTime) / (seg.endTime - seg.startTime);
+  return Math.min(1, Math.max(0, progress * 3 - index));
+}
 
 /** 翻译行按时间对齐到原文行（毫秒取整做键；网易 tlyric 与原文同轴） */
 function translationOf(time: number): string {
@@ -511,16 +530,15 @@ onBeforeUnmount(() => {
         @pointerup="onPointerUp"
         @pointercancel="onPointerCancel"
       >
-        <button
-          v-for="(line, i) in lines"
-          :key="`${line.time}-${i}`"
-          v-memo="[
-            i === activeIndex,
-            i < activeIndex,
-            depths[i],
-            i === activeIndex ? fillKey : '',
-            translationsKey,
-          ]"
+        <template v-for="(line, i) in lines" :key="`${line.time}-${i}`">
+          <button
+            v-memo="[
+              i === activeIndex,
+              i < activeIndex,
+              depths[i],
+              i === activeIndex ? fillKey : '',
+              translationsKey,
+            ]"
           :ref="refSetters[i]"
           type="button"
           class="lyline"
@@ -550,7 +568,25 @@ onBeforeUnmount(() => {
           <!-- 翻译（v6.40）与音译（v6.43）：原文下方的小字，音译排在翻译之下 -->
           <span v-if="translationOf(line.time)" class="tr">{{ translationOf(line.time) }}</span>
           <span v-if="romanOf(line.time)" class="tr">{{ romanOf(line.time) }}</span>
-        </button>
+          </button>
+          <!-- 间奏点（v6.44）：长间奏时渲染呼吸点，随时间逐个点亮；点击跳过间奏 -->
+          <div
+            v-if="activeInterlude && activeInterlude.afterIndex === i"
+            class="ly-dots"
+            role="button"
+            tabindex="0"
+            aria-label="跳过间奏"
+            @click="emit('seek', activeInterlude.endTime)"
+            @keydown.enter="emit('seek', activeInterlude.endTime)"
+          >
+            <span
+              v-for="di in [0, 1, 2]"
+              :key="di"
+              class="ly-dot"
+              :style="{ '--dp': dotFill(di) }"
+            />
+          </div>
+        </template>
       </div>
     </div>
 
@@ -737,6 +773,29 @@ onBeforeUnmount(() => {
   opacity: 1;
   transform: scale(1);
   cursor: default;
+}
+
+/* 间奏点（v6.44，AMLL 的 interlude dots）：长间奏时渲染呼吸点，
+   随间奏进度逐个点亮；点击跳过间奏。缩进与歌词行文字对齐 */
+.ly-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.35em 1em;
+  cursor: pointer;
+}
+
+.ly-dot {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: var(--text-1);
+  transform: scale(calc(0.55 + var(--dp, 0) * 0.45));
+  opacity: calc(0.25 + var(--dp, 0) * 0.75);
+}
+
+.lyline.current + .ly-dots .ly-dot {
+  background: var(--accent);
 }
 
 /* 翻译行（v6.40；v6.41 按 AMLL 的 lyricSubLine 重调）：

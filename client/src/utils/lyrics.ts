@@ -96,6 +96,32 @@ function parseWordTags(body: string, base: number): LyricWord[] | null {
   return words.length > 0 ? words : null;
 }
 
+/**
+ * 间奏段（v6.44，AMLL 的间奏点）：相邻两行起点间隔 ≥ minGapSeconds 时，
+ * 视为一段无词区间（前奏 / 间奏 / 尾奏），调用方（LyricsView）在其间渲染呼吸点。
+ * afterIndex = 间奏**前**那行的下标（点渲染在该行之后）。
+ */
+export interface LyricInterlude {
+  afterIndex: number;
+  startTime: number;
+  endTime: number;
+}
+
+export function findInterludes(
+  lines: readonly LyricLine[],
+  minGapSeconds = 8,
+): LyricInterlude[] {
+  const out: LyricInterlude[] = [];
+  for (let i = 0; i + 1 < lines.length; i += 1) {
+    const startTime = lines[i].time;
+    const endTime = lines[i + 1].time;
+    if (endTime - startTime >= minGapSeconds) {
+      out.push({ afterIndex: i, startTime, endTime });
+    }
+  }
+  return out;
+}
+
 export function parseLyrics(raw: string): ParsedLyrics {
   const lines: LyricLine[] = [];
   let hasWordTiming = false;

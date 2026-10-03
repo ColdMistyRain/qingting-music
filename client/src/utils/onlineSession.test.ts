@@ -20,7 +20,7 @@ beforeEach(() => {
   } as Storage;
 });
 
-const PROFILE: OnlineProfile = { userId: "77", nickname: "夜行客", avatarUrl: null };
+const PROFILE: OnlineProfile = { userId: "77", nickname: "夜行客", avatarUrl: null, vip: false };
 
 function session(overrides: Partial<OnlineSession> = {}): OnlineSession {
   return {

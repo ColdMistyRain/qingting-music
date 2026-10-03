@@ -463,10 +463,13 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
         const userId = asId(profile.userId) || asString(profile.userId).trim();
         const nickname = asString(profile.nickname).trim();
         if (!userId || !nickname) return null;
+        // vipType > 0 = 会员（决定 VIP 曲目的行内标语义：能完整播，标「VIP」而非「试听」）
+        const vipType = Number(profile.vipType);
         return {
           userId,
           nickname,
           avatarUrl: asString(profile.avatarUrl).trim() || null,
+          vip: Number.isFinite(vipType) && vipType > 0,
         };
       },
 

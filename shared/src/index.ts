@@ -94,12 +94,15 @@ export interface OnlineLyricsInfo {
 }
 
 /* ---------- 音源账号（ON-10，v6.30：扫码登录，听自己收藏的歌）---------- */
-/** 音源账号资料（登录后展示用；只取界面需要的三个字段） */
+/** 音源账号资料（登录后展示用；只取界面需要的字段） */
 export interface OnlineProfile {
   /** 音源内的用户 id（拉歌单要用） */
   userId: string;
   nickname: string;
   avatarUrl: string | null;
+  /** 是否会员（网易 vipType > 0）：决定 VIP 曲目的行内标语义（v6.37）——
+   *  会员看 vipOnly 曲目是「VIP」（能完整播），非会员才是「VIP + 试听」。 */
+  vip?: boolean;
 }
 
 /**

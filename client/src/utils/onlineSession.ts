@@ -31,6 +31,11 @@ function isProfile(value: unknown): value is OnlineProfile {
   return typeof raw.userId === "string" && typeof raw.nickname === "string";
 }
 
+/** profile 从存储里读回来时补齐 vip（旧格式没有这个字段） */
+function normalizeProfile(raw: OnlineProfile): OnlineProfile {
+  return { ...raw, vip: raw.vip === true };
+}
+
 function parse(raw: string | null, provider: string): OnlineSession | null {
   if (!raw) return null;
   let data: unknown;
@@ -50,7 +55,7 @@ function parse(raw: string | null, provider: string): OnlineSession | null {
   return {
     provider,
     cookie,
-    profile: isProfile(candidate.profile) ? candidate.profile : null,
+    profile: isProfile(candidate.profile) ? normalizeProfile(candidate.profile) : null,
     loggedInAt: typeof candidate.loggedInAt === "string" ? candidate.loggedInAt : null,
   };
 }

@@ -201,6 +201,7 @@ describe("在线音源路由 · 账号与收藏夹（ON-10，会话存前端 v6.
       userId: "77",
       nickname: "夜行客",
       avatarUrl: "https://p1.music.126.net/a.jpg",
+      vip: false,
     });
 
     // 浏览器存下会话后带头来验：仍有效

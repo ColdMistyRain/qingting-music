@@ -7,6 +7,7 @@ import IconMusicNotes from "~icons/ph/music-notes";
 import IconX from "~icons/ph/x";
 import AppTooltip from "@/components/AppTooltip.vue";
 import { onlineProviderLabel } from "@/utils/onlineTracks";
+import { useOnlineStore } from "@/stores/online";
 import { formatTime } from "@/utils/format";
 
 /**
@@ -62,16 +63,23 @@ const sourceLabel = computed(() => {
  * - VIP 专享（vipOnly）：给「VIP」+「试听」两枚 —— VIP 说明为什么只能试听
  *   （需求方："加上vip标识说明播放这个需要vip"），与网易云自家列表一致。
  */
+const online = useOnlineStore();
+/** 观看者是否网易云会员（会话里的 profile.vip）：VIP 曲目的标记语义随它变 */
+const viewerVip = computed(() => online.profile?.vip === true);
+
 const rowFlags = computed<{ label: string; title: string }[]>(() => {
   if (props.track.source !== "online") return [];
   if (props.track.unavailable === true) {
     return [{ label: "无版权", title: "音源标注暂无版权，无法播放" }];
   }
   if (props.track.vipOnly === true) {
-    return [
-      { label: "VIP", title: "VIP 专享曲目，播放需要会员" },
-      { label: "试听", title: "非会员账号只能试听片段" },
-    ];
+    // 会员看 VIP 曲目是「VIP」（能完整播）；非会员才是「VIP + 试听」（v6.37）
+    return viewerVip.value
+      ? [{ label: "VIP", title: "VIP 专享曲目，会员可完整播放" }]
+      : [
+          { label: "VIP", title: "VIP 专享曲目，播放需要会员" },
+          { label: "试听", title: "非会员账号只能试听片段" },
+        ];
   }
   return [];
 });

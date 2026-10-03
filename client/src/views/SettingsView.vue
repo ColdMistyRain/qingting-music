@@ -271,6 +271,7 @@ async function signOut(): Promise<void> {
           <span>{{ config.error }}</span>
           <button class="btn btn-quiet" @click="config.load(true)">重试</button>
         </div>
+        <!-- 音源与账号合并为一张卡（v6.37，需求方："这两个能合并吗？同时显示以登录的用户有没有vip"） -->
         <div class="set-card card">
           <b>网易云</b>
           <div class="set-row">
@@ -279,22 +280,16 @@ async function signOut(): Promise<void> {
               {{ config.onlineEnabled ? "可用" : "不可用" }}
             </span>
           </div>
-          <div class="set-note">
-            音源随服务端内置（v6.29），开箱可用；部署者也可以用环境变量
-            NETEASE_API_BASE 改接自己部署的音源服务。
-          </div>
-        </div>
-        <div class="set-card card">
-          <b>网易云账号</b>
           <div class="set-row">
-            <span>登录状态</span>
+            <span>账号</span>
             <span v-if="online.loggedIn" class="badge badge--accent">
               已登录 · {{ online.profile?.nickname ?? "网易云账号" }}
+              <span v-if="online.profile?.vip" class="vip-tag">VIP</span>
             </span>
             <span v-else class="badge">未登录</span>
           </div>
           <div class="set-row">
-            <span>收藏的歌单</span>
+            <span />
             <button v-if="!online.loggedIn" class="btn btn-primary" @click="openQr">
               <IconSignIn class="icon" />
               扫码登录
@@ -305,8 +300,10 @@ async function signOut(): Promise<void> {
             </button>
           </div>
           <div class="set-note">
-            登录后可以在「在线搜索」里打开这个账号收藏的歌单。会话保存在这台浏览器里，
-            不与其他浏览器或设备共享 —— 各自扫码、互不影响；清除浏览器数据会退出登录。
+            登录后可以在「在线搜索」里打开这个账号收藏的歌单；会员账号的 VIP
+            曲目可完整播放（列表里只标「VIP」），非会员则是试听片段（标「VIP +
+            试听」）。会话保存在这台浏览器里，不与其他浏览器或设备共享 ——
+            各自扫码、互不影响；清除浏览器数据会退出登录。
           </div>
         </div>
         <div class="set-card card">
@@ -540,5 +537,15 @@ async function signOut(): Promise<void> {
   border-radius: 1.5px;
   background: var(--text-2);
   transform: translateX(-50%);
+}
+/* 账号徽标里的 VIP 小签（v6.37） */
+.vip-tag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--accent);
 }
 </style>

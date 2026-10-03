@@ -410,12 +410,17 @@ describe("网易云适配器 · 账号与收藏夹（ON-10）", () => {
     expect(check.cookie).toEqual(["MUSIC_U=t", "__csrf_token=x"]);
   });
 
-  it("账号资料：登录有效时映射（数字 userId 转字符串）；会话无效给 null", async () => {
+  it("账号资料：登录有效时映射（数字 userId 转字符串、vipType>0 记为会员）；会话无效给 null", async () => {
     const ok = makeTransport({
       login_status: () => ({
         data: {
           code: 200,
-          profile: { userId: 12345, nickname: "夜行客", avatarUrl: "https://p1.music.126.net/a.jpg" },
+          profile: {
+            userId: 12345,
+            nickname: "夜行客",
+            avatarUrl: "https://p1.music.126.net/a.jpg",
+            vipType: 11,
+          },
         },
       }),
     });
@@ -423,10 +428,18 @@ describe("网易云适配器 · 账号与收藏夹（ON-10）", () => {
       userId: "12345",
       nickname: "夜行客",
       avatarUrl: "https://p1.music.126.net/a.jpg",
+      vip: true,
     });
 
     const bad = makeTransport({ login_status: () => ({ data: { code: 301 }, profile: null }) });
     expect(await bad.provider.account!.getProfile(["MUSIC_U=t"])).toBeNull();
+
+    const nonVip = makeTransport({
+      login_status: () => ({
+        data: { code: 200, profile: { userId: 1, nickname: "a", vipType: 0 } },
+      }),
+    });
+    expect((await nonVip.provider.account!.getProfile(["MUSIC_U=t"]))?.vip).toBe(false);
   });
 
   it("登录会话随请求进 transport（内嵌拼成 cookie 字符串），直链随之提档到 exhigh；exhigh 拿不到回落 standard", async () => {

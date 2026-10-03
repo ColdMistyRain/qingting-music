@@ -1,4 +1,9 @@
-import { UNKNOWN_ALBUM, UNKNOWN_ARTIST, type OnlineTrack } from "@qingting/shared";
+import {
+  UNKNOWN_ALBUM,
+  UNKNOWN_ARTIST,
+  type OnlinePlaylistInfo,
+  type OnlineTrack,
+} from "@qingting/shared";
 import { createRequire } from "node:module";
 import { UpstreamError, type OnlineProvider } from "./provider.js";
 
@@ -32,15 +37,20 @@ const SEARCH_LIMIT = 30;
 export interface NeteaseUpstreamResponse {
   status: number;
   body: unknown;
+  /** 上游随响应下发的 Set-Cookie（登录扫码成功的会话就在这里） */
+  cookie: string[];
 }
 
 /**
- * 传输层：给一个**模块名**（如 `cloudsearch` / `song_url_v1`）与参数，拿回回应。
+ * 传输层：给一个**模块名**（如 `cloudsearch` / `song_url_v1`）、参数与会话 Cookie，拿回回应。
  * HTTP 与内嵌两种接法都归一成这个形状，下面的映射代码对两者无感。
+ * cookie 由 provider 方法按需传入（未登录为 undefined）：内嵌库吃 `k=v; k=v` 字符串，
+ * HTTP 侧转成 Cookie 头 —— 两种接法都不让它进 URL。
  */
 export type NeteaseTransport = (
   moduleName: string,
   params: Record<string, unknown>,
+  cookie?: string[],
 ) => Promise<NeteaseUpstreamResponse>;
 
 /** 内嵌库的形状（只用得到这四个模块；`require` 拿到的远不止，收窄到我们用的） */
@@ -83,19 +93,23 @@ function createHttpTransport(options: {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs;
 
-  return async (moduleName, params) => {
+  return async (moduleName, params, cookie) => {
     if (typeof fetchImpl !== "function") {
       throw new UpstreamError("当前环境没有可用的 fetch");
     }
     const query = new URLSearchParams(
       Object.entries(params).map(([key, value]) => [key, String(value)]),
     ).toString();
+    const headers: Record<string, string> = {};
+    // 会话 Cookie 走头、不进 URL（查询串会进日志与代理日志）
+    if (cookie && cookie.length > 0) headers.Cookie = cookie.join("; ");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res: Response;
     try {
       res = await fetchImpl(`${baseUrl}/${moduleName.replace(/_/g, "/")}?${query}`, {
         signal: controller.signal,
+        headers,
       });
     } catch (cause) {
       throw new UpstreamError(`音源请求失败：${cause instanceof Error ? cause.message : cause}`);
@@ -105,8 +119,14 @@ function createHttpTransport(options: {
     if (!res.ok) {
       throw new UpstreamError(`音源返回 HTTP ${res.status}`, res.status);
     }
+    let setCookies: string[] = [];
     try {
-      return { status: res.status, body: await res.json() };
+      setCookies = res.headers.getSetCookie();
+    } catch {
+      // 老运行时没有 getSetCookie：登录流程走内嵌模式，这里不致命
+    }
+    try {
+      return { status: res.status, body: await res.json(), cookie: setCookies };
     } catch {
       throw new UpstreamError("音源返回的不是 JSON", res.status);
     }
@@ -115,16 +135,16 @@ function createHttpTransport(options: {
 
 /** 内嵌库：直接函数调用；没有的模块 / 非 2xx 一律按上游故障处理（与 HTTP 同一口径） */
 function createEmbeddedTransport(options: { timeoutMs: number }): NeteaseTransport {
-  return async (moduleName, params) => {
+  return async (moduleName, params, cookie) => {
     const lib = loadNeteaseLib();
     const fn = lib[moduleName];
     if (typeof fn !== "function") {
       throw new UpstreamError(`内嵌网易云音源没有 ${moduleName} 这个模块`);
     }
-    let result: { status: number; body: unknown };
+    let result: { status: number; body: unknown; cookie?: unknown };
     try {
       result = await withTimeout(
-        Promise.resolve().then(() => fn(params)),
+        Promise.resolve().then(() => fn({ ...params, cookie: cookie?.join("; ") ?? "" })),
         options.timeoutMs,
         "内嵌网易云音源请求超时",
       );
@@ -135,7 +155,13 @@ function createEmbeddedTransport(options: { timeoutMs: number }): NeteaseTranspo
     if (!Number.isInteger(result.status) || result.status < 200 || result.status > 299) {
       throw new UpstreamError(`音源返回 HTTP ${result.status}`, result.status);
     }
-    return { status: result.status, body: result.body };
+    return {
+      status: result.status,
+      body: result.body,
+      cookie: Array.isArray(result.cookie)
+        ? result.cookie.filter((item): item is string => typeof item === "string")
+        : [],
+    };
   };
 }
 
@@ -219,10 +245,17 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
       ? createHttpTransport({ baseUrl: options.baseUrl, fetchImpl: options.fetchImpl, timeoutMs })
       : createEmbeddedTransport({ timeoutMs }));
 
-  /** 调一个上游模块并把 body 归一成对象（HTTP 那条已在 transport 里解析过 JSON） */
-  async function call(moduleName: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const { body } = await transport(moduleName, params);
-    return body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  /** 调一个上游模块；body 归一成对象，cookie 原样带回（登录扫码要用） */
+  async function call(
+    moduleName: string,
+    params: Record<string, unknown>,
+    cookie?: string[],
+  ): Promise<{ body: Record<string, unknown>; cookie: string[] }> {
+    const res = await transport(moduleName, params, cookie);
+    return {
+      body: res.body && typeof res.body === "object" ? (res.body as Record<string, unknown>) : {},
+      cookie: res.cookie,
+    };
   }
 
   function mapSong(raw: NeteaseSearchSong): OnlineTrack | null {
@@ -245,36 +278,39 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
   return {
     id: "netease",
 
-    async search(keyword) {
-      const payload = await call("cloudsearch", {
-        keywords: keyword,
-        type: 1,
-        limit: SEARCH_LIMIT,
-      });
-      const result = payload.result as { songs?: NeteaseSearchSong[] } | undefined;
+    async search(keyword, cookie) {
+      const { body } = await call("cloudsearch", { keywords: keyword, type: 1, limit: SEARCH_LIMIT }, cookie);
+      const result = body.result as { songs?: NeteaseSearchSong[] } | undefined;
       const songs = result?.songs ?? [];
       // 单条缺 id/名字就跳过那一行，别让一条脏数据把整个搜索搞挂
       return songs.map(mapSong).filter((track): track is OnlineTrack => track !== null);
     },
 
-    async getStreamUrl(id) {
+    async getStreamUrl(id, cookie) {
+      const loggedIn = Boolean(cookie && cookie.length > 0);
+      // 登录后提档到 exhigh（320k，VIP 曲目才有完整试听）；匿名保持 standard。
+      // 拿不到时（免费账号对 VIP 曲目等）再用 standard 兜底试一次。
       // randomCNIP：部分受限曲目用国内 IP 形状请求成功率更高；https=true：让上游直接给
       // https 直链（参考 Folia 的接入实践）。旧的 API 分支不认这两个参数也无妨。
-      const payload = await call("song_url_v1", { id, level: "standard", randomCNIP: true, https: true });
-      const data = payload.data as Array<{ url?: unknown }> | undefined;
-      const url = asString(data?.[0]?.url).trim();
+      const requestUrl = async (level: string) => {
+        const { body } = await call("song_url_v1", { id, level, randomCNIP: true, https: true }, cookie);
+        const data = body.data as Array<{ url?: unknown }> | undefined;
+        return asString(data?.[0]?.url).trim();
+      };
+      let url = await requestUrl(loggedIn ? "exhigh" : "standard");
+      if (!url && loggedIn) url = await requestUrl("standard");
       if (!url) return null;
       // 上游仍给 http:// 时（旧版服务）本地再升一次 https：HTTPS 部署下浏览器会把
       // http 直链当混合内容拦掉，而这套 CDN 的签名路径在 https 下同样有效
       return url.replace(/^http:\/\//, "https://");
     },
 
-    async getLyrics(id) {
+    async getLyrics(id, cookie) {
       // lyric_new 才带逐字 yrc；旧版服务没有它（404）就回落 lyric
       try {
-        const payload = await call("lyric_new", { id });
-        const yrc = payload.yrc as { lyric?: unknown } | undefined;
-        const lrc = payload.lrc as { lyric?: unknown } | undefined;
+        const { body } = await call("lyric_new", { id }, cookie);
+        const yrc = body.yrc as { lyric?: unknown } | undefined;
+        const lrc = body.lrc as { lyric?: unknown } | undefined;
         const text = asString(yrc?.lyric).trim() || asString(lrc?.lyric).trim();
         return text || null;
       } catch (error) {
@@ -283,8 +319,8 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
           throw error;
         }
       }
-      const payload = await call("lyric", { id, lv: -1, kv: -1, tv: -1, rv: -1 });
-      const lrc = payload.lrc as { lyric?: unknown } | undefined;
+      const { body } = await call("lyric", { id, lv: -1, kv: -1, tv: -1, rv: -1 }, cookie);
+      const lrc = body.lrc as { lyric?: unknown } | undefined;
       const text = asString(lrc?.lyric).trim();
       return text || null;
     },
@@ -299,6 +335,97 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
       if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
       // 只放行网易云自家图片 CDN：p1.music.126.net / music.126.net …
       return parsed.hostname === "music.126.net" || parsed.hostname.endsWith(".music.126.net");
+    },
+
+    /* ---------- 账号（ON-10，v6.30：扫码登录）---------- */
+
+    account: {
+      async createLogin() {
+        const keyRes = await call("login_qr_key", {});
+        const keyData = keyRes.body.data as { unikey?: unknown } | undefined;
+        const key = asId(keyData?.unikey) || asString(keyData?.unikey).trim();
+        const qrRes = await call("login_qr_create", { key, qrimg: true });
+        const qrData = qrRes.body.data as { qrimg?: unknown } | undefined;
+        const qrDataUrl = asString(qrData?.qrimg).trim();
+        if (!key || !qrDataUrl) throw new UpstreamError("拿不到登录二维码");
+        return { key, qrDataUrl };
+      },
+
+      async checkLogin(key) {
+        const res = await call("login_qr_check", { key });
+        // code：801 等待扫码 / 802 已扫待确认 / 803 成功（会话在响应的 Set-Cookie 里）/ 800 过期
+        const code = Number(res.body.code);
+        if (code === 803) return { state: "success" as const, cookie: res.cookie };
+        if (code === 802) return { state: "scanned" as const, cookie: [] };
+        if (code === 800) return { state: "expired" as const, cookie: [] };
+        return { state: "waiting" as const, cookie: [] };
+      },
+
+      async getProfile(cookie) {
+        const { body } = await call("login_status", {}, cookie);
+        const data = body.data as
+          | { code?: unknown; profile?: Record<string, unknown> }
+          | undefined;
+        if (!data || Number(data.code) !== 200 || !data.profile) return null;
+        const profile = data.profile;
+        const userId = asId(profile.userId) || asString(profile.userId).trim();
+        const nickname = asString(profile.nickname).trim();
+        if (!userId || !nickname) return null;
+        return {
+          userId,
+          nickname,
+          avatarUrl: asString(profile.avatarUrl).trim() || null,
+        };
+      },
+
+      async logout(cookie) {
+        // 尽力而为：让上游注销这个会话；本地的凭据由路由层负责清
+        await call("logout", {}, cookie).catch(() => undefined);
+      },
+    },
+
+    /* ---------- 收藏夹（登录后听自己在音源收的歌）---------- */
+
+    collections: {
+      async getPlaylists(userId, cookie) {
+        const { body } = await call("user_playlist", { uid: userId, limit: 1000 }, cookie);
+        const raw = body.playlist as Array<Record<string, unknown>> | undefined;
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .map((entry): OnlinePlaylistInfo | null => {
+            const id = asId(entry.id) || asString(entry.id).trim();
+            const name = asString(entry.name).trim();
+            if (!id || !name) return null;
+            return {
+              id,
+              name,
+              cover: asString(entry.coverImgUrl).trim() || null,
+              trackCount: Number(entry.trackCount) || 0,
+            };
+          })
+          .filter((entry): entry is OnlinePlaylistInfo => entry !== null);
+      },
+
+      async getPlaylistTracks(playlistId, cookie) {
+        // 分页拉全（一页 500，防特别大的收藏夹）；单曲形状与搜索结果一致，走同一个 mapSong
+        const tracks: OnlineTrack[] = [];
+        const PAGE = 500;
+        for (let offset = 0; offset < 2000; offset += PAGE) {
+          const { body } = await call(
+            "playlist_track_all",
+            { id: playlistId, limit: PAGE, offset },
+            cookie,
+          );
+          const songs = body.songs as NeteaseSearchSong[] | undefined;
+          const page = Array.isArray(songs) ? songs : [];
+          for (const raw of page) {
+            const track = mapSong(raw);
+            if (track) tracks.push(track);
+          }
+          if (page.length < PAGE) break;
+        }
+        return tracks;
+      },
     },
   };
 }

@@ -67,10 +67,11 @@ server/src/services/jsonStore.ts  单文件 JSON 存储的**唯一实现**（原
 server/src/services/fileStream.ts 流式响应唯一入口 `pipeFile`（v6.8）：源流挂 error + 响应结束时销毁源流 ——
                           **别再写 `createReadStream(...).pipe(res)`**（文件在 stat 之后被删 = 未捕获异常 = 进程退出）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
-server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/改元信息/换封面/设歌词）、audio（/audio + /covers）、stats、playlists、online（/api/online/:provider 的 search/stream/lyrics/cover，访客级 - ON-01~05 / v6.28）
-server/src/services/online/  音源适配层（ON-01）：provider.ts 定义 OnlineProvider 接口 + `resolveProvider`（**加新音源只改这一处**）；netease.ts 网易云适配器，上游是**可注入的 transport** ——
+server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/改元信息/换封面/设歌词）、audio（/audio + /covers）、stats、playlists、online（/api/online/:provider 的 search/stream/lyrics/cover/login/collections，访客级 - ON-01~05 / v6.28 + ON-10 / v6.30）
+server/src/services/online/credentials.ts  音源账号会话落盘（data/online-auth.json，**整个部署共享一份**；jsonStore 原子写 + 逐字段清洗）- ON-10 / v6.30
+server/src/services/online/  音源适配层（ON-01）：provider.ts 定义 OnlineProvider 接口 + `resolveProvider`（**加新音源只改这一处**；接口上有可选的 `account`/`collections` 能力 —— 扫码登录与收藏夹，ON-10）；netease.ts 网易云适配器，上游是**可注入的 transport** ——
                           ① 内嵌库（**v6.29 默认**）：`@neteasecloudmusicapienhanced/api`（MIT）按模块名函数调用，部署零配置；
-                          ② 外接自部署服务：配 `NETEASE_API_BASE` 走 HTTP（docker 版 / 换分支时用）。两种接法共享同一套字段映射。
+                          ② 外接自部署服务：配 `NETEASE_API_BASE` 走 HTTP（docker 版 / 换分支时用）。两种接法共享同一套字段映射与 Cookie 会话（登录后直链提档 exhigh）。
                           **封面上游必须过 `canProxyCover` 白名单**（cover 代理是"服务端替人发请求"的口子，只放行音源自家 CDN）
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen
 client/src/assets/        logo-mark.png（品牌标记：透明底单色，供 `.brand-mark` 遮罩上色；水印已裁掉）
@@ -82,7 +83,7 @@ client/src/styles/        tokens.css（令牌 + OKLCH 取色核心；浮层滚�
                           播放条只把方向翻上来；大柔影只给真浮层（v6.7）
 client/src/layouts/       PlayerLayout（侧栏+内容+播放条，含空格键快捷键）、ConsoleLayout（控制台独立布局）
 client/src/router/        路由表 + 守卫（身份决定可达页面）
-client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、
+client/src/stores/        auth、config、theme、online（音源账号与收藏夹：登录态/歌单列表/当前打开的一份歌单 - ON-10 / v6.30）、player（播放器单例：队列/模式/进度/音量/单例 audio）、
                           listening（收藏与最近播放：数据在服务端 data/listening.json - PS-05）、
                           library、transfer（本地列表→上传页的 File 交接 - LC-07）
 client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息与封面 / 排序下标 - v6.14；在线条目在 onlineEnabled 时给 url 空串的可播 Track - v6.28）、
@@ -120,6 +121,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           QueuePopover（PL-06，两套壳层：桌面 Reka Popover 浮层 / 手机 Reka Dialog 半屏底部抽屉 - v5.40）、
                           QueuePanel（队列内容：标题行 + 清空 + 列表，两壳共用一份 - v5.40）、
                           ConfirmDialog（应用内二次确认：Reka Dialog + 自绘玻璃，挂 App.vue 全站一份 - v5.53）、
+                          OnlineQrDialog（音源扫码登录弹窗：轮询 801/802/803/800、过期给重新取码；与 ConfirmDialog 同一套弹窗约定 - ON-10 / v6.30）、
                           ProgressBar（自绘进度条：轨道+填充+手柄+`role`/`aria-*`/键盘，播放条与沉浸页**共用一份** - v6.12）、
                           Slider（自绘滑杆：竖=音量条与均衡器十根竖杆、横=整体增益；几何在 utils/slider.ts - PL-13）、
                           AppSelect（下拉选择**唯一实现**：Reka Select 行为层 + 自绘面板；宿主差异用 :deep(.as-trigger) 覆盖档位 - v6.25）、
@@ -165,6 +167,8 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 **长列表虚拟滚动（v6.27，LB-08）**：需求方选中这一项时定调“**选择虚拟滚动，但是你得把后果给记下来**”。620 首的曲库现在 DOM 里只有 13–22 行（`utils/virtualList.ts` 纯函数 + `composables/useVirtualList.ts`；已覆盖**音乐库 / 本地列表（`TrackList`）、控制台曲库管理、收藏 / 最近播放**三处），`scrollHeight` 与“滚到哪一行、贴顶的就是哪一首”与全量渲染**逐像素一致**（实测滚动条总长恒为 47108 = 620×76−12，滚到 200×76 贴顶就是 Track 0200）。**为什么不分页**（PRD 5.6.2 那份 `?page=&pageSize=` 契约仍未启用）：LB-07 搜索、LB-04 排序与“点播时把眼前这段整份当队列”全靠整份数据，接口一分页搜索就只搜当前页；620 首的 JSON 才 130 KB，瓶颈是 DOM 行数而不是传输量。**后果**：DOM 行数不再等于曲库条数（别用它数条数）、行会按窗口重挂（行内状态须挂数据）、阈值 100 以下整份渲染（行为随条数分档）、找不到能滚的祖先就整份渲染（不赌）、歌单拖拽排序列表**故意不虚拟化**。详见 PRD 决策记录 v6.27。
 
 **在线音源（v6.28，ON-01~05 P1 全落地）**：后端 `server/src/services/online/`（适配层 + 网易云适配器）+ `/api/online/:provider/` 四个口（search / stream / lyrics / **cover 代理**——封面要进 canvas 取色（VS-02），必须同源；代理带 `canProxyCover` 白名单防 SSRF）；`NETEASE_API_BASE` 配置即启用（ON-04，重启生效、前端零改动，未配置时路由 404 + 页面隐藏）。前端：`OnlineView` 真实搜索页（复用 TrackList/TrackRow，搜索防抖 500ms + 序号判 stale）；**播放直链是会过期的签名地址，队列与存档里的在线曲目 url 一律空串、开播前现解析**（`utils/onlineTracks` + player store 的 `resolveOnlineUrl`，同 id 并发去重，解析成功回填 Track）；**VIP/无版权（url: null）= 说清楚并停下，不自动跳歌**（与坏文件 3 秒跳的取舍见 PRD v6.28）；歌词走 `lyricsText`（优先级仍手动>内嵌>在线，store 带 30 首会话缓存 —— 不缓存"切走再切回"就没了）；收藏/最近播放/歌单的在线条目用 `provider:id` 引用（音源已配置即可播，`resolvePlaylistEntry` 已接）；播放存档保留在线曲目但**置空直链**（恢复后首播时重解析，进度照续）。实测：本地假上游 + dev 全链路（搜索映射 / 真实出声 / VIP 提示 / 沉浸页歌词高亮 / 收藏 / 刷新恢复）全部通过。**v6.29 更新：音源内嵌进 server** —— `@neteasecloudmusicapienhanced/api`（MIT）以库形态随 server 安装、**部署零配置**（`NETEASE_API_BASE` 从总开关降级为"外接自部署服务"的可选覆盖，`onlineEnabled` 恒真），适配器上游抽成可注入 transport（内嵌函数调用 / HTTP 透传），映射逻辑一行没改；**真实网易实测通过**（搜索、点播真实出声、歌词 LRC），生产构建（dist）同样可用。留白：QQ/酷狗（P2）、聚合搜索、多源回退、翻译歌词、VIP 徽标（数据已在 `vipOnly` 字段，渲染与否待需求方裁决）、网易账号登录、搜索结果跨页保留。
+
+**音源账号扫码登录（v6.30，ON-10）**：需求方要"听自己在不同平台上收藏的歌"。会话存服务端（`data/online-auth.json`，**整个部署共享一份**，Cookie 不出这台机器）；Provider 接口新增可选能力 `account`（扫码登录四步：取 key → 取二维码 → 轮询 801/802/800 → 803 时 Set-Cookie 落盘）与 `collections`（`user_playlist` 歌单列表 + `playlist_track_all` 分页拉全）。登录同时把直链档位提到 exhigh（320k）—— **VIP 曲目这才真的能完整听**。前端：设置 › 在线音源 账号卡片（扫码/退出）、OnlineQrDialog 扫码弹窗（与 ConfirmDialog 同一套约定）、在线搜索页登录后出现「我的歌单」下拉（选中整单加载、搜索收起；歌单放 store，跳沉浸页回来还在）。实测：真网易二维码生成/轮询/401 引导/回归播放全通过；**真机扫码到歌单那一步留给需求方**。留白：QQ/酷狗扫码（随适配器）、多账号、会话过期重登提示。
 
 **下一步**（建议顺序）：**数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件；在线音源 P1 已交，P2 的 QQ/酷狗/聚合搜索按需求方节奏排）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 

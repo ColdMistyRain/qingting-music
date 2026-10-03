@@ -2,15 +2,26 @@ import { Router } from "express";
 import type { AppConfig } from "../config.js";
 import { asyncHandler, sendFail, sendOk } from "../http.js";
 import { requireAccess } from "../middleware/auth.js";
+import {
+  clearProviderLogin,
+  loadProviderCredentials,
+  saveProviderLogin,
+} from "../services/online/credentials.js";
 import { UpstreamError, resolveProvider } from "../services/online/provider.js";
 
 /**
  * 在线音源（PRD 3.5 / 5.6：`GET /api/online/:provider/...`）。
  *
- *   GET /api/online/:provider/search?keywords=  搜索（ON-02），统一格式 OnlineTrack[]
- *   GET /api/online/:provider/stream?id=        播放直链（ON-03），{ url }；null = 无可用音源
- *   GET /api/online/:provider/lyrics?id=        歌词原文（ON-05），{ lyrics }；null = 没有
- *   GET /api/online/:provider/cover?url=        封面代理（VS-02 取色要 same-origin；白名单见适配器）
+ *   GET    /api/online/:provider/search?keywords=   搜索（ON-02），统一格式 OnlineTrack[]
+ *   GET    /api/online/:provider/stream?id=         播放直链（ON-03），{ url }；null = 无可用音源
+ *   GET    /api/online/:provider/lyrics?id=         歌词原文（ON-05），{ lyrics }；null = 没有
+ *   GET    /api/online/:provider/cover?url=         封面代理（VS-02 取色要 same-origin；白名单见适配器）
+ *   POST   /api/online/:provider/login/qr           生成扫码登录二维码（ON-10）
+ *   GET    /api/online/:provider/login/check?key=   轮询扫码状态；成功即落盘会话
+ *   GET    /api/online/:provider/login              当前记着的音源账号
+ *   DELETE /api/online/:provider/login              退出（上游注销 + 清本地凭据）
+ *   GET    /api/online/:provider/collections        账号在音源里的歌单（收藏夹）
+ *   GET    /api/online/:provider/collections/:id    一份歌单的全部曲目
  *
  * 权限：AC-03 把"在线音源搜索播放"归**访客级**，四个口都是 `visitor`。
  *
@@ -109,6 +120,171 @@ export function createOnlineRouter(config: AppConfig): Router {
       }
       try {
         sendOk(res, { lyrics: await provider.getLyrics(id) });
+      } catch (error) {
+        if (error instanceof UpstreamError) {
+          sendFail(res, 502, "音源暂时连不上，稍后再试");
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
+
+  /* ---------- 账号（ON-10：扫码登录，听自己在音源收的歌）---------- */
+
+  router.post(
+    "/:provider/login/qr",
+    requireAccess("visitor"),
+    asyncHandler(async (req, res) => {
+      const provider = resolveProvider(config, String(req.params.provider));
+      if (!provider?.account) {
+        sendFail(res, 404, "这个音源不支持账号登录");
+        return;
+      }
+      try {
+        sendOk(res, await provider.account.createLogin());
+      } catch (error) {
+        if (error instanceof UpstreamError) {
+          sendFail(res, 502, "音源暂时连不上，稍后再试");
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
+
+  router.get(
+    "/:provider/login/check",
+    requireAccess("visitor"),
+    asyncHandler(async (req, res) => {
+      const provider = resolveProvider(config, String(req.params.provider));
+      if (!provider?.account) {
+        sendFail(res, 404, "这个音源不支持账号登录");
+        return;
+      }
+      const key = String(req.query.key ?? "");
+      if (!key) {
+        sendFail(res, 400, "缺少轮询 key");
+        return;
+      }
+      try {
+        const check = await provider.account.checkLogin(key);
+        if (check.state !== "success" || check.cookie.length === 0) {
+          sendOk(res, { state: check.state, profile: null });
+          return;
+        }
+        // 成功：会话落盘（整个 server 共享这一份），顺带把账号资料带回去。
+        // 资料偶尔拉不到（上游抖动）也不影响登录 —— 会话已有效，收藏夹路由会自愈补拉
+        const profile = await provider.account.getProfile(check.cookie);
+        await saveProviderLogin(config.dataDir, provider.id, { cookie: check.cookie, profile });
+        sendOk(res, { state: check.state, profile });
+      } catch (error) {
+        if (error instanceof UpstreamError) {
+          sendFail(res, 502, "音源暂时连不上，稍后再试");
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
+
+  router.get(
+    "/:provider/login",
+    requireAccess("visitor"),
+    asyncHandler(async (req, res) => {
+      const provider = resolveProvider(config, String(req.params.provider));
+      if (!provider?.account) {
+        sendFail(res, 404, "这个音源不支持账号登录");
+        return;
+      }
+      const credentials = await loadProviderCredentials(config.dataDir, provider.id);
+      sendOk(res, {
+        loggedIn: credentials.cookie.length > 0,
+        profile: credentials.profile,
+      });
+    }),
+  );
+
+  router.delete(
+    "/:provider/login",
+    requireAccess("visitor"),
+    asyncHandler(async (req, res) => {
+      const provider = resolveProvider(config, String(req.params.provider));
+      if (!provider?.account) {
+        sendFail(res, 404, "这个音源不支持账号登录");
+        return;
+      }
+      const credentials = await loadProviderCredentials(config.dataDir, provider.id);
+      if (credentials.cookie.length > 0) {
+        await provider.account.logout(credentials.cookie);
+      }
+      await clearProviderLogin(config.dataDir, provider.id);
+      sendOk(res, { id: provider.id });
+    }),
+  );
+
+  /* ---------- 收藏夹（登录后能听自己在音源收的歌）---------- */
+
+  router.get(
+    "/:provider/collections",
+    requireAccess("visitor"),
+    asyncHandler(async (req, res) => {
+      const provider = resolveProvider(config, String(req.params.provider));
+      if (!provider?.collections) {
+        sendFail(res, 404, "这个音源不支持收藏夹");
+        return;
+      }
+      const credentials = await loadProviderCredentials(config.dataDir, provider.id);
+      let profile = credentials.profile;
+      // 自愈：会话在但资料缺失（登录那会儿上游抖了一下）—— 现补拉一次并落盘
+      if (credentials.cookie.length > 0 && !profile) {
+        profile = await provider.account?.getProfile(credentials.cookie).catch(() => null) ?? null;
+        if (profile) {
+          await saveProviderLogin(config.dataDir, provider.id, {
+            cookie: credentials.cookie,
+            profile,
+          });
+        }
+      }
+      if (credentials.cookie.length === 0 || !profile?.userId) {
+        sendFail(res, 401, "还没有登录这个音源的账号，先到 设置 › 在线音源 扫码登录");
+        return;
+      }
+      try {
+        const playlists = await provider.collections.getPlaylists(profile.userId, credentials.cookie);
+        sendOk(res, { playlists });
+      } catch (error) {
+        if (error instanceof UpstreamError) {
+          sendFail(res, 502, "音源暂时连不上，稍后再试");
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
+
+  router.get(
+    "/:provider/collections/:playlistId",
+    requireAccess("visitor"),
+    asyncHandler(async (req, res) => {
+      const provider = resolveProvider(config, String(req.params.provider));
+      if (!provider?.collections) {
+        sendFail(res, 404, "这个音源不支持收藏夹");
+        return;
+      }
+      const playlistId = String(req.params.playlistId);
+      if (!ID_PATTERN.test(playlistId)) {
+        sendFail(res, 400, "歌单 id 不合法");
+        return;
+      }
+      const credentials = await loadProviderCredentials(config.dataDir, provider.id);
+      if (credentials.cookie.length === 0) {
+        sendFail(res, 401, "还没有登录这个音源的账号，先到 设置 › 在线音源 扫码登录");
+        return;
+      }
+      try {
+        const tracks = await provider.collections.getPlaylistTracks(playlistId, credentials.cookie);
+        sendOk(res, { tracks });
       } catch (error) {
         if (error instanceof UpstreamError) {
           sendFail(res, 502, "音源暂时连不上，稍后再试");

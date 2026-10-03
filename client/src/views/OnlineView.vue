@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
 import type { OnlineTrack } from "@qingting/shared";
 import { toPlaylistItem, type Track } from "@qingting/shared";
 import NavToggle from "@/components/NavToggle.vue";
+import AppSelect from "@/components/AppSelect.vue";
 import IconGlobe from "~icons/ph/globe";
 import IconMagnifyingGlass from "~icons/ph/magnifying-glass";
 import IconPlugsConnected from "~icons/ph/plugs-connected";
@@ -15,6 +17,7 @@ import { toOnlineTrack } from "@/utils/onlineTracks";
 import { debounce } from "@/utils/debounce";
 import { useConfigStore } from "@/stores/config";
 import { useListeningStore } from "@/stores/listening";
+import { useOnlineStore } from "@/stores/online";
 import { usePlayerStore } from "@/stores/player";
 
 /**
@@ -23,15 +26,30 @@ import { usePlayerStore } from "@/stores/player";
  *
  * 输入即时回显、搜索防抖 500ms（每次搜索都是一次上游请求，比本地过滤贵）；
  * 连续输入只认最后一次（序号判 stale，慢的旧响应不覆盖新结果）。
+ *
+ * 账号与收藏夹（ON-10 / v6.30）：登录后这一页多一个「我的歌单」下拉，选中即整单加载；
+ * 搜索会把它收起（搜索是新的意图）。歌单曲目放在 online store 里 —— 跳去沉浸页
+ * 再回来还在；搜索结果是页面状态、不留。
  */
 const config = useConfigStore();
 const listening = useListeningStore();
 const player = usePlayerStore();
+const online = useOnlineStore();
 
 onMounted(() => {
   // 行尾那枚收藏键要知道“收没收藏”，而收藏数据在服务端（PS-05）
   void listening.load();
+  void online.loadAccount();
 });
+
+// 登录态就绪后把歌单列表备好（一次轻请求；未登录时这步自动失败、静默）
+watch(
+  () => online.loggedIn,
+  (loggedIn) => {
+    if (loggedIn) void online.loadPlaylists(true);
+  },
+  { immediate: true },
+);
 
 const keyword = ref("");
 const status = ref<"idle" | "loading" | "ready" | "error">("idle");
@@ -46,6 +64,8 @@ async function search(raw: string): Promise<void> {
   const text = raw.trim();
   if (!text) return;
   const seq = ++searchSeq;
+  // 搜索是新的意图：收起正在看的歌单
+  online.closePlaylist();
   status.value = "loading";
   errorMessage.value = "";
   lastKeyword.value = text;
@@ -74,14 +94,46 @@ function submit(): void {
   void search(keyword.value);
 }
 
-const hasResults = computed(() => status.value === "ready" && tracks.value.length > 0);
-const noResults = computed(() => status.value === "ready" && tracks.value.length === 0);
+/* ---------- 我的歌单（ON-10） ---------- */
+
+const collectionMode = computed(() => online.activePlaylistId !== null);
+
+const pickerOptions = computed(() => [
+  {
+    value: "",
+    label: online.activePlaylistId ? "收起歌单，回到搜索" : "打开我的网易云歌单…",
+  },
+  ...online.playlists.map((entry) => ({
+    value: entry.id,
+    label: `${entry.name} · ${entry.trackCount} 首`,
+  })),
+]);
+
+function onPickerChange(value: string): void {
+  if (value === "") {
+    online.closePlaylist();
+    return;
+  }
+  void online.openPlaylist(value);
+}
+
+/** 展示给列表的曲目：歌单模式用 store 里那份，否则用搜索结果 */
+const displayTracks = computed<Track[]>(() =>
+  collectionMode.value ? online.collectionTracks : tracks.value,
+);
+
+const listStatus = computed<"idle" | "loading" | "ready" | "error">(() =>
+  collectionMode.value ? online.collectionStatus : status.value,
+);
+const listError = computed(() => (collectionMode.value ? online.collectionError : errorMessage.value));
+const hasResults = computed(() => listStatus.value === "ready" && displayTracks.value.length > 0);
+const noResults = computed(() => listStatus.value === "ready" && displayTracks.value.length === 0);
 
 function playAt(index: number): void {
-  const target = tracks.value[index];
+  const target = displayTracks.value[index];
   if (!target) return;
   player.clear();
-  player.addTracks(tracks.value);
+  player.addTracks(displayTracks.value);
   player.playAt(index);
 }
 
@@ -91,7 +143,7 @@ function isFavorite(track: Track): boolean {
 }
 
 function toggleFavorite(index: number): void {
-  const target = tracks.value[index];
+  const target = displayTracks.value[index];
   if (target) void listening.toggleFavorite(toPlaylistItem(target));
 }
 </script>
@@ -102,7 +154,13 @@ function toggleFavorite(index: number): void {
       <div class="page-head__title">
         <NavToggle />
         <h1>在线搜索</h1>
-        <div class="sub">音源：网易云</div>
+        <div class="sub">
+          {{
+            collectionMode && online.activePlaylist
+              ? `网易云歌单 · ${online.activePlaylist.name}`
+              : "音源：网易云"
+          }}
+        </div>
       </div>
     </div>
 
@@ -140,32 +198,76 @@ function toggleFavorite(index: number): void {
         <button class="btn btn-primary" :disabled="status === 'loading'" @click="submit">
           搜索
         </button>
-        <span v-if="status === 'loading'" class="toolbar__spacer count">搜索中…</span>
+        <span v-if="listStatus === 'loading'" class="toolbar__spacer count">
+          {{ collectionMode ? "正在读歌单…" : "搜索中…" }}
+        </span>
         <span v-else-if="hasResults" class="toolbar__spacer count">
-          找到 {{ tracks.length }} 首
+          找到 {{ displayTracks.length }} 首
         </span>
       </div>
 
+      <!-- 我的歌单（ON-10）：登录后才出现；AppSelect 不能收 class（坑 33），外面套一层 -->
+      <div v-if="online.loggedIn" class="collect-bar">
+        <div class="collect-bar__picker">
+          <AppSelect
+            :model-value="online.activePlaylistId ?? ''"
+            :options="pickerOptions"
+            label="我的网易云歌单"
+            @update:model-value="onPickerChange"
+          />
+        </div>
+        <div
+          v-if="online.playlistsStatus === 'error'"
+          class="strip collect-bar__error"
+        >
+          <IconWarningCircle class="icon" />
+          <span>{{ online.playlistsError }}</span>
+          <button class="btn btn-quiet" @click="online.loadPlaylists(true)">重试</button>
+        </div>
+      </div>
+
       <!-- 刷新失败但手上还有上一份结果：保留列表，只在上面给一条提示（不要白屏） -->
-      <div v-if="status === 'error' && tracks.length > 0" class="strip">
+      <div v-if="listStatus === 'error' && hasResults === false && listError" class="strip">
         <IconWarningCircle class="icon" />
-        <span>{{ errorMessage }}</span>
-        <button class="btn btn-quiet" @click="search(lastKeyword)">重试</button>
+        <span>{{ listError }}</span>
+        <button
+          v-if="collectionMode && online.activePlaylistId"
+          class="btn btn-quiet"
+          @click="online.openPlaylist(online.activePlaylistId)"
+        >
+          重试
+        </button>
+        <button v-else-if="lastKeyword" class="btn btn-quiet" @click="search(lastKeyword)">
+          重试
+        </button>
       </div>
 
       <TrackListHead v-if="hasResults" />
 
       <div class="page-frame__scroll">
-        <div v-if="status === 'loading' && tracks.length === 0" class="page-frame__fill">
-          <p class="note">正在搜索「{{ lastKeyword }}」…</p>
+        <div v-if="listStatus === 'loading' && displayTracks.length === 0" class="page-frame__fill">
+          <p class="note">
+            {{ collectionMode ? "正在读取歌单…" : `正在搜索「${lastKeyword}」…` }}
+          </p>
         </div>
 
-        <div v-else-if="status === 'error' && tracks.length === 0" class="page-frame__fill">
+        <div v-else-if="listStatus === 'error' && displayTracks.length === 0" class="page-frame__fill">
           <div class="fail card">
             <span class="fail__badge"><IconWarningCircle class="icon" /></span>
-            <div class="fail__title">搜索没能完成</div>
-            <p class="fail__desc">{{ errorMessage }}</p>
-            <button class="btn btn-primary" @click="search(lastKeyword)">重试</button>
+            <div class="fail__title">
+              {{ collectionMode ? "歌单没能读出来" : "搜索没能完成" }}
+            </div>
+            <p class="fail__desc">{{ listError }}</p>
+            <button
+              v-if="collectionMode && online.activePlaylistId"
+              class="btn btn-primary"
+              @click="online.openPlaylist(online.activePlaylistId)"
+            >
+              重试
+            </button>
+            <button v-else-if="lastKeyword" class="btn btn-primary" @click="search(lastKeyword)">
+              重试
+            </button>
           </div>
         </div>
 
@@ -180,7 +282,7 @@ function toggleFavorite(index: number): void {
 
         <TrackList
           v-else-if="hasResults"
-          :tracks="tracks"
+          :tracks="displayTracks"
           :active-id="player.currentTrack?.id ?? null"
           :removable="false"
           show-favorite
@@ -195,7 +297,11 @@ function toggleFavorite(index: number): void {
             title="搜一首想听的歌"
             desc="支持歌名、歌手或两者一起。在线歌曲可以试听、收藏、加进歌单，与本地和云端曲目混着排队。"
             fill
-          />
+          >
+            <RouterLink v-if="!online.loggedIn" class="btn" :to="{ path: '/settings' }">
+              登录网易云账号，听你收藏的歌
+            </RouterLink>
+          </EmptyState>
         </div>
       </div>
     </template>
@@ -206,5 +312,17 @@ function toggleFavorite(index: number): void {
 .count {
   font-size: 12px;
   color: var(--text-3);
+}
+
+/* 我的歌单那一行：与工具栏同宽对齐；出错提示占满剩余宽度 */
+.collect-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.collect-bar__picker {
+  min-width: 240px;
 }
 </style>

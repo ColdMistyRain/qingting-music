@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
@@ -61,6 +63,38 @@ const STUB_LIB = {
     body: { data: [{ url: "http://m701.music.126.net/abc.mp3" }] },
   }),
   lyric_new: async () => ({ status: 200, body: { lrc: { lyric: "[00:01.17]夜曲" } } }),
+  login_qr_key: async () => ({ status: 200, body: { data: { unikey: "KEY123" } } }),
+  login_qr_create: async () => ({
+    status: 200,
+    body: { data: { qrimg: "data:image/png;base64,xx" } },
+  }),
+  login_qr_check: async () => ({
+    status: 200,
+    body: { code: 803 },
+    cookie: ["MUSIC_U=from-qr"],
+  }),
+  login_status: async () => ({
+    status: 200,
+    body: {
+      data: {
+        code: 200,
+        profile: { userId: 77, nickname: "夜行客", avatarUrl: "https://p1.music.126.net/a.jpg" },
+      },
+    },
+  }),
+  user_playlist: async () => ({
+    status: 200,
+    body: {
+      playlist: [
+        { id: 100, name: "我喜欢的音乐", trackCount: 1, coverImgUrl: "https://p1.music.126.net/c.jpg" },
+      ],
+    },
+  }),
+  playlist_track_all: async () => ({
+    status: 200,
+    body: { songs: [{ id: 186016, name: "夜曲", dt: 226000, fee: 1 }] },
+  }),
+  logout: async () => ({ status: 200, body: { code: 200 } }),
 };
 
 beforeEach(() => setNeteaseLib(STUB_LIB));
@@ -141,6 +175,71 @@ describe("在线音源路由 · 播放地址与歌词（ON-03 / ON-05）", () =>
     expect((await request(brokenLyrics.app).get("/api/online/netease/lyrics?id=186016")).status).toBe(
       502,
     );
+  });
+});
+
+describe("在线音源路由 · 账号与收藏夹（ON-10）", () => {
+  it("扫码登录全流程：取二维码 → 轮询 803 落盘会话 → 状态已登录 → 退出清掉", async () => {
+    // 内嵌模式（不配外接地址）+ 桩库
+    const { app, config } = await setup({ neteaseApiBase: null });
+
+    const qr = await request(app).post("/api/online/netease/login/qr");
+    expect(qr.status).toBe(200);
+    expect(qr.body.data).toEqual({ key: "KEY123", qrDataUrl: "data:image/png;base64,xx" });
+
+    // 轮询前：未登录
+    expect((await request(app).get("/api/online/netease/login")).body.data).toEqual({
+      loggedIn: false,
+      profile: null,
+    });
+
+    const check = await request(app).get("/api/online/netease/login/check?key=KEY123");
+    expect(check.status).toBe(200);
+    expect(check.body.data).toEqual({
+      state: "success",
+      profile: { userId: "77", nickname: "夜行客", avatarUrl: "https://p1.music.126.net/a.jpg" },
+    });
+
+    // 会话已落盘（data/online-auth.json），状态接口随之翻面
+    const after = await request(app).get("/api/online/netease/login");
+    expect(after.body.data.loggedIn).toBe(true);
+    expect(after.body.data.profile?.nickname).toBe("夜行客");
+    const persisted = JSON.parse(
+      await readFile(join(config.dataDir, "online-auth.json"), "utf8"),
+    );
+    expect(persisted.providers.netease.cookie).toEqual(["MUSIC_U=from-qr"]);
+
+    const logout = await request(app).delete("/api/online/netease/login");
+    expect(logout.status).toBe(200);
+    expect((await request(app).get("/api/online/netease/login")).body.data.loggedIn).toBe(false);
+  });
+
+  it("收藏夹：未登录 401；登录后给歌单列表与曲目（曲目带 VIP 标记）", async () => {
+    const { app } = await setup({ neteaseApiBase: null });
+    expect((await request(app).get("/api/online/netease/collections")).status).toBe(401);
+
+    await request(app).get("/api/online/netease/login/check?key=KEY123");
+
+    const list = await request(app).get("/api/online/netease/collections");
+    expect(list.status).toBe(200);
+    expect(list.body.data.playlists).toEqual([
+      { id: "100", name: "我喜欢的音乐", cover: "https://p1.music.126.net/c.jpg", trackCount: 1 },
+    ]);
+
+    const tracks = await request(app).get("/api/online/netease/collections/100");
+    expect(tracks.status).toBe(200);
+    expect(tracks.body.data.tracks).toEqual([
+      {
+        id: "186016",
+        title: "夜曲",
+        artist: "未知歌手",
+        album: "未知专辑",
+        duration: 226,
+        cover: null,
+        vipOnly: true,
+      },
+    ]);
+    expect((await request(app).get("/api/online/netease/collections/..%2Fx")).status).toBe(400);
   });
 });
 

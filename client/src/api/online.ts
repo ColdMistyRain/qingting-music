@@ -1,5 +1,14 @@
-import type { OnlineLyricsInfo, OnlineSearchResult, OnlineStreamInfo } from "@qingting/shared";
-import { apiGet } from "./http";
+import type {
+  OnlineAccountInfo,
+  OnlineCollectionsInfo,
+  OnlineLyricsInfo,
+  OnlinePlaylistTracks,
+  OnlineQrCheck,
+  OnlineQrLogin,
+  OnlineSearchResult,
+  OnlineStreamInfo,
+} from "@qingting/shared";
+import { apiDelete, apiGet, apiPost } from "./http";
 
 /**
  * 在线音源 API（PRD 3.5 / ON-01~05）：全部经自建后端透传（浏览器不直连音源 API）。
@@ -25,4 +34,43 @@ export function fetchOnlineLyrics(provider: string, nativeId: string): Promise<s
   return apiGet<OnlineLyricsInfo>(
     `/api/online/${encodeURIComponent(provider)}/lyrics?id=${encodeURIComponent(nativeId)}`,
   ).then((info) => info.lyrics);
+}
+
+/* ---------- 账号（ON-10：扫码登录，听自己在音源收的歌）---------- */
+
+/** 这个 server 记着的音源账号（登录状态 + 资料） */
+export function fetchOnlineAccount(provider: string): Promise<OnlineAccountInfo> {
+  return apiGet<OnlineAccountInfo>(`/api/online/${encodeURIComponent(provider)}/login`);
+}
+
+/** 生成一次扫码登录的二维码 */
+export function createOnlineQrLogin(provider: string): Promise<OnlineQrLogin> {
+  return apiPost<OnlineQrLogin>(`/api/online/${encodeURIComponent(provider)}/login/qr`);
+}
+
+/** 轮询扫码状态（成功时服务端已把会话存下） */
+export function checkOnlineQrLogin(provider: string, key: string): Promise<OnlineQrCheck> {
+  return apiGet<OnlineQrCheck>(
+    `/api/online/${encodeURIComponent(provider)}/login/check?key=${encodeURIComponent(key)}`,
+  );
+}
+
+/** 退出登录（上游注销 + 清本服务器的凭据） */
+export function logoutOnline(provider: string): Promise<void> {
+  return apiDelete(`/api/online/${encodeURIComponent(provider)}/login`);
+}
+
+/** 账号在音源里的歌单（收藏夹） */
+export function fetchOnlineCollections(provider: string): Promise<OnlineCollectionsInfo> {
+  return apiGet<OnlineCollectionsInfo>(`/api/online/${encodeURIComponent(provider)}/collections`);
+}
+
+/** 一份歌单的全部曲目 */
+export function fetchOnlineCollectionTracks(
+  provider: string,
+  playlistId: string,
+): Promise<OnlinePlaylistTracks> {
+  return apiGet<OnlinePlaylistTracks>(
+    `/api/online/${encodeURIComponent(provider)}/collections/${encodeURIComponent(playlistId)}`,
+  );
 }

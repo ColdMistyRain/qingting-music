@@ -80,6 +80,55 @@ export interface OnlineLyricsInfo {
   lyrics: string | null;
 }
 
+/* ---------- 音源账号（ON-10，v6.30：扫码登录，听自己收藏的歌）---------- */
+/** 音源账号资料（登录后展示用；只取界面需要的三个字段） */
+export interface OnlineProfile {
+  /** 音源内的用户 id（拉歌单要用） */
+  userId: string;
+  nickname: string;
+  avatarUrl: string | null;
+}
+
+/** GET /api/online/:provider/login 的返回：这个 server 记着的音源账号 */
+export interface OnlineAccountInfo {
+  loggedIn: boolean;
+  profile: OnlineProfile | null;
+}
+
+/** POST /api/online/:provider/login/qr 的返回：一张二维码（data URL）+ 轮询用的 key */
+export interface OnlineQrLogin {
+  key: string;
+  qrDataUrl: string;
+}
+
+/** 扫码轮询的状态（网易云 code：801 等待 / 802 已扫 / 803 成功 / 800 过期） */
+export type OnlineQrState = "waiting" | "scanned" | "success" | "expired";
+
+/** GET /api/online/:provider/login/check 的返回 */
+export interface OnlineQrCheck {
+  state: OnlineQrState;
+  /** success 时顺带把账号资料带回来（服务端已把会话存下） */
+  profile: OnlineProfile | null;
+}
+
+/** 音源里的一份歌单（收藏夹） */
+export interface OnlinePlaylistInfo {
+  id: string;
+  name: string;
+  cover: string | null;
+  trackCount: number;
+}
+
+/** GET /api/online/:provider/collections 的返回 */
+export interface OnlineCollectionsInfo {
+  playlists: OnlinePlaylistInfo[];
+}
+
+/** GET /api/online/:provider/collections/:playlistId 的返回 */
+export interface OnlinePlaylistTracks {
+  tracks: OnlineTrack[];
+}
+
 /** 服务端曲目记录（data/songs.json 的一条） */
 export interface Song {
   id: string;

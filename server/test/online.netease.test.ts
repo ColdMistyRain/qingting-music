@@ -276,3 +276,125 @@ describe("网易云适配器 · 内嵌库传输（v6.29 默认）", () => {
     await expect(fast.search("x")).rejects.toMatchObject({ name: "UpstreamError" });
   });
 });
+
+describe("网易云适配器 · 账号与收藏夹（ON-10）", () => {
+  /** 注入式 transport 桩：按模块名回罐头，记录调用 */
+  function makeTransport(routes: Record<string, (params: Record<string, unknown>, cookie?: string[]) => unknown>) {
+    const calls: Array<{ module: string; params: Record<string, unknown>; cookie?: string[] }> = [];
+    const provider = createNeteaseProvider({
+      transport: async (module, params, cookie) => {
+        calls.push({ module, params, cookie });
+        const handler = routes[module];
+        if (!handler) return { status: 404, body: {}, cookie: [] };
+        const out = await handler(params, cookie);
+        return { status: 200, body: out, cookie: [] };
+      },
+    });
+    return { provider, calls };
+  }
+
+  it("扫码登录：先拿 key 再拿二维码；轮询把 801/802/800/803 归一成四种状态", async () => {
+    const { provider, calls } = makeTransport({
+      login_qr_key: () => ({ data: { unikey: "KEY-1" } }),
+      login_qr_create: () => ({ data: { qrimg: "data:image/png;base64,xx" } }),
+      login_qr_check: () => ({ code: 801 }),
+    });
+
+    expect(await provider.account!.createLogin()).toEqual({
+      key: "KEY-1",
+      qrDataUrl: "data:image/png;base64,xx",
+    });
+
+    const codes: Array<[number, string]> = [
+      [801, "waiting"],
+      [802, "scanned"],
+      [800, "expired"],
+    ];
+    for (const [code, state] of codes) {
+      calls.length = 0;
+      const patch = makeTransport({ login_qr_check: () => ({ code }) });
+      expect((await patch.provider.account!.checkLogin("k")).state).toBe(state);
+    }
+
+    const success = makeTransport({
+      login_qr_check: () => ({ code: 803 }),
+    });
+    // 803 的会话在**响应的 Set-Cookie**里：这层由 transport 桩带不出来，单独用 lib 桩测（见 routes 测试）
+    void success;
+    expect(calls.length).toBe(0);
+  });
+
+  it("803 成功时把响应里的 Set-Cookie 作为会话带回", async () => {
+    const provider = createNeteaseProvider({
+      transport: async (module) => {
+        if (module === "login_qr_check") return { status: 200, body: { code: 803 }, cookie: ["MUSIC_U=t", "__csrf_token=x"] };
+        return { status: 404, body: {}, cookie: [] };
+      },
+    });
+    const check = await provider.account!.checkLogin("k");
+    expect(check.state).toBe("success");
+    expect(check.cookie).toEqual(["MUSIC_U=t", "__csrf_token=x"]);
+  });
+
+  it("账号资料：登录有效时映射（数字 userId 转字符串）；会话无效给 null", async () => {
+    const ok = makeTransport({
+      login_status: () => ({
+        data: {
+          code: 200,
+          profile: { userId: 12345, nickname: "夜行客", avatarUrl: "https://p1.music.126.net/a.jpg" },
+        },
+      }),
+    });
+    expect(await ok.provider.account!.getProfile(["MUSIC_U=t"])).toEqual({
+      userId: "12345",
+      nickname: "夜行客",
+      avatarUrl: "https://p1.music.126.net/a.jpg",
+    });
+
+    const bad = makeTransport({ login_status: () => ({ data: { code: 301 }, profile: null }) });
+    expect(await bad.provider.account!.getProfile(["MUSIC_U=t"])).toBeNull();
+  });
+
+  it("登录会话随请求进 transport（内嵌拼成 cookie 字符串），直链随之提档到 exhigh；exhigh 拿不到回落 standard", async () => {
+    const cookie = ["MUSIC_U=t"];
+    const { provider, calls } = makeTransport({
+      song_url_v1: (params) => {
+        // 第一档 exhigh 返回空 url，逼出 standard 兜底
+        return { data: [{ url: params.level === "exhigh" ? null : "http://m801.music.126.net/a.mp3" }] };
+      },
+    });
+    const url = await provider.getStreamUrl("186016", cookie);
+
+    expect(calls.map((c) => c.params.level)).toEqual(["exhigh", "standard"]);
+    expect(calls.every((c) => c.cookie === cookie)).toBe(true);
+    expect(url).toBe("https://m801.music.126.net/a.mp3");
+  });
+
+  it("收藏夹：user_playlist 映射（数字 id、缺名字的行丢弃）；曲目分页拉全", async () => {
+    const { provider, calls } = makeTransport({
+      user_playlist: () => ({
+        playlist: [
+          { id: 100, name: "我喜欢的音乐", trackCount: 2, coverImgUrl: "https://p1.music.126.net/c.jpg" },
+          { id: 201, name: "" },
+          { name: "没有 id" },
+        ],
+      }),
+      playlist_track_all: (params) =>
+        Number(params.offset) === 0
+          ? { songs: Array.from({ length: 500 }, (_, i) => ({ id: i, name: `s${i}` })) }
+          : { songs: [{ id: 186016, name: "夜曲", dt: 226000, fee: 1 }] },
+    });
+
+    const playlists = await provider.collections!.getPlaylists("77", ["MUSIC_U=t"]);
+    expect(playlists).toEqual([
+      { id: "100", name: "我喜欢的音乐", cover: "https://p1.music.126.net/c.jpg", trackCount: 2 },
+    ]);
+
+    const tracks = await provider.collections!.getPlaylistTracks("100", ["MUSIC_U=t"]);
+    expect(tracks).toHaveLength(501);
+    expect(tracks.at(-1)).toMatchObject({ id: "186016", vipOnly: true });
+    expect(calls.filter((c) => c.module === "playlist_track_all").map((c) => c.params.offset)).toEqual([
+      0, 500,
+    ]);
+  });
+});

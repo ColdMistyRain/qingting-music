@@ -1,12 +1,26 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { AppConfig } from "../src/config.js";
 
 /** 每个用例一套独立临时目录：曲库索引与上传文件都落在里面，互不干扰 */
-export async function tempDirs(): Promise<{ dataDir: string; uploadDir: string }> {
+export async function tempDirs(): Promise<{
+  dataDir: string;
+  uploadDir: string;
+  /** 往 dataDir 里写一个文件（测"文件已存在/手改坏"的路径用） */
+  writeFile(name: string, content: string): Promise<void>;
+}> {
   const root = await mkdtemp(path.join(tmpdir(), "qingting-"));
-  return { dataDir: path.join(root, "data"), uploadDir: path.join(root, "uploads") };
+  const dataDir = path.join(root, "data");
+  const uploadDir = path.join(root, "uploads");
+  return {
+    dataDir,
+    uploadDir,
+    writeFile: (name, content) =>
+      mkdir(dataDir, { recursive: true })
+        .then(() => writeFile(path.join(dataDir, name), content, "utf8"))
+        .then(() => undefined),
+  };
 }
 
 /** 测试用配置：默认门禁关闭（AC-05 的最小运行形态）、静态托管关闭 */

@@ -8,9 +8,11 @@ import IconSignOut from "~icons/ph/sign-out";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import SegmentedControl from "@/components/SegmentedControl.vue";
 import EqualizerPanel from "@/components/EqualizerPanel.vue";
+import OnlineQrDialog from "@/components/OnlineQrDialog.vue";
 import { useActiveIndicator } from "@/composables/useActiveIndicator";
 import { useAuthStore } from "@/stores/auth";
 import { useConfigStore } from "@/stores/config";
+import { useOnlineStore } from "@/stores/online";
 import { useThemeStore, type ImLayout, type MaterialMode, type ThemeMode } from "@/stores/theme";
 import { tabSlideDirection } from "@/utils/tabs";
 
@@ -18,7 +20,19 @@ import { tabSlideDirection } from "@/utils/tabs";
 const auth = useAuthStore();
 const config = useConfigStore();
 const theme = useThemeStore();
+const online = useOnlineStore();
 const router = useRouter();
+
+/* ---------- 网易云账号（ON-10）：扫码登录 / 退出 ---------- */
+const qrOpen = ref(false);
+
+function openQr(): void {
+  qrOpen.value = true;
+}
+
+async function logoutNetease(): Promise<void> {
+  await online.logout();
+}
 
 interface SettingsTab {
   key: string;
@@ -260,19 +274,44 @@ async function signOut(): Promise<void> {
         <div class="set-card card">
           <b>网易云</b>
           <div class="set-row">
-            <span>连接状态</span>
+            <span>音源状态</span>
             <span class="badge" :class="{ 'badge--accent': config.onlineEnabled }">
-              {{ config.onlineEnabled ? "已配置" : "未配置" }}
+              {{ config.onlineEnabled ? "可用" : "不可用" }}
             </span>
           </div>
           <div class="set-note">
-            音源地址在部署时用环境变量 NETEASE_API_BASE
-            配置；未配置时"在线搜索"入口隐藏，这里只作状态展示。
+            音源随服务端内置（v6.29），开箱可用；部署者也可以用环境变量
+            NETEASE_API_BASE 改接自己部署的音源服务。
+          </div>
+        </div>
+        <div class="set-card card">
+          <b>网易云账号</b>
+          <div class="set-row">
+            <span>登录状态</span>
+            <span v-if="online.loggedIn" class="badge badge--accent">
+              已登录 · {{ online.profile?.nickname ?? "网易云账号" }}
+            </span>
+            <span v-else class="badge">未登录</span>
+          </div>
+          <div class="set-row">
+            <span>收藏的歌单</span>
+            <button v-if="!online.loggedIn" class="btn btn-primary" @click="openQr">
+              <IconSignIn class="icon" />
+              扫码登录
+            </button>
+            <button v-else class="btn" @click="logoutNetease">
+              <IconSignOut class="icon" />
+              退出登录
+            </button>
+          </div>
+          <div class="set-note">
+            登录后可以在「在线搜索」里打开这个账号收藏的歌单（含 VIP
+            曲目）。登录是这个服务器共享的一份，会话只存在部署者自己的服务器上。
           </div>
         </div>
         <div class="set-card card">
           <b>QQ 音乐 / 酷狗</b>
-          <div class="set-note">还在计划中，接入后会在这里显示连接状态。</div>
+          <div class="set-note">还在计划中，接入后同样在这里扫码登录。</div>
         </div>
       </TabsContent>
 
@@ -323,6 +362,13 @@ async function signOut(): Promise<void> {
         </div>
       </TabsContent>
     </TabsRoot>
+
+    <!-- 扫码登录弹窗（页面级一份；成功后把歌单缓存刷掉，下次进在线页重新拉） -->
+    <OnlineQrDialog
+      :open="qrOpen"
+      @close="qrOpen = false"
+      @logged-in="void online.loadPlaylists(true)"
+    />
   </section>
 </template>
 

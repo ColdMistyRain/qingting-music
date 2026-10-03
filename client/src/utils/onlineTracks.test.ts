@@ -20,6 +20,13 @@ describe("toOnlineTrack（搜索结果 → 播放器曲目）", () => {
     expect(track.url).toBe(ONLINE_EMPTY_URL);
     expect(track.title).toBe("夜曲");
     expect(track.duration).toBe(226);
+    // VIP 标记随曲目进列表：行组件据此显示「试听」标（v6.33）
+    expect(track.vipOnly).toBe(false);
+  });
+
+  it("vipOnly=true 的曲目带上标记（行组件显示试听标）", () => {
+    const track = toOnlineTrack("netease", { ...INFO, vipOnly: true });
+    expect(track.vipOnly).toBe(true);
   });
 
   it("封面换成后端代理地址（取色要 same-origin），不直接用第三方直链", () => {

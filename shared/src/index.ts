@@ -34,6 +34,12 @@ export interface Track {
   lyrics?: string | null;
   /** 服务端抽到内嵌歌词了吗（云端曲目才有；客户端据此决定要不要去拉） */
   hasLyrics?: boolean;
+  /**
+   * 音源侧标记：VIP 专享曲目（ON-03）。在线曲目才有 —— 对非会员账号它只会给
+   * 试听片段（v6.33 需求方定：列表行要加「试听」标记）；能否完整试听以
+   * stream 接口的实际返回为准（freeTrialInfo → 视同无音源）。
+   */
+  vipOnly?: boolean;
 }
 
 /* ---------- 在线音源（PRD 3.5，ON-01~05）：统一曲目抽象 ---------- */

@@ -30,6 +30,8 @@ export function toOnlineTrack(provider: string, info: OnlineTrack): Track {
     // 直链只出现在搜索结果的 transit 里，不进 Track
     cover: info.cover ? onlineCoverUrl(provider, info.cover) : null,
     duration: info.duration,
+    // VIP 专享标记随曲目进列表：行组件据此显示「试听」标（v6.33）
+    vipOnly: info.vipOnly,
   };
 }
 

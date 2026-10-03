@@ -44,6 +44,16 @@ const SOURCE_LABELS: Record<Track["source"], string> = {
 
 const sourceLabel = computed(() => SOURCE_LABELS[props.track.source]);
 
+/**
+ * 试听标（v6.33，需求方："如果是试听的歌曲加上标记说明这个是试听歌曲"）：
+ * 音源标记的 VIP 专享曲目，对非会员账号只会给试听片段 —— 行内标出来，
+ * 把"点开只有 30 秒"的预期放在点击之前（播放时若上游仍给试听片段，
+ * 会有「需要 VIP 或暂无版权」的提示兜底）。
+ */
+const showTrialFlag = computed(
+  () => props.track.source === "online" && props.track.vipOnly === true,
+);
+
 /** 点这一行就是播这一首（v5.96）—— 列表行里不再有播放/暂停键。
     需求方：“播放和暂停都不应该在列表中有这功能，列表行的最右应该放操作歌曲相关的动作”。
     于是“点行即播”从触摸专属（v5.32）扩到鼠标：桌面也靠它，不再需要行内那枚键。
@@ -70,7 +80,12 @@ function onRowClick(): void {
 
     <div class="row__main" :title="track.title">
       <div class="row__title">{{ track.title }}</div>
-      <div class="row__artist">{{ track.artist }}</div>
+      <div class="row__artist">
+        <span v-if="showTrialFlag" class="row__flag" title="VIP 专享曲目，当前账号只能试听片段">
+          试听
+        </span>
+        <span class="row__artist-name">{{ track.artist }}</span>
+      </div>
     </div>
 
     <div class="row__album" :title="track.album">{{ track.album }}</div>
@@ -176,13 +191,31 @@ function onRowClick(): void {
 }
 
 .row__artist {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11.5px;
   color: var(--text-3);
   /* 歌名与歌手不要黏在一起：3px 看着挤（用户反馈），放到 5px */
   margin-top: 5px;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.row__artist-name {
+  overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 试听标（v6.33）：弱色描边小签，说明"这首只能试听"，不与歌名抢注意力 */
+.row__flag {
+  flex: none;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--text-2);
 }
 
 .row__source,

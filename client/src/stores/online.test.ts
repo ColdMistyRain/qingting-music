@@ -164,6 +164,7 @@ describe("online store · 收藏夹（ON-10）", () => {
         album: "十一月的萧邦",
         cover: "/api/online/netease/cover?url=" + encodeURIComponent("https://p1.music.126.net/x.jpg"),
         duration: 226,
+        vipOnly: false,
       },
     ]);
   });

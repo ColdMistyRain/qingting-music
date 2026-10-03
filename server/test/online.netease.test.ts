@@ -251,6 +251,55 @@ describe("网易云适配器 · 歌词（ON-05）", () => {
     });
   });
 
+  it("逐字歌翻译/音译优先取 yrc 对轴版（ytlrc/yromalrc，v6.53 补）；没有就退回 tlyric/romalrc", async () => {
+    // Free Loop 实测：tlyric 留旧 lrc 行起点（0.23s），ytlrc 与 yrc 分毫不差（0.57s）
+    const withYtl = makeProvider({
+      "/lyric/new": {
+        body: {
+          yrc: { lyric: "[570,4080](570,330,0)I'm (900,60,0)a" },
+          lrc: { lyric: "[00:00.00]作词: x" },
+          tlyric: { lyric: "[00:00.23]旧轴翻译" },
+          ytlrc: { lyric: "[00:00.57]对轴翻译" },
+          romalrc: { lyric: "[00:00.23]old roman" },
+          yromalrc: { lyric: "[00:00.57]aligned roman" },
+        },
+      },
+    });
+    expect(await withYtl.provider.getLyrics("1")).toEqual({
+      lyrics: "[570,4080](570,330,0)I'm (900,60,0)a",
+      translation: "[00:00.57]对轴翻译",
+      roman: "[00:00.57]aligned roman",
+    });
+
+    // 纯 LRC 歌（如 DAY BY DAY）：没有 ytlrc/yromalrc，退回 tlyric/romalrc
+    const fallback = makeProvider({
+      "/lyric/new": {
+        body: {
+          lrc: { lyric: "[00:01.00]한국어 가사" },
+          tlyric: { lyric: "[00:01.00]韩国歌词" },
+          romalrc: { lyric: "[00:01.00]hanguk gasa" },
+        },
+      },
+    });
+    expect(await fallback.provider.getLyrics("1")).toEqual({
+      lyrics: "[00:01.00]한국어 가사",
+      translation: "[00:01.00]韩国歌词",
+      roman: "[00:01.00]hanguk gasa",
+    });
+
+    // ytlrc 存在但为空串：同样退回 tlyric（有的歌带空壳字段）
+    const emptyYtl = makeProvider({
+      "/lyric/new": {
+        body: {
+          lrc: { lyric: "[00:01.00]歌词" },
+          tlyric: { lyric: "[00:01.00]翻译" },
+          ytlrc: { lyric: "" },
+        },
+      },
+    });
+    expect((await emptyYtl.provider.getLyrics("1"))?.translation).toBe("[00:01.00]翻译");
+  });
+
   it("两边都是空歌词 → null；上游 5xx 抛 UpstreamError（不回落）", async () => {
     const blank = makeProvider({ "/lyric/new": { body: { lrc: { lyric: "" } } } });
     expect((await blank.provider.getLyrics("1"))?.lyrics).toBeNull();

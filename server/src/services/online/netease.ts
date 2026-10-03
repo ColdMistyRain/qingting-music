@@ -403,13 +403,20 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
         const lrc = body.lrc as { lyric?: unknown } | undefined;
         const tlyric = body.tlyric as { lyric?: unknown } | undefined;
         const romalrc = body.romalrc as { lyric?: unknown } | undefined;
+        const ytlrc = body.ytlrc as { lyric?: unknown } | undefined;
+        const yromalrc = body.yromalrc as { lyric?: unknown } | undefined;
         const text =
           normalizeNeteaseLyric(asString(yrc?.lyric).trim()) ||
           normalizeNeteaseLyric(asString(lrc?.lyric).trim());
-        // 翻译（tlyric）与音译（romalrc），LRC 格式、与原文同时间轴：有正文才带
+        // 翻译与音译：逐字歌**优先取 yrc 对轴版**（ytlrc / yromalrc，v6.53 补）——
+        // tlyric 常留着旧 lrc 的行起点，与按字重排的 yrc 差零点几秒（实测 Free Loop
+        // 差 340~1050ms）；没有 ytlrc 的（纯 LRC 歌）退回 tlyric，客户端的就近匹配继续兜底
         const translation =
+          normalizeNeteaseLyric(asString(ytlrc?.lyric).trim()) ||
           normalizeNeteaseLyric(asString(tlyric?.lyric).trim()) || null;
-        const roman = normalizeNeteaseLyric(asString(romalrc?.lyric).trim()) || null;
+        const roman =
+          normalizeNeteaseLyric(asString(yromalrc?.lyric).trim()) ||
+          normalizeNeteaseLyric(asString(romalrc?.lyric).trim()) || null;
         return {
           lyrics: text || null,
           translation: text ? translation : null,

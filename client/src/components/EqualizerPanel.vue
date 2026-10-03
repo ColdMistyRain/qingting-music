@@ -1,21 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { storeToRefs } from "pinia";
-import {
-  SelectContent,
-  SelectIcon,
-  SelectItem,
-  SelectItemIndicator,
-  SelectItemText,
-  SelectPortal,
-  SelectRoot,
-  SelectTrigger,
-  SelectValue,
-  SelectViewport,
-} from "reka-ui";
-import IconCaretDown from "~icons/ph/caret-down";
-import IconCheck from "~icons/ph/check";
 import IconX from "~icons/ph/x";
+import AppSelect from "@/components/AppSelect.vue";
 import Slider from "@/components/Slider.vue";
 import { useEqualizerStore } from "@/stores/equalizer";
 import {
@@ -50,6 +37,8 @@ const presetValue = computed({
   get: () => settings.value.preset,
   set: (name: string) => eq.applyPreset(name),
 });
+/** 下拉选项：预设名直接当值（自定义预设也在 `presetNames` 里，排在后面） */
+const presetOptions = computed(() => eq.presetNames.map((name) => ({ value: name, label: name })));
 
 function saveCustom(): void {
   const name = nameInput.value;
@@ -92,31 +81,7 @@ function removeCustom(name: string): void {
 
     <div class="fx__row">
       <span class="fx__label">预设</span>
-      <SelectRoot v-model="presetValue">
-        <SelectTrigger class="fx__select" aria-label="均衡器预设">
-          <SelectValue />
-          <SelectIcon class="fx__select-icon">
-            <IconCaretDown class="icon" />
-          </SelectIcon>
-        </SelectTrigger>
-        <SelectPortal>
-          <SelectContent class="fx-menu" position="popper" :side-offset="6" align="start">
-            <SelectViewport class="fx-menu__view">
-              <SelectItem
-                v-for="name in eq.presetNames"
-                :key="name"
-                :value="name"
-                class="fx-menu__item"
-              >
-                <SelectItemText>{{ name }}</SelectItemText>
-                <SelectItemIndicator class="fx-menu__check">
-                  <IconCheck class="icon" />
-                </SelectItemIndicator>
-              </SelectItem>
-            </SelectViewport>
-          </SelectContent>
-        </SelectPortal>
-      </SelectRoot>
+      <AppSelect v-model="presetValue" :options="presetOptions" label="均衡器预设" />
       <span v-if="eq.customNames.length > 0" class="fx__custom">
         <button
           v-for="name in eq.customNames"
@@ -237,27 +202,6 @@ function removeCustom(name: string): void {
   color: var(--text-2);
 }
 
-.fx__select {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 132px;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-control);
-  background: var(--glass-bg);
-  color: var(--text-1);
-  font-size: 13px;
-}
-
-.fx__select-icon .icon {
-  width: 14px;
-  height: 14px;
-  color: var(--text-3);
-}
-
 .fx__custom {
   display: flex;
   flex-wrap: wrap;
@@ -364,47 +308,5 @@ function removeCustom(name: string): void {
   .fx__band-freq {
     font-size: 10px;
   }
-}
-</style>
-
-<style>
-/* ⚠️ 非 scoped：Reka 把 Select 的内容 Teleport 到 body，scoped 属性不会跟过去（AGENTS 坑 6）。
-   隔离靠 fx-menu 前缀。 */
-.fx-menu {
-  z-index: 92;
-  min-width: 132px;
-  max-height: 260px;
-  overflow: hidden auto;
-  padding: 6px;
-  border-radius: var(--radius-control);
-  border: 1px solid var(--glass-border);
-  background: var(--tray-bg);
-  backdrop-filter: var(--tray-blur);
-  -webkit-backdrop-filter: var(--tray-blur);
-  box-shadow: var(--panel-sheen), var(--panel-shadow);
-}
-
-.fx-menu__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 10px;
-  border-radius: var(--radius-control);
-  font-size: 13px;
-  color: var(--text-1);
-  cursor: pointer;
-  outline: none;
-  user-select: none;
-}
-
-.fx-menu__item[data-highlighted] {
-  background: var(--hover);
-}
-
-.fx-menu__check .icon {
-  width: 14px;
-  height: 14px;
-  color: var(--accent);
 }
 </style>

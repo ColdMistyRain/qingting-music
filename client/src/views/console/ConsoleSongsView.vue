@@ -12,6 +12,7 @@ import IconWarningCircle from "~icons/ph/warning-circle";
 import AppTooltip from "@/components/AppTooltip.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import SongMetaDialog from "@/components/SongMetaDialog.vue";
+import AppSelect from "@/components/AppSelect.vue";
 import { useLibraryStore } from "@/stores/library";
 import { confirmAction } from "@/utils/confirm";
 import { debounce } from "@/utils/debounce";
@@ -43,6 +44,10 @@ const applyQuery = debounce((value: string) => {
 watch(keyword, (value) => applyQuery.call(value));
 onBeforeUnmount(() => applyQuery.cancel());
 const sortKey = ref<SongSortKey>("uploadedAt");
+/** 下拉里显示的那份（带“按”字）：`SORT_OPTIONS` 本体还要给排序逻辑用，不动它 */
+const sortOptions = computed(() =>
+  SORT_OPTIONS.map((option) => ({ value: option.value, label: `按${option.label}` })),
+);
 const direction = ref<SortDirection>("desc");
 const selected = ref<Set<string>>(new Set());
 const busy = ref(false);
@@ -191,13 +196,11 @@ async function removeSelected(): Promise<void> {
         <input v-model="keyword" type="search" placeholder="搜索歌名、歌手或专辑" />
       </label>
 
-      <label class="sort">
-        <select v-model="sortKey">
-          <option v-for="option in SORT_OPTIONS" :key="option.value" :value="option.value">
-            按{{ option.label }}
-          </option>
-        </select>
-      </label>
+      <!-- 外面这层 div 只为给宿主样式一个落点：`SelectRoot` 自己**不渲染包装元素**
+           （组件根是 fragment，透传的 class 会被丢掉），所以不能把 class 写在组件上。 -->
+      <div class="sort">
+        <AppSelect v-model="sortKey" :options="sortOptions" label="排序方式" />
+      </div>
       <!-- 只有图标的键按约定走 AppTooltip（label 同时是 aria-label）——v6.10 从原生 title 收口 -->
       <AppTooltip :label="direction === 'asc' ? '升序（点击改为降序）' : '降序（点击改为升序）'">
         <button class="ctl" @click="toggleDirection">
@@ -314,15 +317,14 @@ async function removeSelected(): Promise<void> {
   color: var(--text-3);
 }
 
-.sort select {
-  height: 34px;
-  padding: 0 10px;
-  border-radius: var(--radius-control);
+.sort :deep(.as-trigger) {
+  /* 工具栏那一档（与旁边的搜索框同高）：下拉触发器默认是卡片内控件那一档，
+     在工具栏里要跟着邻居走 —— 宿主差异由宿主给（v6.25，同时把原来的原生 `<select>`
+     换成共用的 `AppSelect`：原生弹层是系统画的、样式管不到）。 */
+  min-width: 132px;
   background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border);
   color: var(--text-2);
   font-size: 12.5px;
-  cursor: pointer;
 }
 
 .songs {

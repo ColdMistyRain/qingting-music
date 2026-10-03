@@ -114,6 +114,7 @@ client/src/components/    AppSidebar、PlayerBar（受 store 驱动）、NavTogg
                           ConfirmDialog（应用内二次确认：Reka Dialog + 自绘玻璃，挂 App.vue 全站一份 - v5.53）、
                           ProgressBar（自绘进度条：轨道+填充+手柄+`role`/`aria-*`/键盘，播放条与沉浸页**共用一份** - v6.12）、
                           Slider（自绘滑杆：竖=音量条与均衡器十根竖杆、横=整体增益；几何在 utils/slider.ts - PL-13）、
+                          AppSelect（下拉选择**唯一实现**：Reka Select 行为层 + 自绘面板；宿主差异用 :deep(.as-trigger) 覆盖档位 - v6.25）、
                           AppTooltip（自绘玻璃提示：只有图标的键共用一份，label 同时是 aria-label - v5.71）、
                           AppToast（提示条宿主：Reka Toast + 自绘玻璃，挂 App.vue 全站一份 - v5.72）、
                           EqualizerPanel（均衡器面板：设置页「音效」Tab - PL-13）、
@@ -210,6 +211,7 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 30. **`v-memo` 的依赖漏了“每帧会变”的量，被 memo 住的那层就永不更新（v6.20 实测）**：v6.9 给歌词行加 `v-memo="[i === activeIndex, i < activeIndex, depths[i]]"`，播放中这三个值一句之内不变 → 当前行子树被原样复用，逐字填充**一帧都没亮过**（实测 `--p` 同句内恒为 0.0078、换句才变）。补法：把“会变的量”做成 computed（这里把逐字进度压成字符串 `fillKey`），只对**当前行**取它、其余行恒为空串（只有当前行每帧重渲染，收窄目的一起保住）。另：逐字时间轴还有个口径坑 —— `word.start` 是**相对句首**的，`wordFillProgress` 当初拿**绝对秒**去比，于是所有字一上来就算“已唱完”（旧单测喂的也是相对时间，正好掩盖）。写时间类纯函数：参数名要写明相对/绝对，或函数里先减掉行起点，单测里拿“绝对时间 + 非零行起点”做一例。
 31. **自己实现的拖拽必须声明 `touch-action`，且 `pointercancel` ≠ 点击（v6.22 / v6.23）**：① 用 pointer 事件自己推位移的地方（歌词列表、**播放进度条**、播放条滑动区、歌单拖拽、滑杆）如果没写 `touch-action`，真机上手指一动浏览器就接管这次触摸 —— 我们**一个 `pointermove` 都收不到**（只收到 `pointercancel`），表现是“怎么拖都不动”；桌面用鼠标复现不出来（没有触摸仲裁）。仓内先例：`.pb-left { touch-action: pan-y }`；两轴都自己管就写 `none`。② `pointercancel` 只表示“浏览器把触摸收走了”——若把它按“没滑动 = 点一下”处理，滑动就会变成误点（歌词那处会跳到手指下那一句）。③ `setPointerCapture` / `releasePointerCapture` **一律走 `utils/pointer.ts` 的 `togglePointerCapture`**（两边都包 try/catch，四处拖动已统一）：释放那次往往排在“做正事”前面，一抛就把正事吞了（实测歌词那处白点一下、进度条那处 `seeking` 永远挂着）。
 32. **居中不只是 `text-align`：flex 行要用 `justify-content`（v6.24 实测）**：“沉浸歌词”布局写着“标题与歌词都居中”，但标题那一行是 `display: flex`（歌名 + 收藏键）—— `text-align` 对 **flex items** 无效，只有下面的块级歌手行居中，歌名与键就贴在左边缘（实测标题中心 126 / 容器中心 195）。给一行做居中前先看它的 `display`；看一段文字到底居没居中，量的是**元素中心 vs 容器中心**。布局要改共享子组件的版式时用 `:deep()`（VS-09 的既定写法），别把共享组件写成可配置的。
+33. **`SelectRoot` 不渲染元素：组件根是 fragment，透传的 `class` 会被静默丢掉（v6.25 实测）**：`AppSelect.vue` 的根是 `SelectRoot`，而它自己**不产元素**（只把插槽渲染成 `SelectTrigger` + `SelectPortal` 两个兄弟）—— 于是 `<AppSelect class="sort" …>` 的 `class` **既没落到触发器上、也没落到任何东西上**，宿主那条 `.sort :deep(.as-trigger)` 静默失配：**不报错、不警告，只是那条样式从没生效**（我因此白跑了两轮探测）。**判别技巧：先量“那个 class 到底在哪个元素上”** —— `document.querySelectorAll(".as-trigger").length` + 触发器自己的 `className` + 它的 `parentElement.className`，别一上来就怀疑“样式被覆盖了”。修法：宿主外面包一层 `<div class="sort">`，或给组件 `inheritAttrs: false` 后把 `$attrs` 显式绑到触发器上。同族：凡是被当成组件根、而自己又不产元素的第三方 Root，都别指望透传属性生效。
 
 ## 文档索引
 

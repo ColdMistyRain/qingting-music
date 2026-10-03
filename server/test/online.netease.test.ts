@@ -125,6 +125,20 @@ describe("网易云适配器 · 播放地址（ON-03）", () => {
     const broken = makeProvider({ "/song/url/v1": { body: {} } });
     expect(await broken.provider.getStreamUrl("1")).toBeNull();
   });
+
+  it("上游应答带 freeTrialInfo = 这条直链只是试听片段 → 视同没有可用音源（放一半就断不如明说）", async () => {
+    const trial = makeProvider({
+      "/song/url/v1": {
+        body: { data: [{ url: "http://m801.music.126.net/trial.mp3", freeTrialInfo: { end: 32 } }] },
+      },
+    });
+    expect(await trial.provider.getStreamUrl("1")).toBeNull();
+
+    const full = makeProvider({
+      "/song/url/v1": { body: { data: [{ url: "http://m801.music.126.net/full.mp3", freeTrialInfo: null }] } },
+    });
+    expect(await full.provider.getStreamUrl("1")).toBe("https://m801.music.126.net/full.mp3");
+  });
 });
 
 describe("网易云适配器 · 歌词（ON-05）", () => {

@@ -288,14 +288,24 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
 
     async getStreamUrl(id, cookie) {
       const loggedIn = Boolean(cookie && cookie.length > 0);
-      // 登录后提档到 exhigh（320k，VIP 曲目才有完整试听）；匿名保持 standard。
+      // 登录后提档到 exhigh（320k，VIP 会员的曲目才有完整试听）；匿名保持 standard。
       // 拿不到时（免费账号对 VIP 曲目等）再用 standard 兜底试一次。
       // randomCNIP：部分受限曲目用国内 IP 形状请求成功率更高；https=true：让上游直接给
       // https 直链（参考 Folia 的接入实践）。旧的 API 分支不认这两个参数也无妨。
+      interface SongUrlItem {
+        url?: unknown;
+        /** 非空 = 这条直链只是**试听片段**（账号没有该曲的完整权益） */
+        freeTrialInfo?: unknown;
+      }
       const requestUrl = async (level: string) => {
         const { body } = await call("song_url_v1", { id, level, randomCNIP: true, https: true }, cookie);
-        const data = body.data as Array<{ url?: unknown }> | undefined;
-        return asString(data?.[0]?.url).trim();
+        const data = body.data as SongUrlItem[] | undefined;
+        const item = data?.[0];
+        const url = asString(item?.url).trim();
+        if (!url) return null;
+        // 上游应答带 freeTrialInfo 时，直链只覆盖试听片段（实测 30~50 秒）——
+        // 把它当"没有可用音源"处理：放一半就断比明确说"这首歌要会员"更糟
+        return item && item.freeTrialInfo ? null : url;
       };
       let url = await requestUrl(loggedIn ? "exhigh" : "standard");
       if (!url && loggedIn) url = await requestUrl("standard");

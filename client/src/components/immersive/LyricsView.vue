@@ -723,7 +723,8 @@ onBeforeUnmount(() => {
 .lyline .tr {
   display: block;
   margin-top: 0.2em;
-  font-size: max(0.5em, 10px);
+  /* AMLL 的 0.5em 基于它更大的主行字号；我们的当前句较小，等效视觉放大到 0.65em（下限 12px） */
+  font-size: max(0.65em, 12px);
   line-height: 1.5;
   letter-spacing: normal;
   opacity: 0.3;

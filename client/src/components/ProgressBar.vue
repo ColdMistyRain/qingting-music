@@ -83,9 +83,20 @@ function onTrackKeydown(event: KeyboardEvent): void {
     @pointerup="onPointerUp"
     @pointercancel="onPointerUp"
   >
+    <!-- 缓冲层（v6.42）：浅一档的底色显示"已下载到哪"，在线曲目加载慢时不再无从判断 -->
+    <div
+      v-if="player.bufferedEnd > 0"
+      class="buffered"
+      :style="{ width: `${player.bufferedEnd * 100}%` }"
+    />
     <div class="fill" :style="{ width: `${player.displayRatio * 100}%` }" />
     <!-- 没在播曲目时不画手柄：「一个能拖的点」会让人以为有什么可拖（v6.11 统一，
          原先沉浸页那一份在空态下也画） -->
-    <div v-if="player.hasTrack" class="knob" :style="{ left: `${player.displayRatio * 100}%` }" />
+    <div
+      v-if="player.hasTrack"
+      class="knob"
+      :class="{ buffering: player.buffering }"
+      :style="{ left: `${player.displayRatio * 100}%` }"
+    />
   </div>
 </template>

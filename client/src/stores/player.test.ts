@@ -883,6 +883,38 @@ describe("在线曲目（ON-03/05）", () => {
     expect(player.lyricsText).toBe("[00:01.17]夜曲");
   });
 
+  it("缓冲状态与缓冲末端（v6.42）：loadstart/waiting 亮、canplay/playing 灭、progress 刷末端", async () => {
+    // 这个 describe 本不桩 Audio：进度事件需要真实元素，这里自己桩一个
+    FakeAudio.instances = [];
+    vi.stubGlobal("Audio", FakeAudio as unknown as typeof Audio);
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1")]);
+    player.playAt(0);
+    // playAt 即视为开始加载
+    expect(player.buffering).toBe(true);
+
+    await settle(); // playAt 是异步的：直链解析完才建 audio 元素
+    const audio = FakeAudio.instances[0]!;
+    audio.emit("canplay"); // 真实引擎在数据可播时发；桩不自动发，手动补
+    expect(player.buffering).toBe(false);
+
+    // progress：buffered 末端 30s / 时长 100s → 30%
+    (audio as unknown as { buffered: TimeRanges }).buffered = {
+      length: 1,
+      end: () => 30,
+      start: () => 0,
+    } as TimeRanges;
+    (audio as unknown as { duration: number }).duration = 100;
+    audio.emit("progress");
+    expect(player.bufferedEnd).toBeCloseTo(0.3);
+
+    // waiting → 缓冲中；playing → 恢复
+    audio.emit("waiting");
+    expect(player.buffering).toBe(true);
+    audio.emit("playing");
+    expect(player.buffering).toBe(false);
+  });
+
   it("翻译显示开关（v6.41）：默认开、切换翻面、偏好写 localStorage", async () => {
     vi.mocked(fetchOnlineLyrics).mockResolvedValue({
       lyrics: "[00:01.17]한국어 가사",

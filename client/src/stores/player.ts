@@ -74,6 +74,13 @@ export const usePlayerStore = defineStore("player", () => {
   const seeking = ref(false);
   const seekTarget = ref(0);
   /**
+   * 缓冲状态（v6.42）：`loadstart` / `waiting` 时为真，`canplay` / `playing` / 暂停时为假
+   * —— 在线曲目加载或卡顿时，进度条要能说明"在等数据"。
+   */
+  const buffering = ref(false);
+  /** 已缓冲到的位置（0~1，`buffered` 最后一个区间的末端 / 总时长），进度条的浅色底层用 */
+  const bufferedEnd = ref(0);
+  /**
    * 当前曲目的歌词原文（LR-02 的数据入口：内嵌 > 在线 > 手动上传，管线稍后接入）。
    * 沉浸页只从这里取，不自己去找文件/接口——数据来源变了，页面不用动。
    */
@@ -430,6 +437,36 @@ export const usePlayerStore = defineStore("player", () => {
     audio.addEventListener("error", () => {
       void handlePlaybackFailure();
     });
+    // 缓冲（v6.42）：loadstart / waiting = 在等数据；canplay / playing / 暂停 = 不在等。
+    // progress 期间刷 buffered 末端（在线曲目看得见"下载到哪了"）。
+    audio.addEventListener("loadstart", () => {
+      buffering.value = true;
+      bufferedEnd.value = 0;
+    });
+    audio.addEventListener("waiting", () => {
+      buffering.value = true;
+    });
+    audio.addEventListener("canplay", () => {
+      buffering.value = false;
+    });
+    audio.addEventListener("playing", () => {
+      buffering.value = false;
+    });
+    audio.addEventListener("pause", () => {
+      buffering.value = false;
+    });
+    // 闭包里取非空的局部引用（TS 在回调里不认上面已收窄的 audio；this 在测试桩里也不保留）
+    const el = audio;
+    audio.addEventListener("progress", () => {
+      try {
+        const buffered = el.buffered;
+        if (buffered.length > 0 && el.duration > 0) {
+          bufferedEnd.value = Math.min(1, buffered.end(buffered.length - 1) / el.duration);
+        }
+      } catch {
+        // 个别引擎在卸载边缘读 buffered 会抛：忽略这次
+      }
+    });
     return audio;
   }
 
@@ -546,6 +583,8 @@ export const usePlayerStore = defineStore("player", () => {
     currentIndex.value = index;
     progress.value = 0;
     duration.value = track.duration ?? 0;
+    bufferedEnd.value = 0;
+    buffering.value = true; // 新 src 从加载开始
     pendingSeconds = 0;
     notify("");
     persist();
@@ -735,6 +774,8 @@ export const usePlayerStore = defineStore("player", () => {
     currentIndex.value = -1;
     progress.value = 0;
     duration.value = 0;
+    buffering.value = false;
+    bufferedEnd.value = 0;
     pendingSeconds = 0;
     notify("");
     pause();
@@ -836,6 +877,8 @@ export const usePlayerStore = defineStore("player", () => {
     progress,
     duration,
     seeking,
+    buffering,
+    bufferedEnd,
     // 派生
     currentTrack,
     hasTrack,

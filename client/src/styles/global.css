@@ -1227,6 +1227,49 @@ select {
   cursor: default;
 }
 
+/* 缓冲层（v6.42）：走过的填充后面垫一段"已下载到哪"的浅色底
+   （在线曲目加载/卡顿时，光看走到的位置判断不了准备到哪了）。
+   比填充弱两大档 —— 它是背景信息，不与填充抢注意力。 */
+.progress .buffered {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-1) 16%, transparent);
+}
+
+/* 缓冲中（waiting 之后、canplay 之前）：手柄脉动示意"在等数据"。
+   只用 transform / opacity（合成层）——同 knob-glow 的两条规矩；
+   与播放光晕（knob-glow）互斥：在等数据时不在播放，不会同帧两个动画。 */
+.progress.buffering .knob {
+  opacity: 1;
+}
+
+.progress.buffering .knob::after {
+  animation: knob-buffer 1s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes knob-buffer {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: scale(1.9);
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress.buffering .knob::after {
+    animation: none;
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
+}
+
 .progress .fill {
   position: absolute;
   inset: 0 auto 0 0;

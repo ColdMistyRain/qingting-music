@@ -332,6 +332,8 @@ describe("播放提示（PL-09，v5.72 起走提示条）", () => {
 class FakeAudio {
   static instances: FakeAudio[] = [];
   src = "";
+  /** CORS 模式（v6.54：ensureAudio 会设 anonymous；跨域直链失败时回退一次无 CORS） */
+  crossOrigin: string | null = null;
   currentTime = 0;
   duration = 0;
   volume = 1;
@@ -376,6 +378,11 @@ class FakeAudio {
 
   removeAttribute(): void {
     this.src = "";
+  }
+
+  /** 重新加载当前 src（v6.54 的无 CORS 回退会调它；真元素会重发请求） */
+  load(): void {
+    // 测试桩：什么都不做 —— error 状态由用例自己控制
   }
 }
 
@@ -805,6 +812,29 @@ describe("在线曲目（ON-03/05）", () => {
     player.playAt(0);
     await settle();
     expect(fetchOnlineStreamUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("在线直链加载报错：先回退一次无 CORS 直连（不跳歌），再次报错才走失败流程（v6.54）", async () => {
+    stubServer(true);
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1"), onlineTrack("netease:2")]);
+    player.playAt(0);
+    await settle();
+
+    const element = FakeAudio.instances[0]!;
+    expect(element.crossOrigin).toBe("anonymous"); // 乐观 CORS（媒体图才有数据）
+    element.emit("error");
+    await settle();
+    // 第一次报错 = 乐观 CORS 落空：摘掉 crossOrigin 原地重载，既不跳歌也不弹失败
+    expect(element.crossOrigin).toBeNull();
+    expect(element.src).toBe("https://cdn.example.test/stream.mp3");
+    expect(player.currentTrack?.id).toBe("netease:1");
+
+    // 第二次报错（无 CORS 下仍放不出）：才交给失败流程（3 秒后跳）
+    element.emit("error");
+    await settle();
+    await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS);
+    expect(player.currentTrack?.id).toBe("netease:2");
   });
 
   it("VIP/无版权（url 为 null）：说清楚原因并停下，不自动跳歌", async () => {

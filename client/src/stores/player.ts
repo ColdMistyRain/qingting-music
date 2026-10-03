@@ -430,6 +430,10 @@ export const usePlayerStore = defineStore("player", () => {
 
     audio = new Audio();
     audio.preload = "metadata";
+    // 在线曲目是跨域直链（网易 CDN），不设 CORS 模式的话媒体图一接上就是**静音**
+    // （EQ / 节奏 / 频谱共用它，v6.54 实测 CDN 允许 CORS → anonymous 拿得到数据）。
+    // 真不给 CORS 头的音源会加载报错 → error 处理里对同一条直链回退一次无 CORS 直连。
+    audio.crossOrigin = "anonymous";
     audio.volume = volume.value;
     audio.muted = muted.value;
     // 挂进文档（隐藏）：便于在开发者工具里查看状态，后续 Media Session（RT-04）也依赖它在文档中
@@ -468,7 +472,27 @@ export const usePlayerStore = defineStore("player", () => {
     });
     // PL-09（v6.26 修订）：失败要**先分清“这一首坏了”还是“服务器断了”**，再决定跳不跳。
     // 服务器断线还一首首往下跳，等于把“后端挂了”演成“整个列表都坏了”（列表循环下永远停不下来）。
+    // v6.54 先接一层乐观 CORS 的回退：crossOrigin=anonymous 遇上真不给 CORS 头的直链
+    // 会加载报错 —— 对同一条直链回退一次“无 CORS 直连”（能响，但媒体图拿不到数据，
+    // 频谱自动隐藏）；换新直链时在赋 src 处重新乐观。本地/云端是同源，进不了这个分支。
+    let corsRetrySrc = "";
     audio.addEventListener("error", () => {
+      const element = audio;
+      // 只有在线曲目的直链才可能 CORS 失败（本地/云端同源）：加载报错时对同一条
+      // 直链回退一次"无 CORS 直连"（能响，但媒体图拿不到数据，频谱自动隐藏）
+      if (
+        element &&
+        element.crossOrigin &&
+        element.src &&
+        corsRetrySrc !== element.src &&
+        currentTrack.value?.source === "online"
+      ) {
+        corsRetrySrc = element.src;
+        element.crossOrigin = null;
+        element.load();
+        if (playing.value) void element.play().catch(() => {});
+        return;
+      }
       void handlePlaybackFailure();
     });
     // 缓冲（v6.42）：loadstart / waiting = 在等数据；canplay / playing / 暂停 = 不在等。
@@ -537,6 +561,8 @@ export const usePlayerStore = defineStore("player", () => {
         notifyStreamFailure(resolved.reason);
         return;
       }
+      // 新直链重新乐观 CORS（上一条直链若走过无 CORS 回退，这里就是恢复点）
+      element.crossOrigin = "anonymous";
       element.src = resolved.url;
     }
     try {
@@ -657,6 +683,8 @@ export const usePlayerStore = defineStore("player", () => {
 
     const element = ensureAudio();
     if (!element) return;
+    // 新直链重新乐观 CORS（同 play() 里的那处：无 CORS 回退后的恢复点）
+    element.crossOrigin = "anonymous";
     element.src = track.url;
     if (autoplay) void play();
   }
@@ -902,7 +930,10 @@ export const usePlayerStore = defineStore("player", () => {
       // 只预载元数据把时长与进度摆好，不 play()。
       // 在线曲目的直链在存档里是空串（会过期的签名地址）：src 不设，
       // 等用户按播放时现解析（`play()` 里的那段）；这时长直接用存档里带的。
-      if (element && track.url) element.src = track.url;
+      if (element && track.url) {
+        element.crossOrigin = "anonymous";
+        element.src = track.url;
+      }
     }
 
     if (dropped > 0) {

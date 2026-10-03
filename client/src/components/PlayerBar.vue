@@ -13,6 +13,7 @@ import AppTooltip from "@/components/AppTooltip.vue";
 import ProgressBar from "@/components/ProgressBar.vue";
 import ScrollingText from "@/components/ScrollingText.vue";
 import QueuePopover from "@/components/QueuePopover.vue";
+import SpectrumBars from "@/components/SpectrumBars.vue";
 import VolumeControl from "@/components/VolumeControl.vue";
 import { usePlayback } from "@/composables/usePlayback";
 import { MOBILE_QUERY, useMediaQuery } from "@/composables/useMediaQuery";
@@ -184,6 +185,9 @@ const marqueeActive = computed(() => player.playing || hovering.value);
             />
           </svg>
         </div>
+        <!-- 频谱迷你指示（VS-05，v6.54）：在播时的活信号 —— 桌面才有（手机那排被
+             封面环进度占了，塞不下也不需要）；拿不到数据（跨域兜底）时自动隐藏 -->
+        <SpectrumBars v-if="!isMobile && player.hasTrack" class="pb-spectrum" :count="4" />
         <div class="pb-info">
           <ScrollingText class="pb-title" :text="titleText" :active="marqueeActive" />
           <!-- 第二行按断点换内容：桌面是 歌手 · 专辑，手机是当前歌词（内容不同，只能换文本，

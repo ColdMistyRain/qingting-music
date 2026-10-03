@@ -903,10 +903,21 @@ select {
   touch-action: pan-y;
 }
 
-/* 歌曲信息块：铺满固定列宽剩下的固定空间（封面 52 + 间隔 12 → 文字区 176） */
+/* 歌曲信息块：铺满固定列宽剩下的固定空间（封面 52 + 间隔 12 + 频谱 18 + 间隔 12 → 文字区 146；
+   v6.54 加了频谱迷你指示，手机上不渲染、这块宽度还给文字） */
 .pb-info {
   flex: 1;
   min-width: 0;
+}
+
+/* 频谱迷你指示（VS-05，v6.54）：封面与文字之间一枚小 VU 表 —— 高度对齐封面内缘，
+   宽度给 4 根 3px 条 + 呼吸缝；颜色走 SpectrumBars 的 currentColor（=accent）。
+   条子在跳时它就是"正在响"的活信号，暂停时落成地板高度的一排小刻度。 */
+.pb-spectrum {
+  height: 22px;
+  width: 18px;
+  flex: none;
+  opacity: 0.8;
 }
 
 .pb-left .cover {

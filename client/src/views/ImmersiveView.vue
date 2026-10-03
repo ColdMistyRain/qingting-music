@@ -5,6 +5,7 @@ import IconCaretDown from "~icons/ph/caret-down";
 import IconMusicNotes from "~icons/ph/music-notes";
 import AppTooltip from "@/components/AppTooltip.vue";
 import ImControls from "@/components/immersive/ImControls.vue";
+import SpectrumBars from "@/components/SpectrumBars.vue";
 import ImLayoutCenter from "@/components/immersive/ImLayoutCenter.vue";
 import ImLayoutDuo from "@/components/immersive/ImLayoutDuo.vue";
 import ImLayoutPoster from "@/components/immersive/ImLayoutPoster.vue";
@@ -264,6 +265,15 @@ onBeforeUnmount(() => {
         />
       </div>
 
+      <!-- 频谱大图（VS-05，v6.54）：三布局共用的一条横幅，贴在走带键上方 ——
+           宽度与走带键同一档（min(560px, 74vw)，手机铺满），高度很矮、颜色很淡，
+           是页面的"声压指示"而不是装饰。拿不到数据（跨域兜底）时自动隐藏。 -->
+      <SpectrumBars
+        v-if="player.hasTrack"
+        class="im-spectrum"
+        :count="28"
+      />
+
       <footer class="im-bottom">
         <ImControls />
       </footer>
@@ -474,6 +484,25 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   padding: 0 20px 26px;
+}
+
+/* 频谱大图（VS-05，v6.54）：一条矮横幅贴在走带键上方 —— 宽度与控制区同一档
+   （min(560px, 74vw)，手机铺满，两侧收窄也和 .im-bottom 同步），高度 26px 封顶；
+   颜色压得很淡（accent 55%）：是页面的"声压指示"，不与歌词抢眼。
+   拿不到数据时 SpectrumBars 自己 opacity→0（自动隐藏），这里不占布局分支。 */
+.im-spectrum {
+  flex: none;
+  width: min(560px, 74vw);
+  height: 26px;
+  margin: 0 auto 10px;
+  color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+@media (max-width: 767px) {
+  .im-spectrum {
+    width: 100%;
+    margin-bottom: 6px;
+  }
 }
 
 /* 手机：底栏两侧留白收窄（v5.93）。

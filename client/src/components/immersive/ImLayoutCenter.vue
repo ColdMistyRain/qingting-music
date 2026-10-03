@@ -74,7 +74,7 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
 /* 钮排让位要对称（v6.50）：LyricsView 的让位只加右内边距，左对齐的布局没问题；
    这里是居中版式，单侧让位会让文字整体偏轴 —— 补等量左内边距，文字仍在轴线上。 */
 .center :deep(.ly--flags .lyline) {
-  padding-left: 54px;
+  padding-left: 25px;
 }
 
 .center :deep(.ly-list) {

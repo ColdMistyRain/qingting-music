@@ -4,7 +4,6 @@ import { RouterLink } from "vue-router";
 import type { OnlineTrack } from "@qingting/shared";
 import { toPlaylistItem, type Track } from "@qingting/shared";
 import NavToggle from "@/components/NavToggle.vue";
-import AppSelect from "@/components/AppSelect.vue";
 import IconGlobe from "~icons/ph/globe";
 import IconMagnifyingGlass from "~icons/ph/magnifying-glass";
 import IconPlugsConnected from "~icons/ph/plugs-connected";
@@ -27,7 +26,8 @@ import { usePlayerStore } from "@/stores/player";
  * 输入即时回显、搜索防抖 500ms（每次搜索都是一次上游请求，比本地过滤贵）；
  * 连续输入只认最后一次（序号判 stale，慢的旧响应不覆盖新结果）。
  *
- * 账号与收藏夹（ON-10 / v6.30）：登录后这一页多一个「我的歌单」下拉，选中即整单加载；
+ * 账号与收藏夹（ON-10）：网易云歌单列在**侧边栏**（v6.32，需求方定："第三方在线的歌单能
+ * 放在侧边栏里面？然后在上面说明这个是网易云的歌单"），点侧栏条目即在本页打开整单；
  * 搜索会把它收起（搜索是新的意图）。歌单曲目放在 online store 里 —— 跳去沉浸页
  * 再回来还在；搜索结果是页面状态、不留。
  */
@@ -94,32 +94,9 @@ function submit(): void {
   void search(keyword.value);
 }
 
-/* ---------- 我的歌单（ON-10） ---------- */
+/* ---------- 我的歌单（ON-10）：导航在侧栏，这里只负责展示 ---------- */
 
 const collectionMode = computed(() => online.activePlaylistId !== null);
-
-/** 「没选歌单」的哨兵值：Reka 的 SelectItem **不接受空串 value**（内容会静默渲染失败），
-    而网易云歌单 id 是纯数字，`:none` 不会撞上任何真实 id */
-const NO_PLAYLIST = ":none";
-
-const pickerOptions = computed(() => [
-  {
-    value: NO_PLAYLIST,
-    label: online.activePlaylistId ? "收起歌单，回到搜索" : "打开我的网易云歌单…",
-  },
-  ...online.playlists.map((entry) => ({
-    value: entry.id,
-    label: `${entry.name} · ${entry.trackCount} 首`,
-  })),
-]);
-
-function onPickerChange(value: string): void {
-  if (value === NO_PLAYLIST) {
-    online.closePlaylist();
-    return;
-  }
-  void online.openPlaylist(value);
-}
 
 /** 展示给列表的曲目：歌单模式用 store 里那份，否则用搜索结果 */
 const displayTracks = computed<Track[]>(() =>
@@ -210,26 +187,6 @@ function toggleFavorite(index: number): void {
         </span>
       </div>
 
-      <!-- 我的歌单（ON-10）：登录后才出现；AppSelect 不能收 class（坑 33），外面套一层 -->
-      <div v-if="online.loggedIn" class="collect-bar">
-        <div class="collect-bar__picker">
-          <AppSelect
-            :model-value="online.activePlaylistId ?? NO_PLAYLIST"
-            :options="pickerOptions"
-            label="我的网易云歌单"
-            @update:model-value="onPickerChange"
-          />
-        </div>
-        <div
-          v-if="online.playlistsStatus === 'error'"
-          class="strip collect-bar__error"
-        >
-          <IconWarningCircle class="icon" />
-          <span>{{ online.playlistsError }}</span>
-          <button class="btn btn-quiet" @click="online.loadPlaylists(true)">重试</button>
-        </div>
-      </div>
-
       <!-- 刷新失败但手上还有上一份结果：保留列表，只在上面给一条提示（不要白屏） -->
       <div v-if="listStatus === 'error' && hasResults === false && listError" class="strip">
         <IconWarningCircle class="icon" />
@@ -316,17 +273,5 @@ function toggleFavorite(index: number): void {
 .count {
   font-size: 12px;
   color: var(--text-3);
-}
-
-/* 我的歌单那一行：与工具栏同宽对齐；出错提示占满剩余宽度 */
-.collect-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.collect-bar__picker {
-  min-width: 240px;
 }
 </style>

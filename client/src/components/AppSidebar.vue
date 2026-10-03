@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import IconCaretDoubleLeft from "~icons/ph/caret-double-left";
 import IconGearSix from "~icons/ph/gear-six";
 import IconListPlus from "~icons/ph/list-plus";
@@ -10,6 +10,7 @@ import InlineNameInput from "@/components/InlineNameInput.vue";
 import { useNavItems } from "@/composables/useNavItems";
 import { playlistErrorMessage } from "@/api/playlists";
 import { useAuthStore } from "@/stores/auth";
+import { useOnlineStore } from "@/stores/online";
 import { usePlaylistsStore } from "@/stores/playlists";
 
 const props = withDefaults(defineProps<{ collapsed: boolean; toggleLabel?: string }>(), {
@@ -22,7 +23,9 @@ const navItems = useNavItems();
 
 const auth = useAuthStore();
 const playlists = usePlaylistsStore();
+const online = useOnlineStore();
 const router = useRouter();
+const route = useRoute();
 
 /** 歌单存在服务器端（PS-01），且是访客级（AC-03）—— 未登录时看不到也建不了（AC-01） */
 const canUsePlaylists = computed(() => auth.role !== "anonymous");
@@ -30,7 +33,36 @@ const creating = ref(false);
 
 onMounted(() => {
   if (canUsePlaylists.value) void playlists.load();
+  // 侧栏要显示网易云分区：启动时验一次本浏览器的音源会话（有会话才触发上游验证）
+  if (canUsePlaylists.value) void online.loadAccount();
 });
+
+// 登录态就绪后把网易云歌单拉下来（loadPlaylists 自带 ready 守卫，与在线页的触发互不打架）
+watch(
+  () => online.loggedIn,
+  (loggedIn) => {
+    if (loggedIn) void online.loadPlaylists();
+  },
+  { immediate: true },
+);
+
+/** 点侧栏的网易云歌单：在 store 里打开它，并落到「在线搜索」页看曲目 */
+function openOnlinePlaylist(id: string): void {
+  void online.openPlaylist(id);
+  if (route.name !== "online") void router.push({ name: "online" });
+}
+
+/**
+ * 主导航的高亮（手动判定，不再用 RouterLink 的 active-class）：
+ * 打开着某份网易云歌单时，当前语境是**那份歌单**，「在线搜索」不再同时高亮
+ * （需求方："这两个不需要同时高亮了"）—— 用户一旦搜索或收起歌单，高亮自然回到「在线搜索」。
+ * 其余项与原 active-class 行为一致（这些路由都是叶子，按路由名判定等价）。
+ */
+function isNavActive(name: string): boolean {
+  if (route.name !== name) return false;
+  if (name === "online" && online.activePlaylistId !== null) return false;
+  return true;
+}
 
 /** 新建：建完直接跳进新歌单，省得再去列表里找一遍 */
 async function submitCreate(name: string): Promise<void> {
@@ -72,7 +104,11 @@ function dismissPlaylistError(): void {
             side="right"
             :side-offset="10"
           >
-            <RouterLink class="nav-item" active-class="active" :to="{ name: item.name }">
+            <RouterLink
+            class="nav-item"
+            :class="{ active: isNavActive(item.name) }"
+            :to="{ name: item.name }"
+          >
               <component :is="item.icon" class="icon" />
               <span class="lbl">{{ item.label }}</span>
             </RouterLink>
@@ -129,6 +165,41 @@ function dismissPlaylistError(): void {
             </li>
           </ul>
         </div>
+
+        <!-- 网易云歌单（ON-10）：登录后把自己在网易云的歌单列在这里，点击即到「在线搜索」打开。
+             分区标题注明来源（需求方："在上面说明这个是网易云的歌单"）；
+             会话存各浏览器自己手里（v6.31），所以这份列表跟着登录那台浏览器走。 -->
+        <template v-if="online.loggedIn">
+          <div class="sb-sep" />
+          <div class="sb-section">
+            <div class="sb-section-head">
+              <span class="lbl">网易云歌单</span>
+            </div>
+
+            <p v-if="online.playlistsStatus === 'loading'" class="sb-hint lbl">读取中…</p>
+            <p v-else-if="online.playlistsStatus === 'error'" class="sb-hint lbl" role="alert">
+              {{ online.playlistsError }}
+            </p>
+            <p v-else-if="online.playlists.length === 0" class="sb-hint lbl">
+              这个账号还没有歌单
+            </p>
+
+            <ul v-else class="sb-lists">
+              <li v-for="entry in online.playlists" :key="entry.id">
+                <button
+                  class="nav-item"
+                  :class="{ active: online.activePlaylistId === entry.id && route.name === 'online' }"
+                  :title="entry.name"
+                  @click="openOnlinePlaylist(entry.id)"
+                >
+                  <IconPlaylist class="icon" />
+                  <span class="lbl">{{ entry.name }}</span>
+                  <span class="sb-count lbl">{{ entry.trackCount }}</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </template>
       </div>
 
       <div class="sb-foot">
@@ -293,7 +364,11 @@ function dismissPlaylistError(): void {
 }
 
 .sb-section {
-  padding: 0 12px 8px;
+  /* 分区**不再横向缩进**（v6.32 需求方："这里没必要往后退一个位置"）——
+     歌单行的图标/文字与主导航同一条竖线；原来 .sb-section 自带 0 12px 的横向 padding，
+     行内容因此比导航右移 12px（应用歌单一直是空的所以从没暴露过，网易云歌单一进来就看见了）。
+     横向内边距挪到分区标题上：标题与导航标签的对齐线保持不变。 */
+  padding: 0 0 8px;
 }
 
 .sb-section-head {
@@ -303,7 +378,9 @@ function dismissPlaylistError(): void {
   color: var(--text-3);
   font-size: 11px;
   letter-spacing: 2px;
-  padding: 6px 0;
+  /* 竖向 6px 是原有呼吸空间；横向 12px 让分区标题与导航标签同一条竖线
+     （v6.32：分区不再整体缩进后，横向内边距挪到标题上） */
+  padding: 6px 12px;
 }
 
 .sb-add {

@@ -20,6 +20,8 @@ defineProps<{
   subtitle: string;
   coverUrl: string | null;
   lines: LyricLine[];
+  /** 翻译歌词行（v6.40，网易 tlyric）：与 lines 同时间轴，可为空数组 */
+  translations?: LyricLine[];
   time: number;
   playing: boolean;
 }>();
@@ -35,7 +37,13 @@ useBeat(() => posterEl.value);
   <div ref="posterEl" class="poster" :class="{ 'is-playing': playing }">
     <div class="poster__col">
       <ImTitle :title="title" :subtitle="subtitle" />
-      <LyricsView class="ly" :lines="lines" :time="time" @seek="emit('seek', $event)" />
+      <LyricsView
+        class="ly"
+        :lines="lines"
+        :translations="translations"
+        :time="time"
+        @seek="emit('seek', $event)"
+      />
     </div>
 
     <!-- 彩胶：外壳（不转·不裁剪）> 旋转盘（转·圆形裁剪）> 盘体/纹理/标签，高光挂外壳内；

@@ -79,6 +79,11 @@ export const usePlayerStore = defineStore("player", () => {
    */
   const lyricsText = ref("");
   /**
+   * 当前曲目的**翻译歌词**原文（v6.40，网易 tlyric；与 lyricsText 同时间轴的 LRC）。
+   * 沉浸页在原文下方渲染。只有在线来源带翻译；切歌即清。
+   */
+  const lyricsTranslation = ref("");
+  /**
    * 手动导入的歌词（LR-02 的第三条来源，v4.87）：按曲目存，刷新后还在。
    * 键的推导见 `utils/lyricsLibrary`：服务器/在线用 id，本地曲目用“歌手|曲名”（id 每次重生成）。
    */
@@ -216,6 +221,7 @@ export const usePlayerStore = defineStore("player", () => {
   /** 换曲即清空歌词：歌词永远属于当前曲目，留着会挂在新歌上 */
   watch(currentIndex, () => {
     lyricsText.value = "";
+    lyricsTranslation.value = "";
   });
 
   /* ---------- 云端曲目的内嵌歌词（LR-02）：开播时按需拉一次 ---------- */
@@ -247,13 +253,13 @@ export const usePlayerStore = defineStore("player", () => {
    * 拉到过的歌词按曲目存一份（会话级、有上限）：`lyricsText` 在切歌时会被清空，
    * 不缓存的话“切走再切回”就得重新发请求，来回听歌的体验是歌词时有时无。
    */
-  const onlineLyricsCache = new Map<string, string>();
+  const onlineLyricsCache = new Map<string, { lyrics: string; translation: string }>();
   /** 上限的理由与手动歌词库一致：歌词很小，但架不住攒得多 */
   const ONLINE_LYRICS_CACHE_LIMIT = 30;
 
-  function cacheOnlineLyrics(id: string, text: string): void {
+  function cacheOnlineLyrics(id: string, entry: { lyrics: string; translation: string }): void {
     if (onlineLyricsCache.has(id)) onlineLyricsCache.delete(id);
-    onlineLyricsCache.set(id, text);
+    onlineLyricsCache.set(id, entry);
     while (onlineLyricsCache.size > ONLINE_LYRICS_CACHE_LIMIT) {
       const oldest = onlineLyricsCache.keys().next().value;
       if (oldest === undefined) break;
@@ -274,18 +280,20 @@ export const usePlayerStore = defineStore("player", () => {
     // 缓存命中直接给：这一步是同步的，切回来马上就有
     const cached = onlineLyricsCache.get(track.id);
     if (cached !== undefined) {
-      lyricsText.value = cached;
+      lyricsText.value = cached.lyrics;
+      lyricsTranslation.value = cached.translation;
       return;
     }
     if (askedOnlineLyrics.has(track.id)) return;
 
     try {
-      const lyrics = await fetchOnlineLyrics(parsed.provider, parsed.nativeId);
+      const { lyrics, translation } = await fetchOnlineLyrics(parsed.provider, parsed.nativeId);
       // 请求回来时可能已经切歌：歌词永远属于当前曲目
       if (currentTrack.value?.id !== track.id) return;
-      if (lyrics) cacheOnlineLyrics(track.id, lyrics);
+      if (lyrics) cacheOnlineLyrics(track.id, { lyrics, translation: translation ?? "" });
       else askedOnlineLyrics.add(track.id);
       lyricsText.value = lyrics ?? "";
+      lyricsTranslation.value = translation ?? "";
     } catch {
       // 音源不可用就不给歌词，不影响播放与手动导入；下次切回还会再试
     }
@@ -816,6 +824,7 @@ export const usePlayerStore = defineStore("player", () => {
     displaySeconds,
     displayRatio,
     lyricsText,
+    lyricsTranslation,
     importedLyrics,
     hasImportedLyrics,
     lyricsSource,

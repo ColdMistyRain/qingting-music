@@ -136,9 +136,11 @@ export function createOnlineRouter(config: AppConfig): Router {
       }
       const session = readSession(req);
       try {
-        sendOk(res, {
-          lyrics: await provider.getLyrics(id, session.length > 0 ? session : undefined),
-        });
+        const { lyrics, translation } = await provider.getLyrics(
+          id,
+          session.length > 0 ? session : undefined,
+        );
+        sendOk(res, { lyrics, translation });
       } catch (error) {
         if (error instanceof UpstreamError) {
           sendFail(res, 502, "音源暂时连不上，稍后再试");

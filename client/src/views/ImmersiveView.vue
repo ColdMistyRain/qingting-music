@@ -79,6 +79,14 @@ const coverUrl = computed(() => track.value?.cover ?? null);
 const lines = computed(() => parseLyrics(player.lyricsSource).lines);
 
 /**
+ * 翻译歌词（v6.40，网易 tlyric）：与原文同时间轴的 LRC，按时间对齐到原文行。
+ * 只在歌词来自在线音源时有值；按毫秒取整做键，浮点相等性不掺运气。
+ */
+const translationLines = computed(() =>
+  player.lyricsTranslation ? parseLyrics(player.lyricsTranslation).lines : [],
+);
+
+/**
  * 时间采样：timeupdate 只有 ~4Hz，直接喂给逐字填充会一跳一跳。
  * 播放中用 rAF 每帧向 store 取一次"此刻真实时间"；暂停时用 store 的展示值兜住（拖进度条也能更新）。
  */
@@ -240,6 +248,7 @@ onBeforeUnmount(() => {
           :subtitle="subtitleText"
           :cover-url="coverUrl"
           :lines="lines"
+          :translations="translationLines"
           :time="now"
           :playing="player.playing"
           @seek="player.seekTo($event)"

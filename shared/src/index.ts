@@ -91,6 +91,11 @@ export interface OnlineStreamInfo {
 /** GET /api/online/:provider/lyrics 的返回（ON-05）：原文（LRC / yrc），没有就是 null */
 export interface OnlineLyricsInfo {
   lyrics: string | null;
+  /**
+   * 翻译歌词（LR-02 扩展，v6.40）：与原文同时间轴的 LRC（网易 tlyric），
+   * 沉浸页在原文下方渲染。没有就是 null。
+   */
+  translation?: string | null;
 }
 
 /* ---------- 音源账号（ON-10，v6.30：扫码登录，听自己收藏的歌）---------- */

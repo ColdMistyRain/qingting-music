@@ -32,7 +32,9 @@ function stubUpstream(routes: UpstreamRoutes = {}) {
 const UPSTREAM_OK = {
   "/cloudsearch": { body: { result: { songs: [{ id: 186016, name: "夜曲", dt: 226000 }] } } },
   "/song/url/v1": { body: { data: [{ url: "http://m701.music.126.net/abc.mp3" }] } },
-  "/lyric/new": { body: { lrc: { lyric: "[00:01.17]夜曲" } } },
+  "/lyric/new": {
+    body: { lrc: { lyric: "[00:01.17]夜曲" }, tlyric: { lyric: "[00:01.17]Night Song" } },
+  },
 };
 
 type UpstreamRoutes = Record<string, { status?: number; body?: unknown }>;
@@ -156,11 +158,14 @@ describe("在线音源路由 · 播放地址与歌词（ON-03 / ON-05）", () =>
     expect(res.body.data).toEqual({ url: null });
   });
 
-  it("歌词返回原文；id 形状不合法 400（../ 这类别想顺进查询串）", async () => {
+  it("歌词返回原文与翻译；id 形状不合法 400（../ 这类别想顺进查询串）", async () => {
     const { app } = await setup();
 
     const res = await request(app).get("/api/online/netease/lyrics?id=186016");
-    expect(res.body.data).toEqual({ lyrics: "[00:01.17]夜曲" });
+    expect(res.body.data).toEqual({
+      lyrics: "[00:01.17]夜曲",
+      translation: "[00:01.17]Night Song",
+    });
     expect((await request(app).get("/api/online/netease/lyrics?id=../etc")).status).toBe(400);
     expect((await request(app).get("/api/online/netease/stream?id=")).status).toBe(400);
   });

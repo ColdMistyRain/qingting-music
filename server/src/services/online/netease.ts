@@ -396,15 +396,19 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
     },
 
     async getLyrics(id, cookie) {
-      // lyric_new 才带逐字 yrc；旧版服务没有它（404）就回落 lyric
+      // lyric_new 才带逐字 yrc 与翻译 tlyric；旧版服务没有它（404）就回落 lyric
       try {
         const { body } = await call("lyric_new", { id }, cookie);
         const yrc = body.yrc as { lyric?: unknown } | undefined;
         const lrc = body.lrc as { lyric?: unknown } | undefined;
+        const tlyric = body.tlyric as { lyric?: unknown } | undefined;
         const text =
           normalizeNeteaseLyric(asString(yrc?.lyric).trim()) ||
           normalizeNeteaseLyric(asString(lrc?.lyric).trim());
-        return text || null;
+        // 翻译（tlyric，LRC 格式、与原文同时间轴）：有正文才有翻译
+        const translation =
+          normalizeNeteaseLyric(asString(tlyric?.lyric).trim()) || null;
+        return { lyrics: text || null, translation: text ? translation : null };
       } catch (error) {
         // 只有"这个接口不存在"才值得回落；上游真断了就让 502 说实话
         if (!(error instanceof UpstreamError && error.status === 404)) {
@@ -413,8 +417,13 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
       }
       const { body } = await call("lyric", { id, lv: -1, kv: -1, tv: -1, rv: -1 }, cookie);
       const lrc = body.lrc as { lyric?: unknown } | undefined;
+      const tlyric = body.tlyric as { lyric?: unknown } | undefined;
       const text = normalizeNeteaseLyric(asString(lrc?.lyric).trim());
-      return text || null;
+      const translation = normalizeNeteaseLyric(asString(tlyric?.lyric).trim());
+      return {
+        lyrics: text || null,
+        translation: text ? translation || null : null,
+      };
     },
 
     canProxyCover(url) {

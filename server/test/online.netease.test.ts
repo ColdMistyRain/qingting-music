@@ -170,12 +170,12 @@ describe("网易云适配器 · 歌词（ON-05）", () => {
     const withYrc = makeProvider({
       "/lyric/new": { body: { yrc: { lyric: "[1170,2900](1170,240,0)糖" }, lrc: { lyric: "[00:01.17]糖" } } },
     });
-    expect(await withYrc.provider.getLyrics("1")).toBe("[1170,2900](1170,240,0)糖");
+    expect((await withYrc.provider.getLyrics("1"))?.lyrics).toBe("[1170,2900](1170,240,0)糖");
 
     const lineOnly = makeProvider({
       "/lyric/new": { body: { lrc: { lyric: "[00:01.17]糖" } } },
     });
-    expect(await lineOnly.provider.getLyrics("1")).toBe("[00:01.17]糖");
+    expect((await lineOnly.provider.getLyrics("1"))?.lyrics).toBe("[00:01.17]糖");
   });
 
   it("旧版服务没有 /lyric/new（404）时回落 /lyric", async () => {
@@ -183,7 +183,7 @@ describe("网易云适配器 · 歌词（ON-05）", () => {
       "/lyric/new": { status: 404, body: { msg: "未知接口" } },
       "/lyric": { body: { lrc: { lyric: "[00:01.17]糖" } } },
     });
-    expect(await provider.getLyrics("1")).toBe("[00:01.17]糖");
+    expect((await provider.getLyrics("1"))?.lyrics).toBe("[00:01.17]糖");
     expect(stub.calls.some((path) => path.startsWith("/lyric?"))).toBe(true);
   });
 
@@ -197,7 +197,7 @@ describe("网易云适配器 · 歌词（ON-05）", () => {
     ].join("\n");
     const { provider } = makeProvider({ "/lyric/new": { body: { yrc: { lyric: mixed } } } });
 
-    const text = await provider.getLyrics("1");
+    const { lyrics: text } = await provider.getLyrics("1");
     expect(text).toBe(
       "[00:00.00]作曲: 高桥优\n" +
         "[00:01.00]作词: 米果\n" +
@@ -217,15 +217,35 @@ describe("网易云适配器 · 歌词（ON-05）", () => {
     ].join("\n");
     const { provider } = makeProvider({ "/lyric/new": { body: { lrc: { lyric: jsonLyric } } } });
 
-    const text = await provider.getLyrics("1");
+    const { lyrics: text } = await provider.getLyrics("1");
     expect(text).toBe(
       "[00:00.00]作词: Lucky 小爱\n[00:01.00]第一句\n不是 JSON 的行会被跳过\n[00:00.00]预备行",
     );
   });
 
+  it("翻译 tlyric 随正文带出（v6.40）；正文为空时不给孤立的翻译", async () => {
+    const withTrans = makeProvider({
+      "/lyric/new": {
+        body: {
+          lrc: { lyric: "[00:01.00]한국어 가사" },
+          tlyric: { lyric: "[00:01.00]韩国歌词" },
+        },
+      },
+    });
+    expect(await withTrans.provider.getLyrics("1")).toEqual({
+      lyrics: "[00:01.00]한국어 가사",
+      translation: "[00:01.00]韩国歌词",
+    });
+
+    const noText = makeProvider({
+      "/lyric/new": { body: { tlyric: { lyric: "[00:01.00]孤立的翻译" } } },
+    });
+    expect(await noText.provider.getLyrics("1")).toEqual({ lyrics: null, translation: null });
+  });
+
   it("两边都是空歌词 → null；上游 5xx 抛 UpstreamError（不回落）", async () => {
     const blank = makeProvider({ "/lyric/new": { body: { lrc: { lyric: "" } } } });
-    expect(await blank.provider.getLyrics("1")).toBeNull();
+    expect((await blank.provider.getLyrics("1"))?.lyrics).toBeNull();
 
     const down = makeProvider({ "/lyric/new": { status: 502, body: "bad gateway" } });
     await expect(down.provider.getLyrics("1")).rejects.toBeInstanceOf(UpstreamError);
@@ -328,7 +348,7 @@ describe("网易云适配器 · 内嵌库传输（v6.29 默认）", () => {
       lyric_new: async () => ({ status: 200, body: { lrc: { lyric: "[00:01.17]糖" } } }),
     });
     expect(await ok.getStreamUrl("186016")).toBe("https://m701.music.126.net/a.mp3");
-    expect(await ok.getLyrics("186016")).toBe("[00:01.17]糖");
+    expect((await ok.getLyrics("186016"))?.lyrics).toBe("[00:01.17]糖");
 
     const err = makeEmbedded({
       song_url_v1: async () => ({ status: 502, body: { code: 502 } }),

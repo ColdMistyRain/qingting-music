@@ -47,11 +47,14 @@ export function fetchOnlineStreamUrl(provider: string, nativeId: string): Promis
 }
 
 /** 歌词原文（ON-05）：LRC / yrc；`null` = 这首歌没有歌词 */
-export function fetchOnlineLyrics(provider: string, nativeId: string): Promise<string | null> {
+export function fetchOnlineLyrics(
+  provider: string,
+  nativeId: string,
+): Promise<{ lyrics: string | null; translation: string | null }> {
   return apiGet<OnlineLyricsInfo>(
     `/api/online/${encodeURIComponent(provider)}/lyrics?id=${encodeURIComponent(nativeId)}`,
     withSession(),
-  ).then((info) => info.lyrics);
+  ).then((info) => ({ lyrics: info.lyrics, translation: info.translation ?? null }));
 }
 
 /* ---------- 账号（ON-10：扫码登录，听自己在音源收的歌）---------- */

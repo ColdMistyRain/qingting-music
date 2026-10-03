@@ -42,8 +42,14 @@ export interface OnlineProvider {
    * 带登录会话时适配器可以请求更高音质档位。
    */
   getStreamUrl(id: string, cookie?: string[]): Promise<string | null>;
-  /** 歌词原文（LRC / yrc 均可，客户端解析器都认）；`null` = 这首歌没有歌词（ON-05） */
-  getLyrics(id: string, cookie?: string[]): Promise<string | null>;
+  /**
+   * 歌词原文（LRC / yrc 均可，客户端解析器都认）+ 可选的翻译 LRC（tlyric，
+   * 与原文同时间轴，v6.40）。`lyrics: null` = 这首歌没有歌词（ON-05）。
+   */
+  getLyrics(
+    id: string,
+    cookie?: string[],
+  ): Promise<{ lyrics: string | null; translation: string | null }>;
   /**
    * 封面代理白名单（SSRF 防线）：`/api/online/:provider/cover` 只转发**这里放行**的 URL。
    * 音源返回的封面地址都在它自家 CDN 上，按 host 后缀放行即可；别写成"任意 URL 都转发"。

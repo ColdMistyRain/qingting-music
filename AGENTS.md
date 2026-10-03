@@ -170,7 +170,7 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 
 **音源账号扫码登录（v6.30，ON-10；v6.31 会话模型修订）**：需求方要"听自己在不同平台上收藏的歌"。Provider 接口新增可选能力 `account`（扫码登录四步：取 key → 取二维码 → 轮询 801/802/800 → 803 时 Set-Cookie **原样交给扫码的浏览器**）与 `collections`（`user_playlist` 歌单列表 + `playlist_track_all` 分页拉全）。**v6.31（需求方定）**：会话不再存服务端（单槽下两人先后扫码会互相覆盖、账号串号）—— 改存**各浏览器自己的 localStorage**（`utils/onlineSession`，按音源分槽），每次在线请求经 `X-Online-Auth` 头带给后端转交，后端全程无状态；`GET /login` 是无状态验真（失效即清本地），旧的 `data/online-auth.json` 已撤销（上游注销 + 删文件）。代价：换浏览器/清浏览器数据要重新扫码。登录后直链档位提到 exhigh（320k）；VIP 曲目能否完整听由账号会员状态决定（上游 freeTrialInfo 标记试听片段，适配器把它视同"无可用音源"，前端说"需要 VIP 或暂无版权"）。前端：设置 › 在线音源 账号卡片（扫码/退出）、OnlineQrDialog 扫码弹窗（与 ConfirmDialog 同一套约定）、在线搜索页登录后出现「我的歌单」下拉（选中整单加载、搜索收起；歌单放 store，跳沉浸页回来还在）。试听歌曲行内加「试听」小签（v6.33，需求方定）：`Track.vipOnly` 随 toOnlineTrack 带进列表，TrackRow 歌手行渲染弱色描边标；权威判定仍是 stream 的 freeTrialInfo。留白：QQ/酷狗扫码（随适配器）、会话过期重登提示、会员账号下标记语义（profile vipType）、收藏/最近播放在线引用暂无标记。
 
-**进度条缓冲指示（v6.42）**：缓冲层（`audio.buffered` 末端的浅色底，弱两大档）垫在填充后面 + 缓冲中手柄脉动（waiting 亮/canplay·playing·暂停灭；合成层属性）；`buffering`/`bufferedEnd` 在 player store，ProgressBar 共享件直接读；回调里读 audio.buffered 用闭包非空引用（this 在测试桩里不保留）。
+**专辑网格视图**（v6.47：`groupAlbums` 纯函数按专辑名聚组 + LibraryView 列表/专辑双视图；点卡片进专辑详情，队列 = 该专辑曲目）。**进度条缓冲指示（v6.42）**：缓冲层（`audio.buffered` 末端的浅色底，弱两大档）垫在填充后面 + 缓冲中手柄脉动（waiting 亮/canplay·playing·暂停灭；合成层属性）；`buffering`/`bufferedEnd` 在 player store，ProgressBar 共享件直接读；回调里读 audio.buffered 用闭包非空引用（this 在测试桩里不保留）。
 
 **音/译独立开关按钮排**（v6.46：沉浸页歌词右侧竖排「音/译」钮，学 AMLL Player；`romanVisible` 与翻译独立持久；v-memo 依赖需补 `romansKey` 否则暂停中切换不生效）。
 

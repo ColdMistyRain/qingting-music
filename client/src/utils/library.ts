@@ -9,6 +9,8 @@ export type SongSortKey = "title" | "artist" | "size" | "uploadedAt";
 export type SortDirection = "asc" | "desc";
 
 /** 关键词过滤（标题 / 歌手 / 专辑，忽略大小写）；空关键词返回全部 */
+import { UNKNOWN_ALBUM } from "@qingting/shared";
+
 export function filterSongs<T extends { title: string; artist: string; album: string }>(
   songs: readonly T[],
   keyword: string,
@@ -20,6 +22,38 @@ export function filterSongs<T extends { title: string; artist: string; album: st
   return songs.filter((song) =>
     [song.title, song.artist, song.album].some((field) => field.toLowerCase().includes(needle)),
   );
+}
+
+/** 专辑分组（VS-06）：按专辑名聚组，封面/歌手取组内第一首有值的 */
+export interface AlbumGroup {
+  /** 专辑名（trim 后的小写键，展示用原始名） */
+  key: string;
+  name: string;
+  /** 组内第一首的歌手（同名专辑多位歌手时此处只显示第一位） */
+  artist: string;
+  /** 组内第一首有封面的封面；全无则 null（网格占位符兜底） */
+  cover: string | null;
+  tracks: Song[];
+}
+
+/**
+ * 按专辑名分组（trim 后按小写归并同名）。所有歌都会进组（含「未知专辑」——
+ * 真实曲库的常态，网格里一个"未知专辑"卡比 N 张散卡诚实）。
+ */
+export function groupAlbums(songs: readonly Song[]): AlbumGroup[] {
+  const groups = new Map<string, AlbumGroup>();
+  for (const song of songs) {
+    const name = song.album.trim() || UNKNOWN_ALBUM;
+    const key = name.toLowerCase();
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, name, artist: song.artist, cover: song.coverUrl, tracks: [] };
+      groups.set(key, group);
+    }
+    group.tracks.push(song);
+    if (!group.cover && song.coverUrl) group.cover = song.coverUrl;
+  }
+  return [...groups.values()];
 }
 
 /** 排序：文本按中文语序，数值按大小；返回新数组，不修改入参 */ export function sortSongs(

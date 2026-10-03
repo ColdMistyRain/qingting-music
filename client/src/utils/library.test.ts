@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Song } from "@qingting/shared";
-import { filterSongs, songToTrack, sortSongs } from "./library";
+import { UNKNOWN_ALBUM, type Song } from "@qingting/shared";
+import { filterSongs, groupAlbums, songToTrack, sortSongs } from "./library";
 
 function song(patch: Partial<Song> & { id: string }): Song {
   return {
@@ -43,6 +43,35 @@ const LIBRARY: Song[] = [
     uploadedAt: "2026-09-30T11:00:00.000Z",
   }),
 ];
+
+describe("groupAlbums（VS-06 专辑网格）", () => {
+  it("按专辑名聚组（trim + 小写归并同名）；封面取组内第一首有值的", () => {
+    const groups = groupAlbums([
+      song({ id: "1", album: " 叶惠美 ", coverUrl: null }),
+      song({ id: "2", album: "叶惠美", coverUrl: "/covers/y.jpg" }),
+      song({ id: "3", album: "乐与怒" }),
+    ]);
+    expect(groups).toHaveLength(2);
+    const yehuimei = groups.find((g) => g.key === "叶惠美")!;
+    expect(yehuimei.tracks.map((t) => t.id)).toEqual(["1", "2"]);
+    expect(yehuimei.cover).toBe("/covers/y.jpg");
+    expect(groups.find((g) => g.key === "乐与怒")?.cover).toBeNull();
+  });
+
+  it("未知专辑 / 空专辑名归并进「未知专辑」一组（真实曲库常态）", () => {
+    const groups = groupAlbums([
+      song({ id: "1", album: UNKNOWN_ALBUM }),
+      song({ id: "2", album: "  " }),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.name).toBe(UNKNOWN_ALBUM);
+    expect(groups[0]?.tracks).toHaveLength(2);
+  });
+
+  it("空曲库 → 空数组", () => {
+    expect(groupAlbums([])).toEqual([]);
+  });
+});
 
 describe("filterSongs（对 Track 同样适用：在线歌单的站内过滤，v6.35）", () => {
   it("按标题/歌手过滤曲目，忽略大小写", () => {

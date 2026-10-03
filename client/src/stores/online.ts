@@ -188,13 +188,15 @@ export const useOnlineStore = defineStore("online", () => {
     if (playlistsStatus.value === "ready" && !force) return;
     playlistsStatus.value = "loading";
     try {
-      playlists.value = (await fetchOnlineCollections("netease")).playlists;
+      // 跟随所选音源（v6.57：QQ 登录后侧栏就是 QQ 的歌单；切音源由 setProvider 清态重拉）
+      playlists.value = (await fetchOnlineCollections(provider.value)).playlists;
       playlistsStatus.value = "ready";
     } catch (error) {
       // 未登录（401）是最常见的原因：给一句能照着做的话
+      const label = provider.value === "qq" ? "QQ 音乐" : "网易云";
       playlistsError.value =
         error instanceof ApiError && error.status === 401
-          ? "还没有登录网易云账号"
+          ? `还没有登录${label}账号`
           : (error instanceof Error ? error.message : "歌单没能读出来");
       playlistsStatus.value = "error";
     }
@@ -215,7 +217,7 @@ export const useOnlineStore = defineStore("online", () => {
     } catch {
       // 存不上就算了：这次会话内仍然有效
     }
-    // 切源 = 换语境：搜索结果与打开中的歌单（网易云的）都清掉
+    // 切源 = 换语境：搜索结果与打开中的歌单都清掉，歌单列表换成新音源的
     closePlaylist();
     searchKeyword.value = "";
     searchStatus.value = "idle";
@@ -223,6 +225,12 @@ export const useOnlineStore = defineStore("online", () => {
     searchTracks.value = [];
     lastSearchKeyword.value = "";
     searchSeq += 1;
+    playlists.value = [];
+    playlistsStatus.value = "idle";
+    playlistsError.value = "";
+    if (next === "qq" ? qqSession.value !== null : session.value !== null) {
+      void loadPlaylists(true);
+    }
   }
 
   /* ---------- 搜索（ON-02）：结果跨页保留（v6.45，需求方连点"继续"后我把
@@ -283,9 +291,9 @@ export const useOnlineStore = defineStore("online", () => {
     collectionError.value = "";
     activePlaylistId.value = id;
 
-    const cached = readCollectionCache("netease", id);
+    const cached = readCollectionCache(provider.value, id);
     if (cached) {
-      collectionTracks.value = cached.tracks.map((info) => toOnlineTrack("netease", info));
+      collectionTracks.value = cached.tracks.map((info) => toOnlineTrack(provider.value, info));
       collectionStatus.value = "ready";
       return;
     }
@@ -300,9 +308,9 @@ export const useOnlineStore = defineStore("online", () => {
     collectionTracks.value = [];
     collectionStatus.value = "loading";
     try {
-      const { tracks } = await fetchOnlineCollectionTracks("netease", id);
-      writeCollectionCache("netease", id, tracks);
-      collectionTracks.value = tracks.map((info) => toOnlineTrack("netease", info));
+      const { tracks } = await fetchOnlineCollectionTracks(provider.value, id);
+      writeCollectionCache(provider.value, id, tracks);
+      collectionTracks.value = tracks.map((info) => toOnlineTrack(provider.value, info));
       collectionStatus.value = "ready";
     } catch (error) {
       collectionError.value = error instanceof Error ? error.message : "歌单没能读出来";

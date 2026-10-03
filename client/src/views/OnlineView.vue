@@ -10,7 +10,6 @@ import IconPlugsConnected from "~icons/ph/plugs-connected";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import EmptyState from "@/components/EmptyState.vue";
 import AppSelect from "@/components/AppSelect.vue";
-import IconQrCode from "~icons/ph/qr-code";
 import TrackList from "@/components/TrackList.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
 import { debounce } from "@/utils/debounce";
@@ -47,13 +46,25 @@ onMounted(() => {
 });
 
 /* ---------- 音源选择（v6.57，ON-06）---------- */
-const sourceOptions = [
-  { value: "netease", label: "网易云" },
-  { value: "qq", label: "QQ 音乐" },
-] as const;
-/** QQ 的搜索必须带登录 Cookie（匿名上游直接拒绝，v6.57 实测）：
-    未登录时不给搜索框，先引导扫码 */
-const qqNeedsLogin = computed(() => online.provider === "qq" && !online.qqLoggedIn);
+/** 音源下拉只列可用的：QQ 的搜索与播放都要登录态（匿名上游直接拒绝），
+    未登录就不出现 QQ 选项（需求方："不登录 qq 音乐就不展示 qq 音乐的音源"）；
+    登录入口在 设置 › 在线音源 */
+const sourceOptions = computed(() =>
+  online.qqLoggedIn
+    ? [
+        { value: "netease", label: "网易云" },
+        { value: "qq", label: "QQ 音乐" },
+      ]
+    : [{ value: "netease", label: "网易云" }],
+);
+
+// QQ 登出后所选音源失效：自动回网易云，不让界面停在"看不到的音源"上
+watch(
+  () => [online.provider, online.qqLoggedIn] as const,
+  ([p, loggedIn]) => {
+    if (p === "qq" && !loggedIn) online.setProvider("netease");
+  },
+);
 
 // 登录态就绪后把歌单列表备好（一次轻请求；未登录时这步自动失败、静默）
 watch(
@@ -196,7 +207,7 @@ function toggleFavorite(index: number): void {
     />
 
     <template v-else>
-      <div v-if="!qqNeedsLogin" class="toolbar">
+      <div class="toolbar">
         <!-- 坑 33：AppSelect 根是 fragment，class 透传不生效 —— 宿主包一层 div 承载版式 -->
         <div v-if="!collectionMode" class="source-select">
           <AppSelect
@@ -236,21 +247,6 @@ function toggleFavorite(index: number): void {
         </span>
       </div>
 
-      <!-- QQ 未登录：搜索必须带登录态（v6.57 实测匿名全被拒），先引导扫码 -->
-      <EmptyState
-        v-if="qqNeedsLogin"
-        :icon="IconQrCode"
-        title="先扫码登录 QQ 音乐"
-        desc="QQ 的搜索与播放都要登录态。登录保存在这台浏览器里，换浏览器需要重新扫码。"
-        fill
-      >
-        <RouterLink class="btn btn-primary" to="/settings">
-          <IconQrCode class="icon" />
-          去 设置 › 在线音源 扫码登录
-        </RouterLink>
-      </EmptyState>
-
-      <template v-else>
       <!-- 刷新失败但手上还有上一份结果：保留列表，只在上面给一条提示（不要白屏） -->
       <div v-if="listStatus === 'error' && hasResults === false && listError" class="strip">
         <IconWarningCircle class="icon" />
@@ -351,7 +347,6 @@ function toggleFavorite(index: number): void {
           </EmptyState>
         </div>
       </div>
-      </template>
     </template>
   </section>
 </template>

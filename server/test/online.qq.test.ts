@@ -7,10 +7,12 @@ function stubFetch(
   routes: Record<string, { status?: number; body?: unknown; raw?: string }>,
 ) {
   const calls: string[] = [];
-  const impl = vi.fn(async (url: string | URL | Request) => {
+  const headerCalls: Record<string, string>[] = [];
+  const impl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const path = String(url).replace(/^https?:\/\/[^/]+/, "");
     const key = Object.keys(routes).find((prefix) => path.startsWith(prefix));
     calls.push(path);
+    if (init?.headers) headerCalls.push(init.headers as Record<string, string>);
     const route = key === undefined ? undefined : routes[key];
     if (!route) return new Response("not found", { status: 404 });
     return new Response(JSON.stringify(route.body ?? null), {
@@ -18,7 +20,7 @@ function stubFetch(
       headers: { "Content-Type": "application/json" },
     });
   }) as unknown as typeof fetch;
-  return { impl, calls };
+  return { impl, calls, headerCalls };
 }
 
 const BASE = "http://qq-service.test";
@@ -85,14 +87,20 @@ describe("QQ 音乐适配器 · 搜索（ON-06）", () => {
     expect(tracks[1]?.artist).toBe("某人 / 另一人");
   });
 
-  it("登录会话经 cookie query 传回（QQ 搜索必须带登录态，v6.57 实测）", async () => {
+  it("带会话的搜索直调 musicu.fcg：Cookie 走请求头（包的搜索链路只认全局 Cookie）", async () => {
     const { provider, stub } = makeProvider({
-      "/getSearchByKey": { body: { code: 0, data: { list: [] } } },
+      "/cgi-bin/musicu.fcg": {
+        body: {
+          "music.search.SearchCgiService": {
+            data: { song: { list: [{ mid: "m1", name: "歌", interval: 10, pay: { pay_play: 1 } }] } },
+          },
+        },
+      },
     });
-    await provider.search("晴天", ["qqmusic_session=sealed-token; uin=o123"]);
-    expect(stub.calls[0]).toContain(
-      "&cookie=" + encodeURIComponent("qqmusic_session=sealed-token; uin=o123"),
-    );
+    const tracks = await provider.search("晴天", ["qqmusic_session=sealed-token; uin=o123"]);
+    expect(stub.calls[0]).toContain("/cgi-bin/musicu.fcg");
+    expect(stub.headerCalls[0]?.Cookie).toBe("qqmusic_session=sealed-token; uin=o123");
+    expect(tracks[0]).toMatchObject({ id: "m1", title: "歌", vipOnly: true });
   });
 
   it("嵌套形状也接得住（data.body.song.list）", async () => {

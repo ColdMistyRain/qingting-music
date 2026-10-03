@@ -30,6 +30,7 @@ import { UpstreamError, type OnlineProvider } from "./provider.js";
 /** 搜索结果里的一首（上游字段：client_search_cp 的 list 项） */
 interface QqSong {
   songmid?: string;
+  mid?: string;
   songname?: string;
   name?: string;
   singer?: { name?: string }[];
@@ -204,11 +205,13 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
       | undefined;
     const inResponse = (response?.song as Record<string, unknown> | undefined)?.list as unknown[] | undefined;
     if (Array.isArray(inResponse)) return inResponse as QqSong[];
+    if (Array.isArray(response?.list)) return response.list as QqSong[];
     return [];
   }
 
-  function mapSong(song: QqSong): OnlineTrack | null {
-    const id = song.songmid;
+  function mapSong(song: QqSong & { mid?: string; pay?: { pay_play?: number } }): OnlineTrack | null {
+    // 两套字段族：搜索老接口 songmid/songname/albumname；musicu.fcg mid/name/album.{mid,name}
+    const id = song.songmid ?? song.mid;
     const title = song.songname ?? song.name;
     if (!id || !title) return null;
     const albumMid = song.album?.mid;
@@ -220,17 +223,50 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
       // QQ 的 interval 本来就是秒（网易才是毫秒）
       duration: typeof song.interval === "number" && song.interval > 0 ? song.interval : null,
       cover: albumMid ? `https://y.gtimg.cn/music/photo_new/T002R500x500M000${albumMid}.jpg` : null,
-      // fee=1 是 VIP 专享（仅供参考，能不能播以 stream 接口为准 —— ON-03 的口径）
-      vipOnly: song.fee === 1,
+      // fee=1 / pay.pay_play=1 是 VIP 专享（仅供参考，能不能播以 stream 接口为准）
+      vipOnly: song.fee === 1 || song.pay?.pay_play === 1,
     };
+  }
+
+  /** musicu.fcg 直调搜索（带登录态）：QQ 网页播放器同一条路 */
+  async function searchDirect(keyword: string, cookie: string[]): Promise<OnlineTrack[]> {
+    const payload = {
+      "music.search.SearchCgiService": {
+        method: "DoSearchForQQMusicDesktop",
+        param: { search_type: 0, query: keyword, page_num: 1, num_per_page: 30 },
+      },
+    };
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://u.y.qq.com/cgi-bin/musicu.fcg?format=json&data=${encodeURIComponent(JSON.stringify(payload))}`,
+        { headers: { Cookie: cookie.join("; "), Referer: "https://y.qq.com/" } },
+      );
+    } catch (error) {
+      throw new UpstreamError(`QQ 音乐搜索连不上：${error instanceof Error ? error.message : String(error)}`);
+    }
+    const body = (await response.json().catch(() => null)) as Record<string, Record<string, unknown>> | null;
+    if (!body) throw new UpstreamError("QQ 音乐搜索回了不成形的响应", response.status);
+    const module = body["music.search.SearchCgiService"] as
+      | { data?: { song?: { list?: QqSong[] } } }
+      | undefined;
+    return (module?.data?.song?.list ?? [])
+      .map(mapSong)
+      .filter((track): track is OnlineTrack => track !== null);
   }
 
   return {
     id: "qq",
 
     async search(keyword, cookie) {
+      // 有会话走 musicu.fcg 直调（带浏览器的真实 Cookie 头）：包的搜索链路只认
+      // 全局配置 Cookie（config/user-info），不认按浏览器的会话 —— v6.57 实测匿名
+      // 老接口 500、musicu.fcg 500003，带真 Cookie 的 musicu.fcg 才是现在的正路
+      if (cookie && cookie.length > 0) {
+        return searchDirect(keyword, cookie);
+      }
       const body = await call(
-        `/getSearchByKey?key=${encodeURIComponent(keyword)}&limit=30&page=1${cookieQuery(cookie)}`,
+        `/getSearchByKey?key=${encodeURIComponent(keyword)}&limit=30&page=1`,
       );
       return songListOf(body)
         .map(mapSong)
@@ -268,6 +304,46 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
       } catch {
         return false;
       }
+    },
+
+    collections: {
+      async getPlaylists(_userId, cookie) {
+        const body = (await call(`/user/playlist?${cookieQuery(cookie).slice(1)}`)) as {
+          data?: { v_playlist?: Record<string, unknown>[] };
+          v_playlist?: Record<string, unknown>[];
+        };
+        const list = body.data?.v_playlist ?? body.v_playlist ?? [];
+        return list.map((item) => {
+          const id = String(item.tid ?? item.dissid ?? item.dirid ?? item.id ?? "");
+          return {
+            id,
+            name: typeof item.dissname === "string" ? item.dissname : typeof item.name === "string" ? item.name : "",
+            cover: typeof item.imgurl === "string" ? item.imgurl : typeof item.logo === "string" ? item.logo : null,
+            trackCount: Number(item.song_count ?? item.songcnt ?? 0) || 0,
+          };
+        });
+      },
+
+      async getPlaylistTracks(playlistId, cookie) {
+        const cookieQs = cookieQuery(cookie).slice(1);
+        const collected: OnlineTrack[] = [];
+        // 分页拉全（包单页上限 100，more/total 告知是否还有；防御性上限 1000 首）
+        for (let offset = 0; offset < 1000; offset += 100) {
+          const body = (await call(
+            `/user/playlist-detail?tid=${encodeURIComponent(playlistId)}&offset=${offset}&limit=100${cookieQs ? `&${cookieQs}` : ""}`,
+          )) as { songs?: Record<string, unknown>[]; more?: boolean | number; total?: number };
+          const songs = Array.isArray(body.songs) ? body.songs : [];
+          for (const item of songs) {
+            // 曲目可能裸放，也可能包在 songInfo 里（musicu 的歌单读法）
+            const song = (item.songInfo ?? item.song ?? item) as QqSong & { mid?: string; pay?: { pay_play?: number } };
+            const mapped = mapSong(song);
+            if (mapped) collected.push(mapped);
+          }
+          const more = body.more === true || body.more === 1;
+          if (!more || songs.length === 0) break;
+        }
+        return collected;
+      },
     },
 
     account: {

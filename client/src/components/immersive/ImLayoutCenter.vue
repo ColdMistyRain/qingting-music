@@ -64,6 +64,14 @@ const emit = defineEmits<{ seek: [seconds: number] }>();
   text-align: center;
 }
 
+/* 标题那一行是 **flex**（歌名 + 收藏键），而 `text-align` 管不到 flex items ——
+   上面 `.tb` 的 `text-align: center` 只让歌手行居中，歌名与心形键还是贴在左边缘
+   （v6.24 需求方圈图：“这个标题应该也居中吧”；实测标题中心 x=126 / 容器中心 195）。
+   歌名定长超长时由自己的 `flex: 0 1 auto` + 省略号处理，整组居中不影向它。 */
+.center :deep(.im-tb__head) {
+  justify-content: center;
+}
+
 @media (max-width: 720px) {
   .ly {
     /* 吃剩余空间（而不是 `min(40vh, 320px)` 的固定高）：

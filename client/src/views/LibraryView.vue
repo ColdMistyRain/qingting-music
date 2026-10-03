@@ -73,6 +73,24 @@ const albumTracks = computed(() =>
     专辑详情 = 这张专辑，否则 = 全库。点播/收藏/计数都用它 —— "眼前这段整份当队列"。 */
 const displayTracks = computed(() => (albumDetail.value ? albumTracks.value : tracks.value));
 
+/** 专辑网格模式（非详情）：网格 + 计数 + 空态都按它分叉 */
+const albumGridMode = computed(() => viewMode.value === "albums" && !albumDetail.value);
+
+/** 网格显示的专辑（v6.52 补：v6.47 的 PRD 写了"网格模式按专辑名过滤"，实现里一直没接
+    —— 搜索词在网格下既不过滤卡片、计数又照报"找到 N 首"，两头对不上）。名字/歌手都匹配 */
+const displayAlbums = computed(() => {
+  const q = query.value.trim().toLowerCase();
+  if (!q) return albums.value;
+  return albums.value.filter(
+    (g) => g.name.toLowerCase().includes(q) || g.artist.toLowerCase().includes(q),
+  );
+});
+
+/** 当前筛选下有没有结果（网格按专辑数，列表/详情按曲目数） */
+const resultEmpty = computed(() =>
+  albumGridMode.value ? displayAlbums.value.length === 0 : displayTracks.value.length === 0,
+);
+
 function openAlbum(key: string): void {
   selectedAlbumKey.value = key;
 }
@@ -184,8 +202,11 @@ function toggleFavorite(index: number): void {
           <IconSquaresFour class="icon" />
         </button>
       </div>
-      <!-- 总数只在**页头**说一次（v5.97）：这里只负责**筛选结果**，没搜就不说 -->
-      <span v-if="isSearching" class="toolbar__spacer count">找到 {{ displayTracks.length }} 首</span>
+      <!-- 总数只在**页头**说一次（v5.97）：这里只负责**筛选结果**，没搜就不说；
+           网格模式数的是专辑（张），列表/详情数的是曲目（首） -->
+      <span v-if="isSearching" class="toolbar__spacer count">
+        {{ albumGridMode ? `找到 ${displayAlbums.length} 张专辑` : `找到 ${displayTracks.length} 首` }}
+      </span>
     </div>
 
     <!-- 表头 = “说明”：放在滚动区外面（固定层），所以既不用吸顶、也不用底色，
@@ -227,8 +248,8 @@ function toggleFavorite(index: number): void {
         </EmptyState>
       </div>
 
-      <p v-else-if="isSearching && displayTracks.length === 0" class="note">
-        没有匹配的歌曲，换个关键词试试。
+      <p v-else-if="isSearching && resultEmpty" class="note">
+        {{ albumGridMode ? "没有匹配的专辑，换个关键词试试。" : "没有匹配的歌曲，换个关键词试试。" }}
       </p>
 
       <!-- 专辑网格（VS-06）：封面卡 + 专辑名 + 歌手 + 曲目数；点卡片进该专辑曲目。
@@ -237,7 +258,7 @@ function toggleFavorite(index: number): void {
         v-else-if="viewMode === 'albums' && !albumDetail"
         class="album-grid"
       >
-        <button v-for="group in albums" :key="group.key" class="album-card" @click="openAlbum(group.key)">
+        <button v-for="group in displayAlbums" :key="group.key" class="album-card" @click="openAlbum(group.key)">
           <img v-if="group.cover" class="album-card__cover" :src="group.cover" alt="" />
           <span v-else class="album-card__cover album-card__cover--ph">
             <IconMusicNotes class="icon" />
@@ -296,6 +317,15 @@ function toggleFavorite(index: number): void {
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 18px;
   padding-bottom: 24px;
+}
+
+/* 手机（v6.52，需求方 iPhone SE 实拍：minmax(148px) 挤不进两列，塌成单列大封面）：
+   固定两列 —— 与 Apple Music / QQ 音乐的手机专辑栅格同款；minmax(0,1fr) 防长专辑名撑爆列 */
+@media (max-width: 767px) {
+  .album-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+  }
 }
 
 .album-card {

@@ -45,6 +45,8 @@ const interludes = computed(() => findInterludes(props.lines));
 /** 带翻译 / 音译数据的行数（音/译按钮跟随当前歌曲的数据有无，v6.48） */
 const translationCount = computed(() => props.translations?.length ?? 0);
 const romanCount = computed(() => props.romans?.length ?? 0);
+/** 右侧钮排在不在（v6.50）：在，行就要让出它的宽度 —— 长句顶到右缘会把按钮压在文字下面 */
+const hasFlags = computed(() => romanCount.value > 0 || translationCount.value > 0);
 
 /** 当前时间所在间奏（无则 null） */
 const activeInterlude = computed<LyricInterlude | null>(() => {
@@ -556,7 +558,7 @@ onBeforeUnmount(() => {
   <!-- 两层结构：`.ly` 只负责定位（布局给高度）并承载回位按钮，
        `.ly-view` 才是“视窗”（负责上下渐隐遮罩与裁剪）——
        遮罩必须只罩歌词，否则底部的回位按钮会被一起淡掉（实测踩过）。 -->
-  <div class="ly" @wheel="onWheel">
+  <div class="ly" :class="{ 'ly--flags': hasFlags }" @wheel="onWheel">
     <div
       ref="viewportRef"
       class="ly-view"
@@ -882,6 +884,14 @@ onBeforeUnmount(() => {
 
 .lyline.current + .ly-dots .ly-dot {
   background: var(--accent);
+}
+
+/* 行给右侧钮排让位（v6.50，需求方截图：长句换行正好顶到钮排，把按钮压在文字下面）：
+   有钮的歌（任一副线数据存在）行文在钮前收住 —— 54px = 钮右距 ~10px + 钮 28px + 呼吸缝；
+   两数据都没有的歌没有钮，一字不让。居中排版的布局（ImLayoutCenter）自己用 :deep()
+   补对称的左让位，别让居中文字偏轴。 */
+.ly--flags .lyline {
+  padding-right: 54px;
 }
 
 /* 音/译快捷开关排（v6.46，学 AMLL Player 的右侧竖排钮）：

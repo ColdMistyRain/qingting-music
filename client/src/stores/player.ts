@@ -459,9 +459,20 @@ export const usePlayerStore = defineStore("player", () => {
     const el = audio;
     audio.addEventListener("progress", () => {
       try {
+        // buffered 可能是多段不连续区间（CDN 分段/seek 后各段独立）：进度条要的是
+        // "从当前位置起能连续播到哪"，所以取**包含当前播放位置**那一段的末端
+        // （video.js 同款做法）；当前位置不在任何段内时回落最后一段末端。
         const buffered = el.buffered;
+        const current = el.currentTime;
         if (buffered.length > 0 && el.duration > 0) {
-          bufferedEnd.value = Math.min(1, buffered.end(buffered.length - 1) / el.duration);
+          let end = buffered.end(buffered.length - 1);
+          for (let i = 0; i < buffered.length; i += 1) {
+            if (buffered.start(i) <= current && current <= buffered.end(i)) {
+              end = buffered.end(i);
+              break;
+            }
+          }
+          bufferedEnd.value = Math.min(1, end / el.duration);
         }
       } catch {
         // 个别引擎在卸载边缘读 buffered 会抛：忽略这次

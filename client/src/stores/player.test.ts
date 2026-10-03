@@ -908,6 +908,16 @@ describe("在线曲目（ON-03/05）", () => {
     audio.emit("progress");
     expect(player.bufferedEnd).toBeCloseTo(0.3);
 
+    // 多段不连续区间（CDN 分段）：取包含当前播放位置那一段的末端，不取最后段
+    (audio as unknown as { currentTime: number }).currentTime = 10;
+    (audio as unknown as { buffered: TimeRanges }).buffered = {
+      length: 2,
+      end: (i: number) => [30, 90][i],
+      start: (i: number) => [0, 60][i],
+    } as unknown as TimeRanges;
+    audio.emit("progress");
+    expect(player.bufferedEnd).toBeCloseTo(0.3); // 含 10s 的是 [0,30] 段，不是 [60,90] 段
+
     // waiting → 缓冲中；playing → 恢复
     audio.emit("waiting");
     expect(player.buffering).toBe(true);

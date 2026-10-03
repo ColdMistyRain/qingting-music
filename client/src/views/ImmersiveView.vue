@@ -83,7 +83,9 @@ const lines = computed(() => parseLyrics(player.lyricsSource).lines);
  * 只在歌词来自在线音源时有值；按毫秒取整做键，浮点相等性不掺运气。
  */
 const translationLines = computed(() =>
-  player.lyricsTranslation ? parseLyrics(player.lyricsTranslation).lines : [],
+  player.translationVisible && player.lyricsTranslation
+    ? parseLyrics(player.lyricsTranslation).lines
+    : [],
 );
 
 /**

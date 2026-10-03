@@ -65,6 +65,11 @@ const refSetters = computed<VNodeRef[]>(() =>
   props.lines.map((_, index) => (el) => setLineRef(el as Element | null, index)),
 );
 /**
+ * 翻译数据的签名（v6.41）：进 v-memo 依赖 —— 不加的话，暂停中切"显示/隐藏翻译"
+ * 时被 memo 住的行子树不会重渲染，翻译残留（坑 30 的 v-memo 家族）。
+ */
+const translationsKey = computed(() => props.translations?.length ?? 0);
+/**
  * `v-memo` 的第 4 个依赖：**只让当前行**在逐字进度变化时重渲染。
  *
  * 为什么必须有它（v6.19 实测踩到）：`v-memo` 的依赖里原本没有任何“每帧会变”的量，于是当前行整棵
@@ -499,7 +504,13 @@ onBeforeUnmount(() => {
         <button
           v-for="(line, i) in lines"
           :key="`${line.time}-${i}`"
-          v-memo="[i === activeIndex, i < activeIndex, depths[i], i === activeIndex ? fillKey : '']"
+          v-memo="[
+            i === activeIndex,
+            i < activeIndex,
+            depths[i],
+            i === activeIndex ? fillKey : '',
+            translationsKey,
+          ]"
           :ref="refSetters[i]"
           type="button"
           class="lyline"

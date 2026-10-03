@@ -84,6 +84,25 @@ export const usePlayerStore = defineStore("player", () => {
    */
   const lyricsTranslation = ref("");
   /**
+   * 翻译显示开关（v6.41，需求方："建议加一个按钮让用户选择是否展示翻译"）：
+   * 默认开；偏好存 localStorage（轻量显示偏好，与手动歌词库同一域）。
+   */
+  const TRANSLATION_VISIBLE_KEY = "qt-translation-visible";
+  const translationVisible = ref(
+    typeof localStorage === "undefined" || localStorage.getItem(TRANSLATION_VISIBLE_KEY) !== "0",
+  );
+  watch(translationVisible, (value) => {
+    if (typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem(TRANSLATION_VISIBLE_KEY, value ? "1" : "0");
+    } catch {
+      // 存不上就只影响本次会话
+    }
+  });
+  function toggleTranslation(): void {
+    translationVisible.value = !translationVisible.value;
+  }
+  /**
    * 手动导入的歌词（LR-02 的第三条来源，v4.87）：按曲目存，刷新后还在。
    * 键的推导见 `utils/lyricsLibrary`：服务器/在线用 id，本地曲目用“歌手|曲名”（id 每次重生成）。
    */
@@ -825,6 +844,8 @@ export const usePlayerStore = defineStore("player", () => {
     displayRatio,
     lyricsText,
     lyricsTranslation,
+    translationVisible,
+    toggleTranslation,
     importedLyrics,
     hasImportedLyrics,
     lyricsSource,

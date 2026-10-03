@@ -739,6 +739,21 @@ describe("云端曲目的内嵌歌词（LR-02：开播时按需拉一次）", ()
 });
 
 describe("在线曲目（ON-03/05）", () => {
+  /** node 环境没有 localStorage：开关的偏好持久化需要一个内存版 */
+  const prefStorage = new Map<string, string>();
+
+  beforeEach(() => {
+    prefStorage.clear();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => prefStorage.get(key) ?? null,
+      setItem: (key: string, value: string) => void prefStorage.set(key, value),
+      removeItem: (key: string) => void prefStorage.delete(key),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
   /** 在线曲目：进队列时 url 是空串，直链开播前才解析 */
   function onlineTrack(id: string): Track {
     return {
@@ -866,6 +881,32 @@ describe("在线曲目（ON-03/05）", () => {
       .mock.calls.filter(([provider, id]) => provider === "netease" && id === "1");
     expect(callsForFirst).toHaveLength(1);
     expect(player.lyricsText).toBe("[00:01.17]夜曲");
+  });
+
+  it("翻译显示开关（v6.41）：默认开、切换翻面、偏好写 localStorage", async () => {
+    vi.mocked(fetchOnlineLyrics).mockResolvedValue({
+      lyrics: "[00:01.17]한국어 가사",
+      translation: "[00:01.00]韩国歌词",
+    });
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1")]);
+    player.playAt(0);
+    await settle();
+    await settle();
+
+    // 默认开：翻译原文进 store
+    expect(player.translationVisible).toBe(true);
+    expect(player.lyricsTranslation).toContain("韩国歌词");
+
+    player.toggleTranslation();
+    await nextTick(); // watch 是异步 flush：等它把偏好写进 localStorage
+    expect(player.translationVisible).toBe(false);
+    expect(prefStorage.get("qt-translation-visible")).toBe("0");
+
+    player.toggleTranslation();
+    await nextTick();
+    expect(player.translationVisible).toBe(true);
+    expect(prefStorage.get("qt-translation-visible")).toBe("1");
   });
 
   it("在线歌词拉不到时安静退场：lyricsText 留空，也不打扰播放", async () => {

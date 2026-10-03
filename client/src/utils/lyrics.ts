@@ -129,7 +129,12 @@ export function parseLyrics(raw: string): ParsedLyrics {
         const duration = Number(match[2]);
         const word = match[3] ?? "";
         if (!Number.isFinite(offset) || !Number.isFinite(duration) || !word) continue;
-        words.push({ start: offset / 1000, duration: duration / 1000, text: word });
+        // 网易 yrc 的字偏移是**绝对歌内毫秒**（实测三份样本：行首与首字相等，如
+        // [24080,5080](24080,280,0)半…），而解析器的对外约定是**相对行首**
+        // （wordFillProgress 用 inside = time - line.time 来比）—— 在这里归一，
+        // 绝对与相对两种写法里，绝对才是线上数据的真实形状（v6.35 补 8 实测抓出）。
+        const relativeMs = Math.max(0, offset - startMs);
+        words.push({ start: relativeMs / 1000, duration: duration / 1000, text: word });
       }
 
       if (words.length > 0) {

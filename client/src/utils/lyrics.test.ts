@@ -65,9 +65,9 @@ describe("parseLyrics（LRC 行级）", () => {
 });
 
 describe("parseLyrics（yrc 逐字）", () => {
-  it("解析逐字片段：行时间与字时间都换算成秒，行文本由字拼接", () => {
+  it("解析逐字片段：字偏移是绝对歌内毫秒，归一成相对行首的秒", () => {
     const { lines, hasWordTiming } = parseLyrics(
-      "[1000,2000](0,500,0)你(500,500,0)好(1000,1000,0)世界",
+      "[1000,2000](1000,500,0)你(1500,500,0)好(2000,1000,0)世界",
     );
 
     expect(hasWordTiming).toBe(true);
@@ -90,7 +90,7 @@ describe("parseLyrics（yrc 逐字）", () => {
 
   it("同一份歌词里混着 LRC 与 yrc 也不崩（极端情况，按行各自解析）", () => {
     const { lines, hasWordTiming } = parseLyrics(
-      "[00:01.00]普通行\n[2000,1000](0,400,0)逐(400,600,0)字",
+      "[00:01.00]普通行\n[2000,1000](2000,400,0)逐(2400,600,0)字",
     );
 
     expect(hasWordTiming).toBe(true);
@@ -140,8 +140,8 @@ describe("parseLyrics（增强型 LRC：行内词级标签，v4.87）", () => {
     expect(lines[0]?.words?.[1]).toEqual({ start: 0.4, duration: 0.5, text: "乙" });
   });
 
-  it("yrc 也吃 offset（此前只有 LRC 那一支吃）", () => {
-    const { lines } = parseLyrics("[offset:500]\n[1000,2000](0,500,0)你(500,500,0)好");
+  it("yrc 也吃 offset（行时间随 offset 走；字归一成相对行首，不受影响）", () => {
+    const { lines } = parseLyrics("[offset:500]\n[1000,2000](1000,500,0)你(1500,500,0)好");
 
     expect(lines[0]?.time).toBe(1.5);
     expect(lines[0]?.words?.[0]?.start).toBe(0);
@@ -172,7 +172,7 @@ describe("wordFillProgress（LR-05 逐字填充）", () => {
   // 本句起点 1.0s，字一律是“相对本句开头”的（解析器的约定）——
   // 所以下面一律喂**绝对时间**（组件就是这么喂的）；早期这组用例喂的是相对时间，
   // 正好把“绝对时间去比相对起点”这个 bug 掩盖了（v6.19 实测抓到）。
-  const { lines } = parseLyrics("[1000,2000](0,500,0)你(500,500,0)好(1000,1000,0)世界");
+  const { lines } = parseLyrics("[1000,2000](1000,500,0)你(1500,500,0)好(2000,1000,0)世界");
   const line = lines[0]!;
 
   it("按字自己的时间算进度，唱完为 1", () => {

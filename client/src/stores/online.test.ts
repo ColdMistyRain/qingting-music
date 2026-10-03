@@ -254,6 +254,27 @@ describe("online store · 收藏夹（ON-10）", () => {
     expect(storage.has("qt-online-collection:netease:100")).toBe(false);
   });
 
+  it("refreshPlaylist 绕过缓存强制重拉（「刷新列表」按钮）", async () => {
+    vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
+    vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });
+    const online = useOnlineStore();
+    await online.openPlaylist("100"); // 先走一遍：缓存里是 TRACK
+
+    // 预埋旧缓存 + 让网络回一份不同的新数据
+    writeCollectionCache("netease", "100", [{ ...TRACK, title: "缓存旧版" }]);
+    vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({
+      tracks: [{ ...TRACK, title: "音源新版" }],
+    });
+
+    await online.refreshPlaylist("100");
+
+    // 不展示缓存旧版，直接是音源新数据；缓存也被更新
+    expect(online.collectionTracks.map((t) => t.title)).toEqual(["音源新版"]);
+    const stored = JSON.parse(storage.get("qt-online-collection:netease:100")!).tracks[0].title;
+    expect(stored).toBe("音源新版");
+    void online.closePlaylist();
+  });
+
   it("closePlaylist 收起歌单：曲目清空、回到搜索态", async () => {
     vi.mocked(fetchOnlineCollections).mockResolvedValue({ playlists: PLAYLISTS });
     vi.mocked(fetchOnlineCollectionTracks).mockResolvedValue({ tracks: [TRACK] });

@@ -173,6 +173,11 @@ export const useOnlineStore = defineStore("online", () => {
 
     // 没缓存：必须清掉上一份的曲目 —— 否则"加载中"期间页面还摆着旧列表，
     // 且视图的加载分支（要求列表为空）接不住，会掉进空闲空态（v6.34 实测）
+    await loadCollection(id);
+  }
+
+  /** 清掉旧曲目、重新拉一份（openPlaylist 的无缓存路径与「刷新列表」按钮共用） */
+  async function loadCollection(id: string): Promise<void> {
     collectionTracks.value = [];
     collectionStatus.value = "loading";
     try {
@@ -184,6 +189,17 @@ export const useOnlineStore = defineStore("online", () => {
       collectionError.value = error instanceof Error ? error.message : "歌单没能读出来";
       collectionStatus.value = "error";
     }
+  }
+
+  /**
+   * 强制刷新一份歌单（「刷新列表」按钮，v6.35 补）：**绕过缓存**重新拉取 ——
+   * 点侧栏歌单走缓存秒开，这个按钮才是"跟音源对一遍"的入口。
+   */
+  async function refreshPlaylist(id: string): Promise<void> {
+    if (collectionStatus.value === "loading") return;
+    collectionError.value = "";
+    activePlaylistId.value = id;
+    await loadCollection(id);
   }
 
   /** 后台刷新一份已展示的歌单：有缓存垫底，失败静默（下次再点还会试） */
@@ -227,6 +243,7 @@ export const useOnlineStore = defineStore("online", () => {
     collectionStatus,
     collectionError,
     openPlaylist,
+    refreshPlaylist,
     closePlaylist,
   };
 });

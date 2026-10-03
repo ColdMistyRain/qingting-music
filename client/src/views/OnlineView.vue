@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 import type { OnlineTrack } from "@qingting/shared";
 import { toPlaylistItem, type Track } from "@qingting/shared";
 import NavToggle from "@/components/NavToggle.vue";
+import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
 import IconGlobe from "~icons/ph/globe";
 import IconMagnifyingGlass from "~icons/ph/magnifying-glass";
 import IconPlugsConnected from "~icons/ph/plugs-connected";
@@ -119,14 +120,6 @@ function submit(): void {
   void search(keyword.value);
 }
 
-/** 回到搜索态：收起歌单、清掉过滤词（侧栏点「在线搜索」走同一条路） */
-function exitToSearch(): void {
-  applyQuery.cancel();
-  online.closePlaylist();
-  keyword.value = "";
-  query.value = "";
-}
-
 const isFiltering = computed(() => collectionMode.value && query.value.trim().length > 0);
 
 /** 展示给列表的曲目：歌单态用过滤后的歌单曲目，搜索态用搜索结果 */
@@ -179,7 +172,16 @@ function toggleFavorite(index: number): void {
         <div class="sub">{{ pageSubtitle }}</div>
       </div>
       <div v-if="collectionMode" class="page-head__actions">
-        <button class="btn" @click="exitToSearch">返回搜索</button>
+        <!-- 刷新列表（v6.35 补，需求方："这按钮去掉，改成刷新列表"）：绕过缓存重新拉取；
+             回搜索的出口在侧栏「在线搜索」（点它即收起歌单） -->
+        <button
+          class="btn"
+          :disabled="listStatus === 'loading'"
+          @click="online.activePlaylistId && void online.refreshPlaylist(online.activePlaylistId)"
+        >
+          <IconArrowsClockwise class="icon" />
+          刷新列表
+        </button>
       </div>
     </div>
 

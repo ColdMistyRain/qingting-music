@@ -8,11 +8,19 @@ function stubFetch(
 ) {
   const calls: string[] = [];
   const headerCalls: Record<string, string>[] = [];
+  const bodyCalls: Record<string, unknown>[] = [];
   const impl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const path = String(url).replace(/^https?:\/\/[^/]+/, "");
     const key = Object.keys(routes).find((prefix) => path.startsWith(prefix));
     calls.push(path);
     if (init?.headers) headerCalls.push(init.headers as Record<string, string>);
+    if (typeof init?.body === "string") {
+      try {
+        bodyCalls.push(JSON.parse(init.body) as Record<string, unknown>);
+      } catch {
+        bodyCalls.push({});
+      }
+    }
     const route = key === undefined ? undefined : routes[key];
     if (!route) return new Response("not found", { status: 404 });
     return new Response(JSON.stringify(route.body ?? null), {
@@ -20,7 +28,7 @@ function stubFetch(
       headers: { "Content-Type": "application/json" },
     });
   }) as unknown as typeof fetch;
-  return { impl, calls, headerCalls };
+  return { impl, calls, headerCalls, bodyCalls };
 }
 
 const BASE = "http://qq-service.test";
@@ -38,31 +46,34 @@ afterEach(() => {
 });
 
 describe("QQ 音乐适配器 · 搜索（ON-06）", () => {
-  it("把 client_search_cp 的字段映射成统一格式：interval 已是秒、fee===1 记为 VIP、albummid 拼封面", async () => {
+  it("搜索走 musicu.fcg 的安卓轻应用壳（免登录）：comm 块、字段映射、VIP 来自 pay", async () => {
     const { provider, stub } = makeProvider({
-      "/getSearchByKey": {
+      "/cgi-bin/musicu.fcg": {
         body: {
           code: 0,
-          data: {
-            list: [
-              {
-                songmid: "0039MnYb0qxYhV",
-                songname: "晴天",
-                singer: [{ name: "周杰伦" }],
-                albumname: "叶惠美",
-                album: { mid: "003DFRz92u3Scd" },
-                interval: 269,
-                fee: 0,
+          request: {
+            code: 0,
+            data: {
+              body: {
+                item_song: [
+                  {
+                    mid: "0039MnYb0qxYhV",
+                    title: "晴天",
+                    singer: [{ name: "周杰伦" }],
+                    album: { name: "叶惠美", mid: "003DFRz92u3Scd" },
+                    interval: 269,
+                  },
+                  {
+                    mid: "002bSWW92aov3m",
+                    title: "VIP 专享",
+                    singer: [{ name: "某人" }, { name: "另一人" }],
+                    album: { name: "" },
+                    interval: 180,
+                    pay: { pay_play: 1 },
+                  },
+                ],
               },
-              {
-                songmid: "002bSWW92aov3m",
-                songname: "VIP 专享",
-                singer: [{ name: "某人" }, { name: "另一人" }],
-                albumname: "",
-                interval: 180,
-                fee: 1,
-              },
-            ],
+            },
           },
         },
       },
@@ -70,9 +81,18 @@ describe("QQ 音乐适配器 · 搜索（ON-06）", () => {
 
     const tracks = await provider.search("晴天");
 
-    expect(stub.calls[0]).toBe(
-      "/getSearchByKey?key=" + encodeURIComponent("晴天") + "&limit=30&page=1",
-    );
+    expect(stub.calls[0]).toBe("/cgi-bin/musicu.fcg");
+    expect(stub.headerCalls[0]?.Cookie).toBe("tmeLoginType=-1;");
+    expect(stub.headerCalls[0]?.["User-Agent"]).toBe("okhttp/3.14.9");
+    const payload = stub.bodyCalls[0] as {
+      comm: { tmeAppID: string };
+      request: { method: string; module: string; param: { query: string; search_type: number } };
+    };
+    expect(payload.comm.tmeAppID).toBe("qqmusiclight");
+    expect(payload.request.method).toBe("DoSearchForQQMusicLite");
+    expect(payload.request.module).toBe("music.search.SearchCgiService");
+    expect(payload.request.param.query).toBe("晴天");
+
     expect(tracks).toHaveLength(2);
     expect(tracks[0]).toMatchObject({
       id: "0039MnYb0qxYhV",
@@ -85,33 +105,6 @@ describe("QQ 音乐适配器 · 搜索（ON-06）", () => {
     });
     expect(tracks[1]?.vipOnly).toBe(true);
     expect(tracks[1]?.artist).toBe("某人 / 另一人");
-  });
-
-  it("带会话的搜索直调 musicu.fcg：Cookie 走请求头（包的搜索链路只认全局 Cookie）", async () => {
-    const { provider, stub } = makeProvider({
-      "/cgi-bin/musicu.fcg": {
-        body: {
-          "music.search.SearchCgiService": {
-            data: { song: { list: [{ mid: "m1", name: "歌", interval: 10, pay: { pay_play: 1 } }] } },
-          },
-        },
-      },
-    });
-    const tracks = await provider.search("晴天", ["qqmusic_session=sealed-token; uin=o123"]);
-    expect(stub.calls[0]).toContain("/cgi-bin/musicu.fcg");
-    expect(stub.headerCalls[0]?.Cookie).toBe("qqmusic_session=sealed-token; uin=o123");
-    expect(tracks[0]).toMatchObject({ id: "m1", title: "歌", vipOnly: true });
-  });
-
-  it("嵌套形状也接得住（data.body.song.list）", async () => {
-    const { provider } = makeProvider({
-      "/getSearchByKey": {
-        body: { code: 0, data: { body: { song: { list: [{ songmid: "m1", songname: "歌", interval: 10 }] } } } },
-      },
-    });
-    const tracks = await provider.search("歌");
-    expect(tracks).toHaveLength(1);
-    expect(tracks[0]?.id).toBe("m1");
   });
 });
 
@@ -223,9 +216,14 @@ describe("QQ 音乐适配器 · 账号（微信扫码，ON-06）", () => {
     });
   });
 
-  it("getProfile：字段映射 + 形状不对返回 null", async () => {
+  it("getProfile：包的 profile 字段映射（musicid/nick/logo）+ 持续 401 返回 null", async () => {
     const ok = makeProvider({
-      "/user/detail": { body: { data: { uin: 123, nickname: "某人", faceurl: "https://x.test/a.jpg", is_vip: 1 } } },
+      "/user/detail": {
+        body: {
+          code: 200,
+          profile: { musicid: 123, nick: "某人", logo: "https://x.test/a.jpg", vip: true },
+        },
+      },
     }).provider;
     expect(await ok.account!.getProfile(["qqmusic_session=s"])).toEqual({
       userId: "123",
@@ -234,7 +232,7 @@ describe("QQ 音乐适配器 · 账号（微信扫码，ON-06）", () => {
       vip: true,
     });
 
-    const empty = makeProvider({ "/user/detail": { body: {} } }).provider;
+    const empty = makeProvider({ "/user/detail": { body: { code: 401, message: "Login required" } } }).provider;
     expect(await empty.account!.getProfile(["qqmusic_session=s"])).toBeNull();
   });
 

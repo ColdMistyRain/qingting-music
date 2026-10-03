@@ -33,6 +33,7 @@ interface QqSong {
   mid?: string;
   songname?: string;
   name?: string;
+  title?: string;
   singer?: { name?: string }[];
   albumname?: string;
   album?: { name?: string; mid?: string };
@@ -191,28 +192,11 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
     return get(baseUrl, pathname);
   }
 
-  /** 从搜索应答的多种形状里把歌曲列表捞出来（上游直通，形状随接口版本漂） */
-  function songListOf(body: unknown): QqSong[] {
-    const root = body as Record<string, unknown> | null;
-    const data = root?.data as Record<string, unknown> | undefined;
-    const direct = data?.list;
-    if (Array.isArray(direct)) return direct as QqSong[];
-    const bodyOfData = data?.body as Record<string, unknown> | undefined;
-    const nested = (bodyOfData?.song as Record<string, unknown> | undefined)?.list as unknown[] | undefined;
-    if (Array.isArray(nested)) return nested as QqSong[];
-    const response = (root?.response as Record<string, unknown> | undefined)?.data as
-      | Record<string, unknown>
-      | undefined;
-    const inResponse = (response?.song as Record<string, unknown> | undefined)?.list as unknown[] | undefined;
-    if (Array.isArray(inResponse)) return inResponse as QqSong[];
-    if (Array.isArray(response?.list)) return response.list as QqSong[];
-    return [];
-  }
 
   function mapSong(song: QqSong & { mid?: string; pay?: { pay_play?: number } }): OnlineTrack | null {
     // 两套字段族：搜索老接口 songmid/songname/albumname；musicu.fcg mid/name/album.{mid,name}
     const id = song.songmid ?? song.mid;
-    const title = song.songname ?? song.name;
+    const title = song.songname ?? song.name ?? song.title;
     if (!id || !title) return null;
     const albumMid = song.album?.mid;
     return {
@@ -228,29 +212,76 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
     };
   }
 
-  /** musicu.fcg 直调搜索（带登录态）：QQ 网页播放器同一条路 */
-  async function searchDirect(keyword: string, cookie: string[]): Promise<OnlineTrack[]> {
+  /**
+   * musicu.fcg 直调（安卓轻应用壳）：QQ 网页播放器同一条路。
+   * 要点全在三处（v6.57 按 Folia 的用法核对的接口事实）：**POST**（GET 没有）、
+   * `comm` 设备档案（tmeAppID=qqmusiclight 的安卓壳，缺它上游回 500003）、
+   * `Cookie: tmeLoginType=-1` + okhttp UA（移动客户端身份）。不需要登录态。
+   */
+  async function musicuPost(
+    method: string,
+    module: string,
+    param: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     const payload = {
-      "music.search.SearchCgiService": {
-        method: "DoSearchForQQMusicDesktop",
-        param: { search_type: 0, query: keyword, page_num: 1, num_per_page: 30 },
+      comm: {
+        ct: 11,
+        cv: "1003006",
+        v: "1003006",
+        os_ver: "15",
+        phonetype: "24122RKC7C",
+        rom: "Redmi/miro/miro:15/AE3A.240806.005/OS2.0.102.0.VOMCNXM:user/release-keys",
+        tmeAppID: "qqmusiclight",
+        nettype: "NETWORK_WIFI",
+        udid: "0",
+        uid: "0",
       },
+      request: { method, module, param },
     };
     let response: Response;
     try {
-      response = await fetch(
-        `https://u.y.qq.com/cgi-bin/musicu.fcg?format=json&data=${encodeURIComponent(JSON.stringify(payload))}`,
-        { headers: { Cookie: cookie.join("; "), Referer: "https://y.qq.com/" } },
-      );
+      response = await fetch("https://u.y.qq.com/cgi-bin/musicu.fcg", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "tmeLoginType=-1;",
+          "User-Agent": "okhttp/3.14.9",
+        },
+        body: JSON.stringify(payload),
+      });
     } catch (error) {
-      throw new UpstreamError(`QQ 音乐搜索连不上：${error instanceof Error ? error.message : String(error)}`);
+      throw new UpstreamError(`QQ 音乐连不上：${error instanceof Error ? error.message : String(error)}`);
     }
-    const body = (await response.json().catch(() => null)) as Record<string, Record<string, unknown>> | null;
-    if (!body) throw new UpstreamError("QQ 音乐搜索回了不成形的响应", response.status);
-    const module = body["music.search.SearchCgiService"] as
-      | { data?: { song?: { list?: QqSong[] } } }
-      | undefined;
-    return (module?.data?.song?.list ?? [])
+    const body = (await response.json().catch(() => null)) as {
+      code?: number;
+      request?: { code?: number; data?: Record<string, unknown> };
+    } | null;
+    if (!body) throw new UpstreamError("QQ 音乐回了不成形的响应", response.status);
+    if (body.code !== 0 || body.request?.code !== 0) {
+      throw new UpstreamError(
+        `QQ 音乐接口出错（code ${body.code ?? "?"}/${body.request?.code ?? "?"}）`,
+        response.status,
+      );
+    }
+    return body.request.data ?? {};
+  }
+
+  /** 免登录搜索：DoSearchForQQMusicLite（安卓轻应用版，响应在 body.item_song） */
+  async function searchViaMusicu(keyword: string): Promise<OnlineTrack[]> {
+    const data = await musicuPost("DoSearchForQQMusicLite", "music.search.SearchCgiService", {
+      search_id: String(Math.floor(Math.random() * 1e14 + Date.now() % 86400000)),
+      remoteplace: "search.android.keyboard",
+      query: keyword.length > 60 ? keyword.slice(0, 60) : keyword,
+      search_type: 0,
+      num_per_page: 30,
+      page_num: 1,
+      highlight: 0,
+      nqc_flag: 0,
+      page_id: 1,
+      grp: 1,
+    });
+    const body = data.body as { item_song?: QqSong[] } | undefined;
+    return (body?.item_song ?? [])
       .map(mapSong)
       .filter((track): track is OnlineTrack => track !== null);
   }
@@ -258,19 +289,11 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
   return {
     id: "qq",
 
-    async search(keyword, cookie) {
-      // 有会话走 musicu.fcg 直调（带浏览器的真实 Cookie 头）：包的搜索链路只认
-      // 全局配置 Cookie（config/user-info），不认按浏览器的会话 —— v6.57 实测匿名
-      // 老接口 500、musicu.fcg 500003，带真 Cookie 的 musicu.fcg 才是现在的正路
-      if (cookie && cookie.length > 0) {
-        return searchDirect(keyword, cookie);
-      }
-      const body = await call(
-        `/getSearchByKey?key=${encodeURIComponent(keyword)}&limit=30&page=1`,
-      );
-      return songListOf(body)
-        .map(mapSong)
-        .filter((track): track is OnlineTrack => track !== null);
+    async search(keyword) {
+      // 安卓轻应用壳的 musicu.fcg 搜索：**免登录可用**（匿名 GET 的老接口 500、
+      // 无 comm 块的 musicu 500003 —— comm 设备档案 + POST 是缺失的两块，v6.57 实测）。
+      // 搜索本身不需要登录态；VIP 曲目照常列出（播放时由 authed getMusicPlay 定可播）
+      return searchViaMusicu(keyword);
     },
 
     async getStreamUrl(id, cookie) {
@@ -378,26 +401,32 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
       },
 
       async getProfile(cookie) {
-        const body = (await call(`/user/detail?${cookieQuery(cookie).slice(1)}`)) as {
-          data?: Record<string, unknown>;
-          profile?: Record<string, unknown>;
-        };
-        const raw = (body.data ?? body.profile ?? null) as Record<string, unknown> | null;
+        // 扫码成功的瞬间上游凭据可能还没就绪（/user/detail 短暂 401）：重试两次
+        let raw: Record<string, unknown> | null = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const body = (await call(`/user/detail?${cookieQuery(cookie).slice(1)}`)) as {
+            code?: number;
+            profile?: Record<string, unknown>;
+          };
+          raw = (body.profile ?? null) as Record<string, unknown> | null;
+          if (raw) break;
+          await new Promise((resolve) => setTimeout(resolve, 900));
+        }
         if (!raw) return null;
-        const nickname = typeof raw.nickname === "string" ? raw.nickname : "";
-        const userId = String(raw.uin ?? raw.userid ?? raw.encuin ?? "");
-        if (!nickname && !userId) return null;
+        // 字段名（v6.57 按包源码核对）：musicid/str_musicid、nickname/nick、avatarUrl/logo
+        const nickname = typeof raw.nickname === "string" ? raw.nickname : typeof raw.nick === "string" ? raw.nick : "";
+        const userId = String(raw.musicid ?? raw.str_musicid ?? raw.uin ?? "unknown");
         const avatarUrl =
-          typeof raw.avatar === "string"
-            ? raw.avatar
-            : typeof raw.faceurl === "string"
-              ? raw.faceurl
+          typeof raw.avatarUrl === "string"
+            ? raw.avatarUrl
+            : typeof raw.logo === "string"
+              ? raw.logo
               : null;
         return {
-          userId: userId || "unknown",
+          userId,
           nickname: nickname || "QQ 音乐用户",
           avatarUrl,
-          vip: raw.vip === true || raw.is_vip === 1,
+          vip: raw.vip === true,
         };
       },
 

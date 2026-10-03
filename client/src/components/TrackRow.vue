@@ -56,17 +56,25 @@ const sourceLabel = computed(() => {
  * 把"点开只有 30 秒"的预期放在点击之前（播放时若上游仍给试听片段，
  * 会有「需要 VIP 或暂无版权」的提示兜底）。
  */
-const showTrialFlag = computed(
-  () =>
-    props.track.source === "online" &&
-    props.track.vipOnly === true &&
-    props.track.unavailable !== true,
-);
-/** 无版权标（v6.35 补 6，需求方："没有版权歌曲的需要有标识"）：连试听片段都没有，
-    优先于试听标（一首无版权的歌不是"试听"，是什么都没有） */
-const showUnavailableFlag = computed(
-  () => props.track.source === "online" && props.track.unavailable === true,
-);
+/**
+ * 行内标记（v6.33 试听 → v6.35 补 7 增强为标记组）：
+ * - 无版权（unavailable）：连试听片段都没有，只给一枚「无版权」；
+ * - VIP 专享（vipOnly）：给「VIP」+「试听」两枚 —— VIP 说明为什么只能试听
+ *   （需求方："加上vip标识说明播放这个需要vip"），与网易云自家列表一致。
+ */
+const rowFlags = computed<{ label: string; title: string }[]>(() => {
+  if (props.track.source !== "online") return [];
+  if (props.track.unavailable === true) {
+    return [{ label: "无版权", title: "音源标注暂无版权，无法播放" }];
+  }
+  if (props.track.vipOnly === true) {
+    return [
+      { label: "VIP", title: "VIP 专享曲目，播放需要会员" },
+      { label: "试听", title: "非会员账号只能试听片段" },
+    ];
+  }
+  return [];
+});
 
 /** 点这一行就是播这一首（v5.96）—— 列表行里不再有播放/暂停键。
     需求方：“播放和暂停都不应该在列表中有这功能，列表行的最右应该放操作歌曲相关的动作”。
@@ -96,14 +104,12 @@ function onRowClick(): void {
       <div class="row__title">{{ track.title }}</div>
       <div class="row__artist">
         <span
-          v-if="showUnavailableFlag"
-          class="row__flag row__flag--none"
-          title="音源标注暂无版权，无法播放"
+          v-for="flag in rowFlags"
+          :key="flag.label"
+          class="row__flag"
+          :title="flag.title"
         >
-          无版权
-        </span>
-        <span v-else-if="showTrialFlag" class="row__flag" title="VIP 专享曲目，当前账号只能试听片段">
-          试听
+          {{ flag.label }}
         </span>
         <span class="row__artist-name">{{ track.artist }}</span>
       </div>
@@ -237,12 +243,6 @@ function onRowClick(): void {
   font-size: 10px;
   line-height: 15px;
   color: var(--text-2);
-}
-
-/* 无版权标：暖红一档（这是"播不了"的状态，与试听的弱色提示区分） */
-.row__flag--none {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
-  color: color-mix(in srgb, var(--danger) 75%, var(--text-2));
 }
 
 .row__source,

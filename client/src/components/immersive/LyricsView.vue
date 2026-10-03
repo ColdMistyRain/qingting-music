@@ -12,6 +12,7 @@ import {
 } from "@/utils/lyrics";
 import { emphasisKeyframes, emphasisParams } from "@/utils/lyricEmphasis";
 import { togglePointerCapture } from "@/utils/pointer";
+import { usePlayerStore } from "@/stores/player";
 import { POS_Y_SPRING_BASE, Spring, posYSpringParams } from "@/utils/spring";
 
 /**
@@ -23,6 +24,7 @@ import { POS_Y_SPRING_BASE, Spring, posYSpringParams } from "@/utils/spring";
  * - LR-06 点击行 seek + 当前句自动居中；
  * - LR-07 手动滚动：滚轮 / 拖动暂停自动居中，无操作数秒后回位，并给一个“回到当前句”入口。
  */
+const store = usePlayerStore();
 const props = defineProps<{
   lines: LyricLine[];
   /** 翻译歌词行（v6.40）：与 lines 同时间轴的 LRC 行；空数组/不传 = 没有翻译 */
@@ -39,6 +41,10 @@ const activeIndex = computed(() => currentLineIndex(props.lines, props.time));
 
 /* ---------- 间奏点（v6.44，AMLL 的 interlude dots）：长间奏时渲染呼吸点 ---------- */
 const interludes = computed(() => findInterludes(props.lines));
+
+/** 带翻译 / 音译数据的行数（右侧开关只在有数据时显示） */
+const translationCount = computed(() => props.translations?.length ?? 0);
+const romanCount = computed(() => props.romans?.length ?? 0);
 
 /** 当前时间所在间奏（无则 null） */
 const activeInterlude = computed<LyricInterlude | null>(() => {
@@ -565,9 +571,18 @@ onBeforeUnmount(() => {
                LRC 里没有字级时间，“自左向右渐亮”只能编一个速度出来（需求方 v6.19：
                “我们目前的歌词都是普通的 lrc 格式…参照设计应该降级到逐行高亮”）。 -->
           <span v-else class="txt">{{ line.text }}</span>
-          <!-- 翻译（v6.40）与音译（v6.43）：原文下方的小字，音译排在翻译之下 -->
-          <span v-if="translationOf(line.time)" class="tr">{{ translationOf(line.time) }}</span>
-          <span v-if="romanOf(line.time)" class="tr">{{ romanOf(line.time) }}</span>
+          <!-- 翻译（v6.40）与音译（v6.46）：原文下方的小字，音译排在翻译之下；
+              各自受右侧「译 / 音」按钮独立开关 -->
+          <span
+            v-if="store.translationVisible && translationOf(line.time)"
+            class="tr"
+            >{{ translationOf(line.time) }}</span
+          >
+          <span
+            v-if="store.romanVisible && romanOf(line.time)"
+            class="tr"
+            >{{ romanOf(line.time) }}</span
+          >
           </button>
           <!-- 间奏点（v6.44）：长间奏时渲染呼吸点，随时间逐个点亮；点击跳过间奏 -->
           <div
@@ -588,6 +603,31 @@ onBeforeUnmount(() => {
           </div>
         </template>
       </div>
+    </div>
+
+    <!-- 音/译快捷开关（v6.46，学 AMLL Player 的右侧竖排钮）：
+         只在这首歌有对应数据时显示；点亮 = 显示 -->
+    <div class="ly-flags">
+      <button
+        v-if="romanCount > 0"
+        class="ly-flag"
+        :class="{ on: store.romanVisible }"
+        title="音译"
+        :aria-pressed="store.romanVisible"
+        @click="store.toggleRoman()"
+      >
+        音
+      </button>
+      <button
+        v-if="translationCount > 0"
+        class="ly-flag"
+        :class="{ on: store.translationVisible }"
+        title="翻译"
+        :aria-pressed="store.translationVisible"
+        @click="store.toggleTranslation()"
+      >
+        译
+      </button>
     </div>
 
     <!-- LR-07：手动浏览时给一个明确的回位入口（自动回位要等 6 秒，用户不该被迫等） -->
@@ -796,6 +836,45 @@ onBeforeUnmount(() => {
 
 .lyline.current + .ly-dots .ly-dot {
   background: var(--accent);
+}
+
+/* 音/译快捷开关排（v6.46，学 AMLL Player 的右侧竖排钮）：
+   挂在 .ly 定位层右侧垂直居中；点亮（on）= 显示该副线 */
+.ly-flags {
+  position: absolute;
+  right: 0.6em;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2;
+}
+
+.ly-flag {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-3);
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.ly-flag:hover {
+  opacity: 1;
+  color: var(--text-1);
+}
+
+.ly-flag.on {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  opacity: 1;
 }
 
 /* 翻译行（v6.40；v6.41 按 AMLL 的 lyricSubLine 重调）：

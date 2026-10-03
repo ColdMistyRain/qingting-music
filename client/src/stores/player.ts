@@ -99,20 +99,40 @@ export const usePlayerStore = defineStore("player", () => {
    * 翻译显示开关（v6.41，需求方："建议加一个按钮让用户选择是否展示翻译"）：
    * 默认开；偏好存 localStorage（轻量显示偏好，与手动歌词库同一域）。
    */
-  const TRANSLATION_VISIBLE_KEY = "qt-translation-visible";
-  const translationVisible = ref(
-    typeof localStorage === "undefined" || localStorage.getItem(TRANSLATION_VISIBLE_KEY) !== "0",
-  );
-  watch(translationVisible, (value) => {
+  function readVisibleFlag(key: string): boolean {
+    if (typeof localStorage === "undefined") return true;
+    try {
+      return localStorage.getItem(key) !== "0";
+    } catch {
+      return true;
+    }
+  }
+
+  function writeVisibleFlag(key: string, value: boolean): void {
     if (typeof localStorage === "undefined") return;
     try {
-      localStorage.setItem(TRANSLATION_VISIBLE_KEY, value ? "1" : "0");
+      localStorage.setItem(key, value ? "1" : "0");
     } catch {
       // 存不上就只影响本次会话
     }
-  });
+  }
+
+  const TRANSLATION_VISIBLE_KEY = "qt-translation-visible";
+  const translationVisible = ref(readVisibleFlag(TRANSLATION_VISIBLE_KEY));
+  watch(translationVisible, (value) => writeVisibleFlag(TRANSLATION_VISIBLE_KEY, value));
   function toggleTranslation(): void {
     translationVisible.value = !translationVisible.value;
+  }
+
+  /**
+   * 音译显示开关（v6.46，需求方：音/译两枚按钮独立切换）：
+   * 与翻译独立 —— 一个想看翻译、一个想跟唱罗马音，是两件事。
+   */
+  const ROMAN_VISIBLE_KEY = "qt-roman-visible";
+  const romanVisible = ref(readVisibleFlag(ROMAN_VISIBLE_KEY));
+  watch(romanVisible, (value) => writeVisibleFlag(ROMAN_VISIBLE_KEY, value));
+  function toggleRoman(): void {
+    romanVisible.value = !romanVisible.value;
   }
   /**
    * 手动导入的歌词（LR-02 的第三条来源，v4.87）：按曲目存，刷新后还在。
@@ -914,7 +934,9 @@ export const usePlayerStore = defineStore("player", () => {
     lyricsTranslation,
     lyricsRoman,
     translationVisible,
+    romanVisible,
     toggleTranslation,
+    toggleRoman,
     importedLyrics,
     hasImportedLyrics,
     lyricsSource,

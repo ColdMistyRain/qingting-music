@@ -216,20 +216,33 @@ describe("QQ 音乐适配器 · 账号（微信扫码，ON-06）", () => {
     });
   });
 
-  it("getProfile：包的 profile 字段映射（musicid/nick/logo）+ 持续 401 返回 null", async () => {
+  it("getProfile：账号字段在嵌套 info 里（真实返回形状）+ 顶层兜底 + 持续 401 返回 null", async () => {
     const ok = makeProvider({
       "/user/detail": {
         body: {
           code: 200,
-          profile: { musicid: 123, nick: "某人", logo: "https://x.test/a.jpg", vip: true },
+          profile: {
+            musicid: 910127843,
+            errMsg: "OK",
+            info: { nick: "0x34Hz", logo: "http://thirdqq.qlogo.cn/g?b=sdk&k=x" },
+          },
         },
       },
     }).provider;
     expect(await ok.account!.getProfile(["qqmusic_session=s"])).toEqual({
-      userId: "123",
-      nickname: "某人",
-      avatarUrl: "https://x.test/a.jpg",
-      vip: true,
+      userId: "910127843",
+      nickname: "0x34Hz",
+      avatarUrl: "http://thirdqq.qlogo.cn/g?b=sdk&k=x",
+      vip: false,
+    });
+
+    // 顶层兜底（凭据派的 nick/logo 有值时也认）
+    const top = makeProvider({
+      "/user/detail": { body: { code: 200, profile: { musicid: 5, nick: "顶层名", logo: "http://l/1.png" } } },
+    }).provider;
+    expect(await top.account!.getProfile(["qqmusic_session=s"])).toMatchObject({
+      nickname: "顶层名",
+      avatarUrl: "http://l/1.png",
     });
 
     const empty = makeProvider({ "/user/detail": { body: { code: 401, message: "Login required" } } }).provider;

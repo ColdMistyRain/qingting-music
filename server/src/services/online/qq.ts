@@ -343,18 +343,30 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
 
     collections: {
       async getPlaylists(_userId, cookie) {
+        // 真实信封（v6.57 用真实账号核对）：{ code, playlist: [...] }，
+        // 字段 tid/dirName/songNum/picUrl（bigpicUrl 是大图）
         const body = (await call(`/user/playlist?${cookieQuery(cookie).slice(1)}`)) as {
           data?: { v_playlist?: Record<string, unknown>[] };
           v_playlist?: Record<string, unknown>[];
+          playlist?: Record<string, unknown>[];
         };
-        const list = body.data?.v_playlist ?? body.v_playlist ?? [];
+        const list = body.playlist ?? body.data?.v_playlist ?? body.v_playlist ?? [];
         return list.map((item) => {
-          const id = String(item.tid ?? item.dissid ?? item.dirid ?? item.id ?? "");
+          const id = String(item.tid ?? item.dissid ?? item.dirId ?? item.dirid ?? item.id ?? "");
+          const name = typeof item.dirName === "string" ? item.dirName : typeof item.dissname === "string" ? item.dissname : "";
+          const cover =
+            typeof item.picUrl === "string"
+              ? item.picUrl
+              : typeof item.bigpicUrl === "string"
+                ? item.bigpicUrl
+                : typeof item.imgurl === "string"
+                  ? item.imgurl
+                  : null;
           return {
             id,
-            name: typeof item.dissname === "string" ? item.dissname : typeof item.name === "string" ? item.name : "",
-            cover: typeof item.imgurl === "string" ? item.imgurl : typeof item.logo === "string" ? item.logo : null,
-            trackCount: Number(item.song_count ?? item.songcnt ?? 0) || 0,
+            name,
+            cover,
+            trackCount: Number(item.songNum ?? item.song_count ?? item.songcnt ?? 0) || 0,
           };
         });
       },
@@ -425,15 +437,18 @@ export function createQqProvider(options: { baseUrl?: string; dataDir?: string }
           await new Promise((resolve) => setTimeout(resolve, 900));
         }
         if (!raw) return null;
-        // 字段名（v6.57 按包源码核对）：musicid/str_musicid、nickname/nick、avatarUrl/logo
-        const nickname = typeof raw.nickname === "string" ? raw.nickname : typeof raw.nick === "string" ? raw.nick : "";
-        const userId = String(raw.musicid ?? raw.str_musicid ?? raw.uin ?? "unknown");
-        const avatarUrl =
-          typeof raw.avatarUrl === "string"
-            ? raw.avatarUrl
-            : typeof raw.logo === "string"
-              ? raw.logo
-              : null;
+        // 字段名（v6.57 用真实返回核对）：账号字段全在**嵌套 info** 里（包源码注释也写明
+        // GetLoginUserInfo 顶层不带账号字段）；顶层只有 musicid 与凭据派的 nick/logo（常空）
+        const info = (raw.info ?? null) as Record<string, unknown> | null;
+        const pickString = (...values: unknown[]): string => {
+          for (const value of values) {
+            if (typeof value === "string" && value) return value;
+          }
+          return "";
+        };
+        const nickname = pickString(info?.nick, raw.nickname, raw.nick);
+        const userId = String(raw.musicid ?? raw.str_musicid ?? "unknown");
+        const avatarUrl = pickString(info?.logo, raw.avatarUrl, raw.logo) || null;
         return {
           userId,
           nickname: nickname || "QQ 音乐用户",

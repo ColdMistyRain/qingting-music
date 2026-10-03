@@ -43,6 +43,10 @@ async function logoutNetease(): Promise<void> {
   await online.logout();
 }
 
+// 进设置页就验真一遍音源会话：扫码成功瞬间上游凭据可能还没就绪（资料拿空），
+// 这里补拉一次把昵称/头像填上（loadQqAccount 自带 ready 守卫不会空转）
+void online.loadQqAccount();
+
 async function logoutQq(): Promise<void> {
   await online.logoutQq();
 }

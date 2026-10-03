@@ -262,6 +262,45 @@ export function wordFillProgress(line: LyricLine, time: number): number[] {
   });
 }
 
+/** 署名行（作词 / 作曲 / 编曲 / Lyrics by…）：带时间戳但不是唱的句子。
+    就近匹配翻译时必须排除它们 —— 否则贴着第一句的署名行会把第一句的翻译抢走
+    （v6.53 实测 Free Loop：署名行 0.0/0.28s 距第一句翻译 0.23s 最近）。 */
+const CREDIT_LINE =
+  /^\s*(作词|作曲|编曲|填词|词|曲|原曲|op|lyrics?|lyricist|compos(?:er|ed)|written|written by|produced(?: by)?|arranged?)(\s*[:：]|\s+by\b)/i;
+
+export function isCreditLine(text: string): boolean {
+  return CREDIT_LINE.test(text);
+}
+
+/**
+ * 找与 `time`（秒）最近的一行副线（翻译/音译），偏差超过 `capSeconds` 视为没有。
+ *
+ * 为什么不是"毫秒精确相等"（v6.40 的旧做法）：网易的 tlyric/romalrc 与 yrc 逐字稿
+ * 常常**不同轴** —— yrc 按字重新对轴，tlyric 留着旧 lrc 的行起点。实测 Free Loop
+ * （网易 id 17271094）正文行起点 570/6360/13080ms，翻译行起点 230/5660/12030ms，
+ * 差 340~1050ms，精确匹配整首失配，点「译」看起来像坏了（v6.53 需求方报的）。
+ * 就近取一行 + 上限封顶：差得太远宁可不给（宁缺毋错）。
+ * 空文本行（`[00:18.370]` 这种占位行）直接跳过，不参与就近比较。
+ */
+export function findSublineLine(
+  lines: readonly LyricLine[] | undefined,
+  time: number,
+  capSeconds = 1.5,
+): LyricLine | null {
+  if (!lines?.length) return null;
+  let best: LyricLine | null = null;
+  let bestDelta = Infinity;
+  for (const line of lines) {
+    if (!line.text.trim()) continue;
+    const delta = Math.abs(line.time - time);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = line;
+    }
+  }
+  return best !== null && bestDelta <= capSeconds ? best : null;
+}
+
 /**
  * 自动居中的位移（LR-06）：把当前句挪到窗口垂直中线。
  * **正值 = 列表向上移**（DOM 那边写 `-shift`）——所以：

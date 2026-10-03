@@ -4,8 +4,11 @@ import {
   clampManualShift,
   currentLineIndex,
   findInterludes,
+  findSublineLine,
+  isCreditLine,
   parseLyrics,
   wordFillProgress,
+  type LyricLine,
 } from "./lyrics";
 
 /** LR-01 / PRD 11.2：LRC + yrc 解析，非法行容错 */
@@ -263,5 +266,65 @@ describe("clampManualShift（手动滚动夹取）", () => {
   it("非法输入不抛错", () => {
     expect(clampManualShift(Number.NaN, 800)).toBe(0);
     expect(clampManualShift(100, Number.NaN)).toBe(0);
+  });
+});
+
+describe("findSublineLine（翻译/音译就近对齐）", () => {
+  const tr = (time: number, text: string): LyricLine => ({ time, text });
+
+  it("Free Loop 实测数据：yrc 与 tlyric 差 340~1050ms 也能对上（v6.53 需求方报的失配）", () => {
+    // 网易 id 17271094 的真实时间轴：正文 yrc 行起点 vs 翻译 tlyric 行起点
+    const translations = [
+      tr(0.23, "我已习惯在外面呼唤你的名字"),
+      tr(5.66, "今晚不去见你，不想自己又陷入疯狂"),
+      tr(12.03, "但不知道为什么，这一天过得无精打采"),
+      tr(18.37, ""),
+      tr(24.52, "我也曾辉煌一时，如今却默默无闻"),
+    ];
+    expect(findSublineLine(translations, 0.57)?.text).toBe("我已习惯在外面呼唤你的名字");
+    expect(findSublineLine(translations, 6.36)?.text).toBe("今晚不去见你，不想自己又陷入疯狂");
+    expect(findSublineLine(translations, 13.08)?.text).toBe("但不知道为什么，这一天过得无精打采");
+    // "Hey yeah"（18.9s）：最近的是 18.37s 的空占位行 —— 空行跳过后，真行都超出容差，不给
+    expect(findSublineLine(translations, 18.9)).toBeNull();
+    expect(findSublineLine(translations, 24.52)?.text).toBe("我也曾辉煌一时，如今却默默无闻");
+  });
+
+  it("精确相等照常命中（同轴的老歌不受影响）", () => {
+    const lines = [tr(10, "一"), tr(20, "二")];
+    expect(findSublineLine(lines, 10)?.text).toBe("一");
+  });
+
+  it("超出容差宁可不给（宁缺毋错）", () => {
+    const lines = [tr(10, "一")];
+    expect(findSublineLine(lines, 12.2)).toBeNull();
+    expect(findSublineLine(lines, 12.2, 3)?.text).toBe("一");
+  });
+
+  it("空文本行不参与就近比较", () => {
+    const lines = [tr(10, ""), tr(11.4, "真行")];
+    expect(findSublineLine(lines, 10.2)?.text).toBe("真行");
+  });
+
+  it("空数据与全空行都不给", () => {
+    expect(findSublineLine(undefined, 10)).toBeNull();
+    expect(findSublineLine([], 10)).toBeNull();
+    expect(findSublineLine([tr(10, "  ")], 10)).toBeNull();
+  });
+});
+
+describe("isCreditLine（署名行判别）", () => {
+  it("中英常见署名前缀都认", () => {
+    expect(isCreditLine("作词: Daniel Powter")).toBe(true);
+    expect(isCreditLine("作曲 : Choo Young Soo")).toBe(true);
+    expect(isCreditLine("编曲：某人")).toBe(true);
+    expect(isCreditLine("词：方文山")).toBe(true);
+    expect(isCreditLine("Lyrics by someone")).toBe(true);
+    expect(isCreditLine("Written by someone")).toBe(true);
+    expect(isCreditLine("Produced by someone")).toBe(true);
+  });
+
+  it("唱词不以署名开头，不误伤（“曲”后无分隔符不算）", () => {
+    expect(isCreditLine("曲终人散")).toBe(false);
+    expect(isCreditLine("I've been fabulous through to find my tattered name")).toBe(false);
   });
 });

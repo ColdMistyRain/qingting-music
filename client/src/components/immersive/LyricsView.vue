@@ -7,6 +7,8 @@ import {
   currentLineIndex,
   wordFillProgress,
   findInterludes,
+  findSublineLine,
+  isCreditLine,
   type LyricInterlude,
   type LyricLine,
 } from "@/utils/lyrics";
@@ -62,20 +64,18 @@ function dotFill(index: number): number {
   return Math.min(1, Math.max(0, progress * 3 - index));
 }
 
-/** 翻译行按时间对齐到原文行（毫秒取整做键；网易 tlyric 与原文同轴） */
-function translationOf(time: number): string {
-  const line = props.translations?.find(
-    (l) => Math.round(l.time * 1000) === Math.round(time * 1000),
-  );
-  return line?.text ?? "";
+/** 翻译行按时间对齐到原文行（v6.53 改就近匹配：网易 tlyric 与 yrc 常差几百毫秒，
+    毫秒精确相等会整首失配—— Free Loop 实测差 340~1050ms，点「译」像坏了）。
+    署名行（作词/作曲…）不是唱的句子，不参与对齐 —— 否则会抢走第一句的翻译。 */
+function translationOf(line: LyricLine): string {
+  if (isCreditLine(line.text)) return "";
+  return findSublineLine(props.translations, line.time)?.text ?? "";
 }
 
 /** 音译行同机制对齐（v6.43） */
-function romanOf(time: number): string {
-  const line = props.romans?.find(
-    (l) => Math.round(l.time * 1000) === Math.round(time * 1000),
-  );
-  return line?.text ?? "";
+function romanOf(line: LyricLine): string {
+  if (isCreditLine(line.text)) return "";
+  return findSublineLine(props.romans, line.time)?.text ?? "";
 }
 const activeLine = computed(() => props.lines[activeIndex.value] ?? null);
 /** 逐字填充进度（每个字 0~1） */
@@ -620,16 +620,16 @@ onBeforeUnmount(() => {
               显隐由右侧「译 / 音」钮的开关决定。v6.49：开关不再 v-if 卸载（行高瞬变 =
               整列瞬移），改为 .trw 壳的高度过渡平滑收展 —— 有数据就常驻 DOM，靠类收起 -->
           <span
-            v-if="translationOf(line.time)"
+            v-if="translationOf(line)"
             class="trw"
             :class="{ 'trw--hidden': !store.translationVisible }"
-            ><span class="tr">{{ translationOf(line.time) }}</span></span
+            ><span class="tr">{{ translationOf(line) }}</span></span
           >
           <span
-            v-if="romanOf(line.time)"
+            v-if="romanOf(line)"
             class="trw"
             :class="{ 'trw--hidden': !store.romanVisible }"
-            ><span class="tr">{{ romanOf(line.time) }}</span></span
+            ><span class="tr">{{ romanOf(line) }}</span></span
           >
           </button>
           <!-- 间奏点（v6.44）：长间奏时渲染呼吸点，随时间逐个点亮；点击跳过间奏 -->

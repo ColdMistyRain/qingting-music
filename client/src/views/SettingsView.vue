@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import IconSignIn from "~icons/ph/sign-in";
 import IconSignOut from "~icons/ph/sign-out";
+import IconUserCircle from "~icons/ph/user-circle";
 import IconWarningCircle from "~icons/ph/warning-circle";
 import SegmentedControl from "@/components/SegmentedControl.vue";
 import EqualizerPanel from "@/components/EqualizerPanel.vue";
@@ -272,24 +273,44 @@ async function signOut(): Promise<void> {
           <button class="btn btn-quiet" @click="config.load(true)">重试</button>
         </div>
         <!-- 音源与账号合并为一张卡（v6.37，需求方："这两个能合并吗？同时显示以登录的用户有没有vip"） -->
+        <!-- 账号卡（v6.38 重设计）：头像 + 昵称 + 会员状态一行，动作右对齐；
+             不再用"标签行"表格式布局（合并后行数变多，标签列反而空了一大块） -->
         <div class="set-card card">
-          <b>网易云</b>
-          <div class="set-row">
-            <span>音源状态</span>
+          <div class="net-head">
+            <b>网易云</b>
             <span class="badge" :class="{ 'badge--accent': config.onlineEnabled }">
               {{ config.onlineEnabled ? "可用" : "不可用" }}
             </span>
           </div>
-          <div class="set-row">
-            <span>账号</span>
-            <span v-if="online.loggedIn" class="badge badge--accent">
-              已登录 · {{ online.profile?.nickname ?? "网易云账号" }}
-              <span v-if="online.profile?.vip" class="vip-tag">VIP</span>
+
+          <div class="net-account">
+            <img
+              v-if="online.loggedIn && online.profile?.avatarUrl"
+              class="net-avatar"
+              :src="online.profile.avatarUrl"
+              alt=""
+            />
+            <span v-else class="net-avatar net-avatar--ph">
+              <IconUserCircle class="icon" />
             </span>
-            <span v-else class="badge">未登录</span>
-          </div>
-          <div class="set-row">
-            <span />
+            <div class="net-id">
+              <div class="net-name">
+                <template v-if="online.loggedIn">
+                  {{ online.profile?.nickname ?? "网易云账号" }}
+                  <span v-if="online.profile?.vip" class="vip-tag">VIP</span>
+                </template>
+                <template v-else>未登录</template>
+              </div>
+              <div class="net-sub">
+                {{
+                  online.loggedIn
+                    ? online.profile?.vip
+                      ? "网易云会员 · VIP 曲目可完整播放"
+                      : "VIP 曲目为试听片段，开通会员可完整播放"
+                    : "登录后可听这个账号收藏的歌单"
+                }}
+              </div>
+            </div>
             <button v-if="!online.loggedIn" class="btn btn-primary" @click="openQr">
               <IconSignIn class="icon" />
               扫码登录
@@ -299,10 +320,9 @@ async function signOut(): Promise<void> {
               退出登录
             </button>
           </div>
+
           <div class="set-note">
-            登录后可以在「在线搜索」里打开这个账号收藏的歌单；会员账号的 VIP
-            曲目可完整播放（列表里只标「VIP」），非会员则是试听片段（标「VIP +
-            试听」）。会话保存在这台浏览器里，不与其他浏览器或设备共享 ——
+            会话只保存在这台浏览器里，不与其他浏览器或设备共享 ——
             各自扫码、互不影响；清除浏览器数据会退出登录。
           </div>
         </div>
@@ -538,6 +558,63 @@ async function signOut(): Promise<void> {
   background: var(--text-2);
   transform: translateX(-50%);
 }
+/* 账号卡（v6.38）：头像 + 名字/会员状态 + 动作，一行排开 */
+.net-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.net-account {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-control);
+  background: var(--glass-bg);
+}
+
+.net-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
+.net-avatar--ph {
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+}
+
+.net-avatar--ph .icon {
+  width: 24px;
+  height: 24px;
+}
+
+.net-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.net-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.net-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
 /* 账号徽标里的 VIP 小签（v6.37） */
 .vip-tag {
   margin-left: 6px;

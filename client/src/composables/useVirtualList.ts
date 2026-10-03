@@ -71,6 +71,17 @@ export function useVirtualList(options: UseVirtualListOptions) {
     return null;
   }
 
+  /** 观察列表容器与滚动区：两者尺寸变了都可能要重量（视口变高矮、列表被筛短、侧栏折叠） */
+  function observeTargets(): void {
+    observer?.disconnect();
+    observer = undefined;
+    const list = options.list.value;
+    if (!list) return;
+    observer = new ResizeObserver(() => schedule());
+    observer.observe(list);
+    if (scroller && scroller !== list) observer.observe(scroller);
+  }
+
   /** 解析滚动容器，并把滚动监听挪过去（容器可能晚一步才出现，也可能被换掉） */
   function syncScroller(): HTMLElement | null {
     if (scroller?.isConnected) return scroller;
@@ -81,6 +92,7 @@ export function useVirtualList(options: UseVirtualListOptions) {
       scroller?.removeEventListener("scroll", schedule);
       scroller = next;
       scroller?.addEventListener("scroll", schedule, { passive: true });
+      observeTargets();
     }
     return scroller;
   }
@@ -138,28 +150,45 @@ export function useVirtualList(options: UseVirtualListOptions) {
   }
 
   function schedule(): void {
-    if (frame) return;
-    // 坑 10：页面不可见时 rAF 不触发 —— 直接同步算，否则首帧与后续更新都不来
+    // 坑 10：页面不可见时 rAF 不触发 —— 把可能还挂着的那一帧作废，直接同步算，
+    // 否则“已经排了一帧”的去重标志会把后续所有更新都吃掉
     if (typeof requestAnimationFrame !== "function" || document.visibilityState !== "visible") {
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
       measure();
       return;
     }
+    if (frame) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
       measure();
     });
   }
 
+  /**
+   * 从后台切回前台：把可能还挂着的 rAF 作废，同步量一次。
+   *
+   * 为什么不能只 `schedule()`：`schedule` 有“已经排了一帧就不再排队”的去重，而**后台页面里
+   * 那个 rAF 可能一直不回调**（实测：`visibilityState` 是 `hidden` 时 `requestAnimationFrame`
+   * 在 250ms 内一次都没跑）—— 去重标志于是永远挂着，之后所有 `schedule()` 都被吃掉，
+   * 列表就停在旧窗口上（滚到哪儿都不更新，切回前台才自愈）。这里先作废再量，从根上断开。
+   */
+  function onVisibilityChange(): void {
+    if (document.visibilityState !== "visible") return;
+    if (frame) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+    measure();
+  }
+
   onMounted(async () => {
     await nextTick();
-    measure();
-    const list = options.list.value;
-    if (!list) return;
-    // 视口变高变矮、列表被筛短、侧栏折叠都会改变几何；滚动本身单独听
-    observer = new ResizeObserver(() => schedule());
-    observer.observe(list);
-    if (scroller) observer.observe(scroller);
-    document.addEventListener("visibilitychange", schedule);
+    measure(); // 顺带解析滚动容器
+    observeTargets();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("resize", schedule);
   });
 
@@ -170,14 +199,24 @@ export function useVirtualList(options: UseVirtualListOptions) {
     scroller = null;
     observer?.disconnect();
     observer = undefined;
-    document.removeEventListener("visibilitychange", schedule);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
     window.removeEventListener("resize", schedule);
   });
 
-  watch(options.list, () => schedule());
+  // 列表容器与行数都可能晚一步才来（数据在异步加载，宿主还可能用空态/列表两个分支切换）：
+  // 一律 post flush，等 DOM 落定再量 —— pre flush 时量到的是“上一帧的 DOM”
+  watch(
+    options.list,
+    () => {
+      schedule();
+      observeTargets();
+    },
+    { flush: "post" },
+  );
   watch(
     () => options.count(),
     () => schedule(),
+    { flush: "post" },
   );
 
   return {

@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState.vue";
 import NavToggle from "@/components/NavToggle.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
 import TrackRow from "@/components/TrackRow.vue";
+import { useVirtualList } from "@/composables/useVirtualList";
 import { useLibraryStore } from "@/stores/library";
 import { useListeningStore } from "@/stores/listening";
 import { usePlayerStore } from "@/stores/player";
@@ -58,6 +59,17 @@ const rows = computed(() => {
 /** 列不出来的条数（本地引用 / 已不在曲库） */
 const hidden = computed(() => items.value.length - rows.value.length);
 
+/* 长列表虚拟滚动（LB-08 / v6.27）：与音乐库、控制台同一套（收藏也可能攒到几百首）。
+   这一份列表**没有行间细线**，所以行距是“行高 + 行距”—— 由 composable 量出来，不用管。 */
+const listEl = ref<HTMLElement | null>(null);
+const { start, end, padTop, padBottom } = useVirtualList({
+  list: listEl,
+  rowSelector: ".row",
+  count: () => rows.value.length,
+});
+/** 只渲染窗口里那几行；行上的下标仍是全量列表里的（`start + index`） */
+const windowRows = computed(() => rows.value.slice(start.value, end.value));
+
 const queue = computed<Track[]>(() => rows.value.map((row) => row.track));
 const currentId = computed(() => player.currentTrack?.id ?? null);
 
@@ -70,7 +82,6 @@ function playAt(index: number): void {
   if (queue.value.length === 0) return;
   player.setQueue(queue.value, index);
 }
-
 function playAll(): void {
   if (queue.value.length === 0) return;
   player.setQueue(queue.value, 0);
@@ -166,18 +177,30 @@ async function clearRecent(): Promise<void> {
         <p class="my-note">这一批现在都没有能播的。</p>
       </div>
 
-      <div v-else class="row-list">
+      <div v-else ref="listEl" class="row-list">
+        <div
+          v-if="padTop > 0"
+          class="row-pad"
+          :style="{ height: `${padTop}px` }"
+          aria-hidden="true"
+        />
         <TrackRow
-          v-for="(row, index) in rows"
+          v-for="(row, index) in windowRows"
           :key="row.key"
           :track="row.track"
-          :index="index"
+          :index="start + index"
           :active="currentId === row.track.id"
           :removable="false"
           show-favorite
           :favorite="listening.isFavorite(row.item)"
           @play="playAt"
           @toggle-favorite="toggleFavorite"
+        />
+        <div
+          v-if="padBottom > 0"
+          class="row-pad"
+          :style="{ height: `${padBottom}px` }"
+          aria-hidden="true"
         />
       </div>
     </div>

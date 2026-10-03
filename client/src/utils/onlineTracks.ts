@@ -35,6 +35,22 @@ export function toOnlineTrack(provider: string, info: OnlineTrack): Track {
   };
 }
 
+/** 音源的显示名（来源列等处用）；没收录的音源直接显示它的 id */
+const PROVIDER_LABELS: Record<string, string> = {
+  netease: "网易云",
+};
+
+/**
+ * 从引用键解析音源的**显示名**（v6.35 补 3，需求方："来源应该改成实际的来源，
+ * 如果来自于网易云就显示网易云"）—— `netease:186016` → "网易云"。
+ * 形状不对返回 null（调用方退回通用的「在线」）。
+ */
+export function onlineProviderLabel(trackId: string): string | null {
+  const parsed = parseOnlineTrackId(trackId);
+  if (!parsed) return null;
+  return PROVIDER_LABELS[parsed.provider] ?? parsed.provider;
+}
+
 /** 解析 `provider:id` 引用键；形状不对返回 null（本地/云端 id 冒充在线键时防一手） */
 export function parseOnlineTrackId(
   id: string,

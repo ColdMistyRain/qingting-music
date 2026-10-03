@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { OnlineTrack } from "@qingting/shared";
-import { ONLINE_EMPTY_URL, onlineCoverUrl, parseOnlineTrackId, toOnlineTrack } from "./onlineTracks";
+import {
+  ONLINE_EMPTY_URL,
+  onlineCoverUrl,
+  onlineProviderLabel,
+  parseOnlineTrackId,
+  toOnlineTrack,
+} from "./onlineTracks";
 
 const INFO: OnlineTrack = {
   id: "186016",
@@ -48,6 +54,17 @@ describe("parseOnlineTrackId（provider:id 引用键）", () => {
     expect(parseOnlineTrackId(":186016")).toBeNull();
     expect(parseOnlineTrackId("186016")).toBeNull();
     expect(parseOnlineTrackId("")).toBeNull();
+  });
+});
+
+describe("onlineProviderLabel（来源列的音源显示名，v6.35 补 3）", () => {
+  it("已收录的音源给中文名", () => {
+    expect(onlineProviderLabel("netease:186016")).toBe("网易云");
+  });
+
+  it("没收录的音源显示它的 id；形状不对给 null（调用方退回「在线」）", () => {
+    expect(onlineProviderLabel("qq:1")).toBe("qq");
+    expect(onlineProviderLabel("bad-shape")).toBeNull();
   });
 });
 

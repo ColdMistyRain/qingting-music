@@ -6,6 +6,7 @@ import IconHeartStraightDuotone from "~icons/ph/heart-straight-duotone";
 import IconMusicNotes from "~icons/ph/music-notes";
 import IconX from "~icons/ph/x";
 import AppTooltip from "@/components/AppTooltip.vue";
+import { onlineProviderLabel } from "@/utils/onlineTracks";
 import { formatTime } from "@/utils/format";
 
 /**
@@ -42,7 +43,12 @@ const SOURCE_LABELS: Record<Track["source"], string> = {
   online: "在线",
 };
 
-const sourceLabel = computed(() => SOURCE_LABELS[props.track.source]);
+const sourceLabel = computed(() => {
+  // 在线曲目显示**实际音源**（v6.35 补 3，需求方："如果来自于网易云就显示网易云"）；
+  // 引用键解析不出时退回通用的「在线」
+  if (props.track.source === "online") return onlineProviderLabel(props.track.id) ?? "在线";
+  return SOURCE_LABELS[props.track.source];
+});
 
 /**
  * 试听标（v6.33，需求方："如果是试听的歌曲加上标记说明这个是试听歌曲"）：

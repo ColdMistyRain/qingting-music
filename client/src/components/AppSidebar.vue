@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import IconArrowsClockwise from "~icons/ph/arrows-clockwise";
 import IconCaretDoubleLeft from "~icons/ph/caret-double-left";
 import IconGearSix from "~icons/ph/gear-six";
 import IconListPlus from "~icons/ph/list-plus";
@@ -180,10 +181,31 @@ function dismissPlaylistError(): void {
           <div class="sb-section">
             <div class="sb-section-head">
               <span class="lbl">网易云歌单</span>
+              <!-- 刷新整份歌单列表（v6.35 补 2，需求方圈了分区头右侧）：
+                   手动刷新期间旧列表保持可见（闪一下再回来很难受） -->
+              <AppTooltip label="刷新网易云歌单" :disabled="!props.collapsed" side="right" :side-offset="10">
+                <button
+                  class="sb-refresh"
+                  :class="{ 'is-loading': online.playlistsStatus === 'loading' }"
+                  :disabled="online.playlistsStatus === 'loading'"
+                  @click="void online.loadPlaylists(true)"
+                >
+                  <IconArrowsClockwise class="icon" />
+                </button>
+              </AppTooltip>
             </div>
 
-            <p v-if="online.playlistsStatus === 'loading'" class="sb-hint lbl">读取中…</p>
-            <p v-else-if="online.playlistsStatus === 'error'" class="sb-hint lbl" role="alert">
+            <p
+              v-if="online.playlists.length === 0 && online.playlistsStatus === 'loading'"
+              class="sb-hint lbl"
+            >
+              读取中…
+            </p>
+            <p
+              v-else-if="online.playlists.length === 0 && online.playlistsStatus === 'error'"
+              class="sb-hint lbl"
+              role="alert"
+            >
               {{ online.playlistsError }}
             </p>
             <p v-else-if="online.playlists.length === 0" class="sb-hint lbl">
@@ -399,6 +421,40 @@ function dismissPlaylistError(): void {
   opacity: 0.5;
 }
 
+/* 网易云歌单的刷新键（v6.35 补 2）：与 sb-add 同一档（分区头右侧、弱色、悬停提亮）；
+   加载中旋转给"点了有效"的反馈（这是状态指示，颜色/动效表达状态符合简约定调） */
+.sb-refresh {
+  color: var(--text-3);
+  display: grid;
+  place-items: center;
+}
+
+.sb-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sb-refresh .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.sb-refresh.is-loading .icon {
+  animation: sb-refresh-spin 0.9s linear infinite;
+}
+
+@keyframes sb-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-refresh.is-loading .icon {
+    animation: none;
+  }
+}
+
 .sb-add .icon {
   width: 15px;
   height: 15px;
@@ -462,6 +518,11 @@ function dismissPlaylistError(): void {
    被推到最左边，于是在点击那一帧横跳 161px（实测 199 → 38）。
    shadcn 的 SidebarGroupAction 在 icon 态也是直接 hidden；何况它现在还是 disabled 的。 */
 .app.collapsed > .sidebar .sb-add {
+  display: none;
+}
+
+/* 折叠态同样藏网易云歌单的刷新键（与 sb-add 同一理由：纯图标窄栏不留动作键） */
+.app.collapsed > .sidebar .sb-refresh {
   display: none;
 }
 </style>

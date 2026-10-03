@@ -67,7 +67,9 @@ server/src/services/jsonStore.ts  单文件 JSON 存储的**唯一实现**（原
 server/src/services/fileStream.ts 流式响应唯一入口 `pipeFile`（v6.8）：源流挂 error + 响应结束时销毁源流 ——
                           **别再写 `createReadStream(...).pipe(res)`**（文件在 stat 之后被删 = 未捕获异常 = 进程退出）
 server/src/middleware/     attachRole（角色解析）、requireAccess（401/403）、createLoginLimiter（429）
-server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/改元信息/换封面/设歌词）、audio（/audio + /covers）、stats、playlists
+server/src/routes/        auth、config、songs（列表/上传/删除/重建索引/改元信息/换封面/设歌词）、audio（/audio + /covers）、stats、playlists、online（/api/online/:provider 的 search/stream/lyrics/cover，访客级 - ON-01~05 / v6.28）
+server/src/services/online/  音源适配层（ON-01）：provider.ts 定义 OnlineProvider 接口 + `resolveProvider`（**加新音源只改这一处**）；netease.ts 网易云适配器（自部署 NeteaseCloudMusicApi：/cloudsearch 搜索、/song/url/v1 直链、/lyric/new 歌词）。
+                          **封面上游必须过 `canProxyCover` 白名单**（cover 代理是"服务端替人发请求"的口子，只放行音源自家 CDN）
 server/src/app.ts         createApp(config)（可测试装配）→ index.ts 负责 listen
 client/src/assets/        logo-mark.png（品牌标记：透明底单色，供 `.brand-mark` 遮罩上色；水印已裁掉）
 client/public/            PWA 图标四张（192 / 512 / maskable 512 / apple-touch-icon）—— 由 logo-mark.png
@@ -81,7 +83,8 @@ client/src/router/        路由表 + 守卫（身份决定可达页面）
 client/src/stores/        auth、config、theme、player（播放器单例：队列/模式/进度/音量/单例 audio）、
                           listening（收藏与最近播放：数据在服务端 data/listening.json - PS-05）、
                           library、transfer（本地列表→上传页的 File 交接 - LC-07）
-client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息与封面 / 排序下标 - v6.14）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、
+client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 实时元信息与封面 / 排序下标 - v6.14；在线条目在 onlineEnabled 时给 url 空串的可播 Track - v6.28）、
+                          onlineTracks（在线曲目纯函数：`provider:id` 引用键拆装、搜索结果→Track（**url 恒空串，直链开播前现解析**）、封面代理地址 - ON-01 / v6.28）、playlistExport（歌单导出：M3U8 / JSON 两个纯函数 - PS-06）、player（模式状态机与选曲，纯函数）、
                           playbackFailure（播放失败分类：服务器还在不在（轻请求探测）+ 延时可取消的跳歌 - v6.26）、localFiles（文件名解析/时长探测）、
                           concurrency（带并发上限的批量映射：拖入文件夹时用它，别 forEach 裸并行 - v6.10）、debounce（尾部防抖：列表页搜索框用，输入即时 + 过滤防抖 - v6.10）、
                           fileSystem（拖入文件夹递归）、metadata（ID3 读取）、keyboard（焦点判定）、format、
@@ -159,7 +162,9 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 
 **长列表虚拟滚动（v6.27，LB-08）**：需求方选中这一项时定调“**选择虚拟滚动，但是你得把后果给记下来**”。620 首的曲库现在 DOM 里只有 13–22 行（`utils/virtualList.ts` 纯函数 + `composables/useVirtualList.ts`；已覆盖**音乐库 / 本地列表（`TrackList`）、控制台曲库管理、收藏 / 最近播放**三处），`scrollHeight` 与“滚到哪一行、贴顶的就是哪一首”与全量渲染**逐像素一致**（实测滚动条总长恒为 47108 = 620×76−12，滚到 200×76 贴顶就是 Track 0200）。**为什么不分页**（PRD 5.6.2 那份 `?page=&pageSize=` 契约仍未启用）：LB-07 搜索、LB-04 排序与“点播时把眼前这段整份当队列”全靠整份数据，接口一分页搜索就只搜当前页；620 首的 JSON 才 130 KB，瓶颈是 DOM 行数而不是传输量。**后果**：DOM 行数不再等于曲库条数（别用它数条数）、行会按窗口重挂（行内状态须挂数据）、阈值 100 以下整份渲染（行为随条数分档）、找不到能滚的祖先就整份渲染（不赌）、歌单拖拽排序列表**故意不虚拟化**。详见 PRD 决策记录 v6.27。
 
-**下一步**（建议顺序）：**在线音源（3.5，需求方定：放到最后）** → **数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
+**在线音源（v6.28，ON-01~05 P1 全落地）**：后端 `server/src/services/online/`（适配层 + 网易云适配器）+ `/api/online/:provider/` 四个口（search / stream / lyrics / **cover 代理**——封面要进 canvas 取色（VS-02），必须同源；代理带 `canProxyCover` 白名单防 SSRF）；`NETEASE_API_BASE` 配置即启用（ON-04，重启生效、前端零改动，未配置时路由 404 + 页面隐藏）。前端：`OnlineView` 真实搜索页（复用 TrackList/TrackRow，搜索防抖 500ms + 序号判 stale）；**播放直链是会过期的签名地址，队列与存档里的在线曲目 url 一律空串、开播前现解析**（`utils/onlineTracks` + player store 的 `resolveOnlineUrl`，同 id 并发去重，解析成功回填 Track）；**VIP/无版权（url: null）= 说清楚并停下，不自动跳歌**（与坏文件 3 秒跳的取舍见 PRD v6.28）；歌词走 `lyricsText`（优先级仍手动>内嵌>在线，store 带 30 首会话缓存 —— 不缓存"切走再切回"就没了）；收藏/最近播放/歌单的在线条目用 `provider:id` 引用（音源已配置即可播，`resolvePlaylistEntry` 已接）；播放存档保留在线曲目但**置空直链**（恢复后首播时重解析，进度照续）。实测：本地假上游 + dev 全链路（搜索映射 / 真实出声 / VIP 提示 / 沉浸页歌词高亮 / 收藏 / 刷新恢复）全部通过；**真实自部署 NeteaseCloudMusicApi 的联调仍待做**（接口选择与 Folia 的用法一致 —— Folia 是 AGPL，只核对了接口事实、未复制代码）。留白：QQ/酷狗（P2）、聚合搜索、多源回退、翻译歌词、VIP 徽标（数据已在 `vipOnly` 字段，渲染与否待需求方裁决）、网易账号登录、搜索结果跨页保留。
+
+**下一步**（建议顺序）：**数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件；在线音源 P1 已交，P2 的 QQ/酷狗/聚合搜索按需求方节奏排）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。
 

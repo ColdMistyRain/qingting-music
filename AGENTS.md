@@ -172,7 +172,7 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 
 **专辑网格视图**（v6.47：`groupAlbums` 纯函数按专辑名聚组 + LibraryView 列表/专辑双视图；点卡片进专辑详情，队列 = 该专辑曲目）。**进度条缓冲指示（v6.42）**：缓冲层（`audio.buffered` 末端的浅色底，弱两大档）垫在填充后面 + 缓冲中手柄脉动（waiting 亮/canplay·playing·暂停灭；合成层属性）；`buffering`/`bufferedEnd` 在 player store，ProgressBar 共享件直接读；回调里读 audio.buffered 用闭包非空引用（this 在测试桩里不保留）。
 
-**音/译独立开关按钮排**（v6.46：沉浸页歌词右侧竖排「音/译」钮，学 AMLL Player；`romanVisible` 与翻译独立持久；v-memo 依赖需补 `romansKey` 否则暂停中切换不生效）。
+**音/译独立开关按钮排**（v6.46 初版 + **v6.48 定稿**：按钮**跟随数据有无**——有 tlyric 出「译」、有 romalrc 出「音」、都没有不出；门控在渲染层而非 props 链——否则关掉开关按钮跟着消失成死锁；`romanVisible`/`translationVisible` 独立持久；v-memo 依赖需补 `translationsKey`/`romansKey` 否则暂停中切换不生效）。
 
 **在线账号与歌词收尾（v6.37–v6.40）**：设置页「网易云」两卡合并为一张（音源状态 + 账号 [头像 + 昵称 + VIP 签] + 扫码/退出，`OnlineProfile.vip` 取自 login_status 的 vipType>0）；**行内标会员感知**（会员看 vipOnly=[VIP] 能完整播，非会员=[VIP,试听]）；播放发现试听承诺落空 → 回写 unavailable（行内标当场翻「无版权」，集合缓存也回写持久）；会话验真失效 → toast 提示重新扫码（不再静默清）；**间奏点**（v6.44：findInterludes 纯函数 + LyricsView 行后呼吸点，点即跳过间奏；v-for 包 template 后 key 移到 template）。**搜索结果跨页保留**（v6.45：搜索状态进 online store，SPA 导航往返不丢；整页刷新仍重置——易变数据不进 localStorage）。**翻译显示开关**（v6.41：歌词来源菜单切换项、偏好存 localStorage、默认开；v-memo 需补翻译签名依赖否则暂停中切换不生效；v6.43 起同开关兼管音译行 romalrc）。**翻译歌词上屏**（tlyric 与原文同时间轴，按毫秒对齐渲染在原文下方；`getLyrics` 返回 `{lyrics, translation}`，store 的 `lyricsTranslation` 承载；展示按 AMLL 的 lyricSubLine：主行半高 max(0.5em,10px)、非当前句 30%、换句主行先亮翻译延迟 0.25s 跟进）。注意：真会员账号仍有个别内容拿不到音频（区域/内容级授权），toast 兜底。
 

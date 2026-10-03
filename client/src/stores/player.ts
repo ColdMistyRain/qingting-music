@@ -527,6 +527,10 @@ export const usePlayerStore = defineStore("player", () => {
       // 解析是异步的，回来时用户可能已经点了别的歌 —— 不是这首了就当这次没发生
       if (currentTrack.value?.id !== track.id) return;
       if (!resolved.ok) {
+        // 回写真实可播状态（v6.35 补 6 的留白落地）：标着「试听」却连试听片段
+        // 都没拿到（账号/区域策略），行内标当场从「试听」翻成「无版权」，
+        // 不让徽标继续过度承诺；队列与播放存档都带这个标记
+        patchTrack(track.id, { unavailable: true });
         // 不自动跳（对比坏文件的 3 秒跳过）：VIP/无版权是这首歌**已知**的属性，
         // 一首首自动跳下去就成了另一种"自己换歌"，提示说清楚、停在这里即可
         notifyStreamFailure(resolved.reason);

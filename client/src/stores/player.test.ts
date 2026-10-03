@@ -805,6 +805,8 @@ describe("在线曲目（ON-03/05）", () => {
     expect(player.playing).toBe(false);
     // 解析失败在装 audio 之前就停住了：连元素都不用建
     expect(FakeAudio.instances).toHaveLength(0);
+    // 回写真实可播状态（v6.35 补 6 留白落地）：行内标从「试听」翻成「无版权」
+    expect(player.queue[0]?.unavailable).toBe(true);
     // 与坏文件不同：这里没有排 3 秒的待跳（自动跳下去会成另一种"自己换歌"）
     await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS * 3);
     expect(player.currentTrack?.id).toBe("netease:1");

@@ -21,6 +21,7 @@ import {
   withoutImportedLyric,
   type ImportedLyrics,
 } from "@/utils/lyricsLibrary";
+import { markCollectionTrackUnavailable } from "@/utils/onlineCollectionCache";
 import { parseOnlineTrackId } from "@/utils/onlineTracks";
 import { parseSnapshot, sanitizeSnapshot } from "@/utils/playerState";
 import {
@@ -531,6 +532,9 @@ export const usePlayerStore = defineStore("player", () => {
         // 都没拿到（账号/区域策略），行内标当场从「试听」翻成「无版权」，
         // 不让徽标继续过度承诺；队列与播放存档都带这个标记
         patchTrack(track.id, { unavailable: true });
+        // 集合缓存里的同一条目也标上（跨刷新持久，v6.36 留白落地）
+        const parsedId = parseOnlineTrackId(track.id);
+        if (parsedId) markCollectionTrackUnavailable(parsedId.provider, parsedId.nativeId);
         // 不自动跳（对比坏文件的 3 秒跳过）：VIP/无版权是这首歌**已知**的属性，
         // 一首首自动跳下去就成了另一种"自己换歌"，提示说清楚、停在这里即可
         notifyStreamFailure(resolved.reason);

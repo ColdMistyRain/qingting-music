@@ -15,6 +15,7 @@ import {
   writeOnlineSession,
   type OnlineSession,
 } from "@/utils/onlineSession";
+import { showToast } from "@/utils/toast";
 import {
   clearCollectionCache,
   readCollectionCache,
@@ -67,8 +68,14 @@ export const useOnlineStore = defineStore("online", () => {
         session.value = { ...stored, profile: info.profile };
         writeOnlineSession(session.value);
       } else {
+        // 之前登录着、这次验真失效了：说清楚界面为什么变回未登录（v6.39），
+        // 而不是静默清掉让人摸不着头脑；清掉之后这条提示不会重复出现
         clearOnlineSession("netease");
         session.value = null;
+        showToast({
+          title: "网易云登录已失效",
+          description: "请到 设置 › 在线音源 重新扫码登录",
+        });
       }
       accountStatus.value = "ready";
     } catch {

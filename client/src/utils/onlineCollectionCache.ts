@@ -95,6 +95,52 @@ export function writeCollectionCache(
   }
 }
 
+/**
+ * 播放时发现某曲目不可播（连试听片段都没有，v6.36 的留白落地）：
+ * 把**所有缓存歌单**里对应的条目也标上 unavailable —— 行内标跨刷新持久，
+ * 不然重载后从缓存读回又会回到「试听」。没有匹配条目就是静默无操作。
+ */
+export function markCollectionTrackUnavailable(provider: string, nativeTrackId: string): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const prefix = `${KEY_PREFIX}${provider}:`;
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) keys.push(key);
+    }
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      let data: unknown;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (!data || typeof data !== "object") continue;
+      const candidate = data as { tracks?: unknown };
+      if (!Array.isArray(candidate.tracks)) continue;
+      let changed = false;
+      const tracks = candidate.tracks.map((entry: unknown) => {
+        if (
+          entry &&
+          typeof entry === "object" &&
+          String((entry as { id?: unknown }).id) === nativeTrackId &&
+          (entry as { unavailable?: unknown }).unavailable !== true
+        ) {
+          changed = true;
+          return { ...(entry as object), unavailable: true };
+        }
+        return entry;
+      });
+      if (changed) localStorage.setItem(key, JSON.stringify({ ...candidate, tracks }));
+    }
+  } catch {
+    // 回写失败静默：播放时的 toast 已经把状态说清楚了
+  }
+}
+
 /** 清掉某个音源的全部歌单缓存（退出登录时） */
 export function clearCollectionCache(provider: string): void {
   if (typeof localStorage === "undefined") return;

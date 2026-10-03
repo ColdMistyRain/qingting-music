@@ -3,6 +3,7 @@ import type { OnlineTrack } from "@qingting/shared";
 import {
   clearCollectionCache,
   COLLECTION_CACHE_TTL_MS,
+  markCollectionTrackUnavailable,
   readCollectionCache,
   writeCollectionCache,
 } from "./onlineCollectionCache";
@@ -32,6 +33,7 @@ function track(id: string): OnlineTrack {
     duration: 200,
     cover: null,
     vipOnly: false,
+    unavailable: false,
   };
 }
 
@@ -86,6 +88,27 @@ describe("readCollectionCache / writeCollectionCache", () => {
     broken.cachedAt = "不是日期";
     memory.set("qt-online-collection:netease:100", JSON.stringify(broken));
     expect(readCollectionCache("netease", "100")).toBeNull();
+  });
+
+  it("markCollectionTrackUnavailable：把所有缓存歌单里的同一条目标为不可播（v6.36 留白落地）", () => {
+    writeCollectionCache("netease", "100", [track("186016"), track("999")]);
+    writeCollectionCache("netease", "200", [track("186016")]);
+    writeCollectionCache("kugou", "300", [track("186016")]);
+
+    markCollectionTrackUnavailable("netease", "186016");
+
+    // 两份网易云缓存里都标上了；别的音源不受影响
+    const in100 = readCollectionCache("netease", "100")!.tracks.find((t) => t.id === "186016");
+    const in200 = readCollectionCache("netease", "200")!.tracks.find((t) => t.id === "186016");
+    expect(in100?.unavailable).toBe(true);
+    expect(in200?.unavailable).toBe(true);
+    expect(readCollectionCache("kugou", "300")!.tracks[0]?.unavailable).toBe(false);
+  });
+
+  it("markCollectionTrackUnavailable：没有匹配条目就是静默无操作", () => {
+    writeCollectionCache("netease", "100", [track("a")]);
+    markCollectionTrackUnavailable("netease", "404");
+    expect(readCollectionCache("netease", "100")!.tracks[0]?.unavailable).toBe(false);
   });
 
   it("clearCollectionCache 只清那个音源的歌单缓存", () => {

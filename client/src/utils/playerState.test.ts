@@ -223,3 +223,40 @@ describe("存档里的本地曲目计数", () => {
     expect(next.droppedLocalTracks).toBe(0);
   });
 });
+
+describe("在线曲目的存档（ON-03：直链不进存档）", () => {
+  /** 在线曲目：队列里的 url 本来就是空串（直链开播前才解析） */
+  function online(id: string, url = ""): Track {
+    return { ...track(id, "https://example.test/x"), source: "online", url };
+  }
+
+  it("在线曲目即使 url 是空串也入存档（id 是 provider:id 稳定键，随时能重解析）", () => {
+    const result = sanitizeSnapshot(
+      snapshot({ queue: [online("netease:1"), track("b", "/audio/2.mp3")], currentIndex: 0 }),
+    );
+
+    expect(result.queue.map((t) => t.id)).toEqual(["netease:1", "b"]);
+    expect(result.droppedLocalTracks).toBe(0);
+  });
+
+  it("已经解析出的直链在存档里被置空（签名地址会过期，存下来就是死链）", () => {
+    const live = online("netease:1", "https://m701.music.126.net/abc.mp3");
+    const result = sanitizeSnapshot(snapshot({ queue: [live], currentIndex: 0 }));
+
+    expect(result.queue).toHaveLength(1);
+    expect(result.queue[0]?.url).toBe("");
+    // 不动队列里的原对象：播放中的那份还要靠它出声
+    expect(live.url).toBe("https://m701.music.126.net/abc.mp3");
+  });
+
+  it("恢复后当前曲目仍是同一首：进度对着它夹取", () => {
+    const saved = sanitizeSnapshot(
+      snapshot({ queue: [track("a", "blob:x"), online("netease:9")], currentIndex: 1, seconds: 42 }),
+    );
+    const loaded = parseSnapshot(JSON.stringify(saved));
+
+    expect(loaded?.currentIndex).toBe(0);
+    expect(loaded?.queue[0]?.url).toBe("");
+    expect(loaded?.seconds).toBe(42);
+  });
+});

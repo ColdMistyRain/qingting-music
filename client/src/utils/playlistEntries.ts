@@ -6,10 +6,18 @@ import {
   type Song,
   type Track,
 } from "@qingting/shared";
-import { songToTrack } from "./library";
+import { songToTrackCached } from "./library";
+import { parseOnlineTrackId } from "./onlineTracks";
 
 /** 歌单里一条曲目的可播状态（PS-03；不可播时列表照常显示、只是点不动） */
 export type PlaylistEntryState = "ready" | "missing-cloud" | "missing-local" | "online-off";
+
+/** 解析歌单条目时的数据源（onlineEnabled：ON-04 的开关，决定在线引用是“能播”还是“没接”） */
+export interface PlaylistSources {
+  songs: readonly Song[];
+  queue: readonly Track[];
+  onlineEnabled: boolean;
+}
 
 export interface PlaylistEntry {
   item: PlaylistItem;
@@ -51,20 +59,35 @@ function displayMeta(
 /** 解析歌单里的一条：能不能播、拿什么去播 */
 export function resolvePlaylistEntry(
   item: PlaylistItem,
-  sources: { songs: readonly Song[]; queue: readonly Track[] },
+  sources: PlaylistSources,
 ): PlaylistEntry {
   const key = playlistItemKey(item);
 
-  // 在线音源还没接入（PRD 3.5）：先把引用留住，等接上了就能直接播
+  // 在线引用（ON-03 接入后可播）：track 的 url 留空，开播时由 player store 现解析直链。
+  // 音源没配置（ON-04）或引用键形状不对时留住条目、说明原因，不静默消失。
   if (item.source === "online") {
-    return {
-      item,
-      key,
-      state: "online-off",
-      track: null,
-      reason: "在线音源还没接上",
-      ...displayMeta(item, null),
+    const refId = item.refId ?? "";
+    if (!sources.onlineEnabled || !parseOnlineTrackId(refId)) {
+      return {
+        item,
+        key,
+        state: "online-off",
+        track: null,
+        reason: sources.onlineEnabled ? "这条在线引用没法识别" : "在线音源未配置",
+        ...displayMeta(item, null),
+      };
+    }
+    const track: Track = {
+      id: refId,
+      source: "online",
+      url: "",
+      title: item.title,
+      artist: item.artist,
+      album: "",
+      cover: item.cover ?? null,
+      duration: item.duration ?? null,
     };
+    return { item, key, state: "ready", track, reason: "", ...displayMeta(item, track) };
   }
 
   // 本地曲目：refId 是“歌手|曲名”稳定键，拿当前队列里的实时 Track 来对（它带 Blob URL）
@@ -96,14 +119,15 @@ export function resolvePlaylistEntry(
     };
   }
 
-  const track = songToTrack(song);
+  // 缓存版：同一个 Song 反复解析拿同一个 Track 对象，行组件浅比较才拦得住重渲染（v6.9）
+  const track = songToTrackCached(song);
   return { item, key, state: "ready", track, reason: "", ...displayMeta(item, track) };
 }
 
 /** 整张歌单解析一遍（保持歌单自身的顺序） */
 export function resolvePlaylist(
   playlist: Playlist,
-  sources: { songs: readonly Song[]; queue: readonly Track[] },
+  sources: PlaylistSources,
 ): PlaylistEntry[] {
   return playlist.items.map((item) => resolvePlaylistEntry(item, sources));
 }

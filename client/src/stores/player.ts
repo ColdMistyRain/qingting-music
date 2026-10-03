@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import type { Track } from "@qingting/shared";
 import { fetchLyrics } from "@/api/songs";
+import { fetchOnlineLyrics, fetchOnlineStreamUrl } from "@/api/online";
 import {
   nextMode as nextPlayMode,
   PLAY_MODE_LABELS,
@@ -20,6 +21,7 @@ import {
   withoutImportedLyric,
   type ImportedLyrics,
 } from "@/utils/lyricsLibrary";
+import { parseOnlineTrackId } from "@/utils/onlineTracks";
 import { parseSnapshot, sanitizeSnapshot } from "@/utils/playerState";
 import {
   AUTO_SKIP_DELAY_MS,
@@ -237,7 +239,109 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  watch(currentTrack, (track) => void loadCloudLyrics(track), { immediate: true });
+  /* ---------- 在线曲目的歌词（ON-05 / LR-02 第三优先级）---------- */
+  /** 问过、**确实没有**歌词的曲目：切来切去不重复请求（失败不记，下次还会试） */
+  const askedOnlineLyrics = new Set<string>();
+  /**
+   * 拉到过的歌词按曲目存一份（会话级、有上限）：`lyricsText` 在切歌时会被清空，
+   * 不缓存的话“切走再切回”就得重新发请求，来回听歌的体验是歌词时有时无。
+   */
+  const onlineLyricsCache = new Map<string, string>();
+  /** 上限的理由与手动歌词库一致：歌词很小，但架不住攒得多 */
+  const ONLINE_LYRICS_CACHE_LIMIT = 30;
+
+  function cacheOnlineLyrics(id: string, text: string): void {
+    if (onlineLyricsCache.has(id)) onlineLyricsCache.delete(id);
+    onlineLyricsCache.set(id, text);
+    while (onlineLyricsCache.size > ONLINE_LYRICS_CACHE_LIMIT) {
+      const oldest = onlineLyricsCache.keys().next().value;
+      if (oldest === undefined) break;
+      onlineLyricsCache.delete(oldest);
+    }
+  }
+
+  /**
+   * 在线曲目的歌词进的是 `lyricsText`（`pickLyricsSource` 里的「在线」档）：
+   * 优先级仍是 手动 > 内嵌 > 在线，沉浸页与菜单一行都不用改。
+   * 音源拿不到就安静地当这首歌没歌词；失败也不打扰播放。
+   */
+  async function loadOnlineLyrics(track: Track | null): Promise<void> {
+    if (!track || track.source !== "online") return;
+    const parsed = parseOnlineTrackId(track.id);
+    if (!parsed) return;
+
+    // 缓存命中直接给：这一步是同步的，切回来马上就有
+    const cached = onlineLyricsCache.get(track.id);
+    if (cached !== undefined) {
+      lyricsText.value = cached;
+      return;
+    }
+    if (askedOnlineLyrics.has(track.id)) return;
+
+    try {
+      const lyrics = await fetchOnlineLyrics(parsed.provider, parsed.nativeId);
+      // 请求回来时可能已经切歌：歌词永远属于当前曲目
+      if (currentTrack.value?.id !== track.id) return;
+      if (lyrics) cacheOnlineLyrics(track.id, lyrics);
+      else askedOnlineLyrics.add(track.id);
+      lyricsText.value = lyrics ?? "";
+    } catch {
+      // 音源不可用就不给歌词，不影响播放与手动导入；下次切回还会再试
+    }
+  }
+
+  watch(
+    currentTrack,
+    (track) => {
+      void loadCloudLyrics(track);
+      void loadOnlineLyrics(track);
+    },
+    { immediate: true },
+  );
+
+  /* ---------- 在线曲目的播放直链（ON-03）：开播前现解析 ---------- */
+  /**
+   * 解析结果：`unavailable` = 音源明确说没有（VIP / 无版权，业务结果）；
+   * `failed` = 请求本身没成（后端断了 / 音源 502）。两种提示不一样。
+   */
+  type OnlineResolution =
+    | { ok: true; url: string }
+    | { ok: false; reason: "unavailable" | "failed" };
+
+  /** 同一首的并发解析只发一次请求（快速连点 / 连续切歌都会撞上） */
+  const streamResolutions = new Map<string, Promise<OnlineResolution>>();
+
+  /**
+   * 拿到**可播**的地址（队列/存档里的在线曲目 url 是空串 —— 直链是会过期的签名地址）。
+   * 解析成功回填到那条 Track 上，下次播它就不用再问了。
+   */
+  async function resolveOnlineUrl(track: Track): Promise<OnlineResolution> {
+    if (track.url) return { ok: true, url: track.url };
+    const parsed = parseOnlineTrackId(track.id);
+    if (!parsed) return { ok: false, reason: "unavailable" };
+
+    let pending = streamResolutions.get(track.id);
+    if (!pending) {
+      pending = fetchOnlineStreamUrl(parsed.provider, parsed.nativeId)
+        .then((url): OnlineResolution => {
+          if (url) patchTrack(track.id, { url });
+          return url ? { ok: true, url } : { ok: false, reason: "unavailable" };
+        })
+        .catch((): OnlineResolution => ({ ok: false, reason: "failed" }))
+        .finally(() => streamResolutions.delete(track.id));
+      streamResolutions.set(track.id, pending);
+    }
+    return pending;
+  }
+
+  /** 直链解析失败的两种说法（ON-03：VIP/无版权要给明确提示） */
+  function notifyStreamFailure(reason: "unavailable" | "failed"): void {
+    notify(
+      reason === "unavailable" ? "这首歌需要 VIP 或暂无版权，暂时无法播放" : "在线音源暂时连不上，这首先放不了",
+      true,
+      "danger",
+    );
+  }
 
   /**
    * VS-02：切歌时把封面的两个**原始色源**写到 <html> 上——
@@ -314,6 +418,17 @@ export const usePlayerStore = defineStore("player", () => {
   async function play(): Promise<void> {
     const element = ensureAudio();
     if (!element || !hasTrack.value) return;
+    // 存档恢复的在线曲目没有直链（url 已置空，src 也没设）：按播放键时现解析
+    const track = currentTrack.value;
+    if (track && track.source === "online" && !track.url) {
+      const resolved = await resolveOnlineUrl(track);
+      if (currentTrack.value?.id !== track.id) return;
+      if (!resolved.ok) {
+        notifyStreamFailure(resolved.reason);
+        return;
+      }
+      element.src = resolved.url;
+    }
     try {
       await element.play();
       playing.value = true;
@@ -390,8 +505,12 @@ export const usePlayerStore = defineStore("player", () => {
     else void play();
   }
 
-  /** 播放队列中的某一首（PL-06 列表点击播放） */
-  function playAt(index: number, autoplay = true): void {
+  /**
+   * 播放队列中的某一首（PL-06 列表点击播放）。
+   * 在线曲目在这里**现解析播放直链**（ON-03）——队列/存档里的在线曲目没有地址，
+   * 直链是会过期的签名地址，提前解析只会存下放不出的死链。
+   */
+  async function playAt(index: number, autoplay = true): Promise<void> {
     const track = queue.value[index];
     if (!track) return;
     // 用户自己点了某一首（也可能就是自动跳过自己）：无论哪种，先前那个待跳都不再需要
@@ -402,6 +521,20 @@ export const usePlayerStore = defineStore("player", () => {
     pendingSeconds = 0;
     notify("");
     persist();
+
+    if (track.source === "online" && !track.url) {
+      const resolved = await resolveOnlineUrl(track);
+      // 解析是异步的，回来时用户可能已经点了别的歌 —— 不是这首了就当这次没发生
+      if (currentTrack.value?.id !== track.id) return;
+      if (!resolved.ok) {
+        // 不自动跳（对比坏文件的 3 秒跳过）：VIP/无版权是这首歌**已知**的属性，
+        // 一首首自动跳下去就成了另一种"自己换歌"，提示说清楚、停在这里即可
+        notifyStreamFailure(resolved.reason);
+        pause();
+        return;
+      }
+      track.url = resolved.url;
+    }
 
     const element = ensureAudio();
     if (!element) return;
@@ -645,8 +778,10 @@ export const usePlayerStore = defineStore("player", () => {
       progress.value = snapshot.seconds;
       pendingSeconds = snapshot.seconds;
       const element = ensureAudio();
-      // 只预载元数据把时长与进度摆好，不 play()
-      if (element) element.src = track.url;
+      // 只预载元数据把时长与进度摆好，不 play()。
+      // 在线曲目的直链在存档里是空串（会过期的签名地址）：src 不设，
+      // 等用户按播放时现解析（`play()` 里的那段）；这时长直接用存档里带的。
+      if (element && track.url) element.src = track.url;
     }
 
     if (dropped > 0) {

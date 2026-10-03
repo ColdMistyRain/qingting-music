@@ -51,7 +51,7 @@ function playlistOf(items: PlaylistItem[], name = "夜行歌单"): Playlist {
   };
 }
 
-const sources = { songs: [song()], queue: [] as Track[] };
+const sources = { songs: [song()], queue: [] as Track[], onlineEnabled: false };
 
 describe("toM3U8（PS-06：能播的写地址，不能播的写注释）", () => {
   it("首行是 #EXTM3U，带歌单名注释，云端曲目写绝对地址", () => {
@@ -79,7 +79,7 @@ describe("toM3U8（PS-06：能播的写地址，不能播的写注释）", () =>
     const text = toM3U8("混合", entries);
 
     expect(text).toContain("# 本地文件（导出时不带地址）：林晚 - 夜行");
-    expect(text).toContain("# 在线音源（未接入）：某某 - 在线歌");
+    expect(text).toContain("# 在线音源（播放地址是临时的，只记下这首）：某某 - 在线歌");
     expect(text).toContain("# 已不在曲库：BEYOND - 被删的歌");
     expect(text).not.toContain("#EXTINF");
   });

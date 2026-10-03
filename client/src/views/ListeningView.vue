@@ -4,17 +4,18 @@ import IconClockCounterClockwise from "~icons/ph/clock-counter-clockwise";
 import IconHeartStraight from "~icons/ph/heart-straight";
 import IconPlay from "~icons/ph/play";
 import IconTrash from "~icons/ph/trash";
-import { playlistItemKey, type PlaylistItem, type Track } from "@qingting/shared";
+import { type PlaylistItem, type Track } from "@qingting/shared";
 import EmptyState from "@/components/EmptyState.vue";
 import NavToggle from "@/components/NavToggle.vue";
 import TrackListHead from "@/components/TrackListHead.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import { useVirtualList } from "@/composables/useVirtualList";
+import { useConfigStore } from "@/stores/config";
 import { useLibraryStore } from "@/stores/library";
 import { useListeningStore } from "@/stores/listening";
 import { usePlayerStore } from "@/stores/player";
 import { confirmAction } from "@/utils/confirm";
-import { songToTrackCached } from "@/utils/library";
+import { resolvePlaylistEntry, type PlaylistEntry } from "@/utils/playlistEntries";
 
 /**
  * 我的收藏 / 最近播放（PS-05）：同一份数据的两个入口，各占一个一级导航位。
@@ -36,6 +37,7 @@ const props = defineProps<{ mode: "favorites" | "recent" }>();
 const listening = useListeningStore();
 const library = useLibraryStore();
 const player = usePlayerStore();
+const config = useConfigStore();
 
 const isRecent = computed(() => props.mode === "recent");
 const title = computed(() => (isRecent.value ? "最近播放" : "我的收藏"));
@@ -45,18 +47,23 @@ const items = computed<readonly PlaylistItem[]>(() =>
   isRecent.value ? listening.recent : listening.favorites,
 );
 
-/** 能播的那些：云端引用 + 曲库里还有这一首（本地引用不带地址、在线音源还没接） */
-const rows = computed(() => {
-  const songs = new Map(library.songs.map((song) => [song.id, song]));
-  return items.value.flatMap((item) => {
-    if (item.source !== "server" || !item.refId) return [];
-    const song = songs.get(item.refId);
-    if (!song) return [];
-    return [{ item, key: playlistItemKey(item), track: songToTrackCached(song) }];
-  });
-});
+/** 能播的那些（与歌单同一套解析规则）：云端引用要在曲库里对得上；
+    在线引用要音源已配置（ON-04，track 的 url 留空、开播时由 player store 现解析直链）；
+    本地引用只在它还在当前队列里时能播。 */
+const rows = computed(() =>
+  items.value
+    .map((item) => resolvePlaylistEntry(item, {
+      songs: library.songs,
+      queue: player.queue,
+      onlineEnabled: config.onlineEnabled,
+    }))
+    .filter(
+      (entry): entry is PlaylistEntry & { track: Track } =>
+        entry.state === "ready" && entry.track !== null,
+    ),
+);
 
-/** 列不出来的条数（本地引用 / 已不在曲库） */
+/** 列不出来的条数（本地引用 / 已不在曲库 / 音源没配置） */
 const hidden = computed(() => items.value.length - rows.value.length);
 
 /* 长列表虚拟滚动（LB-08 / v6.27）：与音乐库、控制台同一套（收藏也可能攒到几百首）。
@@ -141,7 +148,7 @@ async function clearRecent(): Promise<void> {
 
     <!-- 列不出来的那些：一句小字说清楚，不静默消失。它说明的是这份列表，所以钉在帧上、不跟着滚 -->
     <p v-if="hidden > 0" class="my-note">
-      有 {{ hidden }} 条暂时列不出来（本地文件不在当前列表里，或云端那首已经不在曲库）。
+      有 {{ hidden }} 条暂时列不出来（本地文件不在当前列表里、云端那首已删除，或在线音源没配置）。
     </p>
 
     <!-- 表头 = “说明”：与音乐库同一套骨架 —— 在滚动区外面，不吸顶、不加底色（v4.41） -->

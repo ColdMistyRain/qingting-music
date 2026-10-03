@@ -54,7 +54,7 @@ const localItem: PlaylistItem = {
 
 describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => {
   it("云端曲目还在曲库：给出可播的 Track（走 /audio/ 流）", () => {
-    const entry = resolvePlaylistEntry(cloudItem, { songs: [song()], queue: [] });
+    const entry = resolvePlaylistEntry(cloudItem, { songs: [song()], queue: [], onlineEnabled: false });
 
     expect(entry.state).toBe("ready");
     expect(entry.track).toMatchObject({ id: "song-1", source: "server", url: "/audio/abc123.mp3" });
@@ -62,7 +62,7 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
   });
 
   it("云端曲目被删了：不假装能播，给出原因", () => {
-    const entry = resolvePlaylistEntry(cloudItem, { songs: [], queue: [] });
+    const entry = resolvePlaylistEntry(cloudItem, { songs: [], queue: [], onlineEnabled: false });
 
     expect(entry.state).toBe("missing-cloud");
     expect(entry.track).toBeNull();
@@ -71,7 +71,7 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
 
   it("本地曲目正在当前列表里：直接复用那条实时 Track（带 Blob URL）", () => {
     const live = localTrack();
-    const entry = resolvePlaylistEntry(localItem, { songs: [], queue: [live] });
+    const entry = resolvePlaylistEntry(localItem, { songs: [], queue: [live], onlineEnabled: false });
 
     expect(entry.state).toBe("ready");
     expect(entry.track).toBe(live);
@@ -79,6 +79,7 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
 
   it("本地曲目不在当前列表里（换了设备/刷新过）：标记本地缺失", () => {
     const entry = resolvePlaylistEntry(localItem, {
+      onlineEnabled: false,
       songs: [],
       queue: [localTrack({ title: "别的" })],
     });
@@ -89,6 +90,7 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
 
   it("本地曲目靠“歌手|曲名”匹配，不看每次都变的本地 id", () => {
     const entry = resolvePlaylistEntry(localItem, {
+      onlineEnabled: false,
       songs: [],
       queue: [localTrack({ id: "另一个-blob-id" })],
     });
@@ -96,19 +98,55 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
     expect(entry.state).toBe("ready");
   });
 
-  it("在线曲目：留着引用，但说明音源还没接上（3.5）", () => {
+  it("在线曲目：音源没配置（ON-04）时留着引用、说明原因，不静默消失", () => {
     const entry = resolvePlaylistEntry(
       { source: "online", refId: "netease:123", title: "在线歌", artist: "某某" },
-      { songs: [], queue: [] },
+      { songs: [], queue: [], onlineEnabled: false },
     );
 
     expect(entry.state).toBe("online-off");
     expect(entry.track).toBeNull();
+    expect(entry.reason).toContain("未配置");
+  });
+
+  it("在线曲目：音源已配置（ON-03 接入）时给可播的 Track —— id 是 provider:id、url 留空由 store 现解析", () => {
+    const entry = resolvePlaylistEntry(
+      {
+        source: "online",
+        refId: "netease:186016",
+        title: "夜曲",
+        artist: "周杰伦",
+        cover: "https://p1.music.126.net/x.jpg",
+        duration: 226,
+      },
+      { songs: [], queue: [], onlineEnabled: true },
+    );
+
+    expect(entry.state).toBe("ready");
+    expect(entry.track).toMatchObject({
+      id: "netease:186016",
+      source: "online",
+      url: "",
+      title: "夜曲",
+      artist: "周杰伦",
+      cover: "https://p1.music.126.net/x.jpg",
+      duration: 226,
+    });
+  });
+
+  it("在线引用键形状不对（没有 provider:id）：即便音源已配置也不能播", () => {
+    const entry = resolvePlaylistEntry(
+      { source: "online", refId: "186016", title: "坏引用", artist: "某某" },
+      { songs: [], queue: [], onlineEnabled: true },
+    );
+
+    expect(entry.state).toBe("online-off");
+    expect(entry.reason).toContain("没法识别");
   });
 
   it("显示用的歌名/歌手优先用实时曲目（AD-02：曲库改过名，歌单里不能还是旧的）", () => {
     const edited = song({ title: "海阔天空（现场版）", artist: "BEYOND 1993" });
-    const entry = resolvePlaylistEntry(cloudItem, { songs: [edited], queue: [] });
+    const entry = resolvePlaylistEntry(cloudItem, { songs: [edited], queue: [], onlineEnabled: false });
 
     expect(entry.title).toBe("海阔天空（现场版）");
     expect(entry.artist).toBe("BEYOND 1993");
@@ -116,17 +154,17 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
   });
 
   it("对不上实时曲目时退回歌单里存的快照（离线/被删时至少还有名字）", () => {
-    const missing = resolvePlaylistEntry(cloudItem, { songs: [], queue: [] });
+    const missing = resolvePlaylistEntry(cloudItem, { songs: [], queue: [], onlineEnabled: false });
     expect(missing.title).toBe("海阔天空");
     expect(missing.artist).toBe("BEYOND");
 
-    const local = resolvePlaylistEntry(localItem, { songs: [], queue: [] });
+    const local = resolvePlaylistEntry(localItem, { songs: [], queue: [], onlineEnabled: false });
     expect(local.title).toBe("夜行");
     expect(local.artist).toBe("林晚");
 
     const online = resolvePlaylistEntry(
       { source: "online", refId: "netease:9", title: "在线歌", artist: "某某" },
-      { songs: [], queue: [] },
+      { songs: [], queue: [], onlineEnabled: false },
     );
     expect(online.title).toBe("在线歌");
   });
@@ -135,7 +173,7 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
     const replaced = song({ coverUrl: "/covers/-id-newName.png" });
     const entry = resolvePlaylistEntry(
       { ...cloudItem, cover: "/covers/-id-oldName.jpg" },
-      { songs: [replaced], queue: [] },
+      { songs: [replaced], queue: [], onlineEnabled: false },
     );
 
     expect(entry.cover).toBe("/covers/-id-newName.png");
@@ -147,11 +185,11 @@ describe("resolvePlaylistEntry（PS-03：能不能播、拿什么播）", () => 
     const withoutCover = song({ coverUrl: null });
     const fallback = resolvePlaylistEntry(
       { ...cloudItem, cover: "/covers/snapshot.jpg" },
-      { songs: [withoutCover], queue: [] },
+      { songs: [withoutCover], queue: [], onlineEnabled: false },
     );
     expect(fallback.cover).toBe("/covers/snapshot.jpg");
 
-    const none = resolvePlaylistEntry(cloudItem, { songs: [withoutCover], queue: [] });
+    const none = resolvePlaylistEntry(cloudItem, { songs: [withoutCover], queue: [], onlineEnabled: false });
     expect(none.cover).toBeNull();
   });
 });
@@ -170,16 +208,16 @@ describe("resolvePlaylist / playableTracks / playlistTotalDuration", () => {
   };
 
   it("按歌单顺序逐条解析，条数一致", () => {
-    const entries = resolvePlaylist(playlist, { songs: [song()], queue: [localTrack()] });
+    const entries = resolvePlaylist(playlist, { songs: [song()], queue: [localTrack()], onlineEnabled: false });
 
     expect(entries.map((entry) => entry.state)).toEqual(["ready", "ready", "online-off"]);
   });
 
   it("整单播放只挑能播的，顺序不变", () => {
-    const entries = resolvePlaylist(playlist, { songs: [song()], queue: [localTrack()] });
+    const entries = resolvePlaylist(playlist, { songs: [song()], queue: [localTrack()], onlineEnabled: false });
 
     expect(playableTracks(entries).map((track) => track.id)).toEqual(["song-1", "blob-1"]);
-    expect(playableTracks(resolvePlaylist(playlist, { songs: [], queue: [] }))).toEqual([]);
+    expect(playableTracks(resolvePlaylist(playlist, { songs: [], queue: [], onlineEnabled: false }))).toEqual([]);
   });
 
   it("总时长只累加知道时长的那几条（未知的不算 0）", () => {

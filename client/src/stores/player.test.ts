@@ -3,6 +3,7 @@ import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Track } from "@qingting/shared";
 import { fetchLyrics } from "@/api/songs";
+import { fetchOnlineLyrics, fetchOnlineStreamUrl } from "@/api/online";
 import { AUTO_SKIP_DELAY_MS } from "@/utils/playbackFailure";
 import { TOAST_DURATION_MS, TOAST_STICKY_DURATION_MS, resetToasts, toasts } from "@/utils/toast";
 import { usePlayerStore } from "./player";
@@ -12,6 +13,12 @@ vi.mock("@/api/songs", () => ({
   fetchLyrics: vi.fn(async (id: string) => ({
     lyrics: id === "cloud" ? "[00:01.00]云端内嵌歌词" : null,
   })),
+}));
+
+// 在线音源（ON-03/05）：直链解析与歌词都走这里，单测里按用例改返回值
+vi.mock("@/api/online", () => ({
+  fetchOnlineStreamUrl: vi.fn(async () => "https://cdn.example.test/stream.mp3"),
+  fetchOnlineLyrics: vi.fn(async () => null),
 }));
 
 /** 队列里的曲目：用 https 地址，避免单测触碰 Blob URL 释放（那是浏览器行为） */
@@ -728,5 +735,143 @@ describe("云端曲目的内嵌歌词（LR-02：开播时按需拉一次）", ()
 
     expect(player.lyricsSource).toBe("[00:09.00]我自己找的");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("在线曲目（ON-03/05）", () => {
+  /** 在线曲目：进队列时 url 是空串，直链开播前才解析 */
+  function onlineTrack(id: string): Track {
+    return {
+      id,
+      source: "online",
+      url: "",
+      title: `在线 ${id}`,
+      artist: "在线歌手",
+      album: "在线专辑",
+      cover: null,
+      duration: 180,
+    };
+  }
+
+  beforeEach(() => {
+    FakeAudio.instances = [];
+    vi.useFakeTimers();
+    vi.stubGlobal("Audio", FakeAudio as unknown as typeof Audio);
+    vi.mocked(fetchOnlineStreamUrl).mockClear();
+    vi.mocked(fetchOnlineStreamUrl).mockResolvedValue("https://cdn.example.test/stream.mp3");
+    vi.mocked(fetchOnlineLyrics).mockClear();
+    vi.mocked(fetchOnlineLyrics).mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("playAt 前先解析直链：解析出的地址回填到曲目上并装进 audio", async () => {
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1")]);
+    player.playAt(0);
+    await settle();
+
+    expect(fetchOnlineStreamUrl).toHaveBeenCalledWith("netease", "1");
+    expect(player.queue[0]?.url).toBe("https://cdn.example.test/stream.mp3");
+    expect(FakeAudio.instances[0]!.src).toBe("https://cdn.example.test/stream.mp3");
+    expect(player.playing).toBe(true);
+  });
+
+  it("已经解析过的曲目再播不再发请求", async () => {
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1")]);
+    player.playAt(0);
+    await settle();
+
+    player.pause();
+    player.playAt(0);
+    await settle();
+    expect(fetchOnlineStreamUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("VIP/无版权（url 为 null）：说清楚原因并停下，不自动跳歌", async () => {
+    vi.mocked(fetchOnlineStreamUrl).mockResolvedValue(null);
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1"), onlineTrack("netease:2")]);
+    player.mode = "list";
+    player.playAt(0);
+    await settle();
+
+    expect(latestToast()?.tone).toBe("danger");
+    expect(latestToast()?.title).toContain("VIP 或暂无版权");
+    expect(player.playing).toBe(false);
+    // 解析失败在装 audio 之前就停住了：连元素都不用建
+    expect(FakeAudio.instances).toHaveLength(0);
+    // 与坏文件不同：这里没有排 3 秒的待跳（自动跳下去会成另一种"自己换歌"）
+    await vi.advanceTimersByTimeAsync(AUTO_SKIP_DELAY_MS * 3);
+    expect(player.currentTrack?.id).toBe("netease:1");
+  });
+
+  it("解析请求本身失败（后端断/音源 502）：提示音源连不上，同样不跳", async () => {
+    vi.mocked(fetchOnlineStreamUrl).mockRejectedValue(new Error("网络断了"));
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1")]);
+    player.playAt(0);
+    await settle();
+
+    expect(latestToast()?.title).toContain("在线音源暂时连不上");
+    expect(player.playing).toBe(false);
+  });
+
+  it("同一首的并发解析只发一次请求（快速连点不炸接口）", async () => {
+    let release!: (value: string | null) => void;
+    vi.mocked(fetchOnlineStreamUrl).mockReturnValue(
+      new Promise<string | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1")]);
+    player.playAt(0);
+    player.playAt(0);
+    release("https://cdn.example.test/late.mp3");
+    await settle();
+
+    expect(fetchOnlineStreamUrl).toHaveBeenCalledTimes(1);
+    expect(player.queue[0]?.url).toBe("https://cdn.example.test/late.mp3");
+  });
+
+  it("切到在线曲目时自动拉歌词进 lyricsText（LR-02 的「在线」档）；同一首只拉一次", async () => {
+    vi.mocked(fetchOnlineLyrics).mockResolvedValue("[00:01.17]夜曲");
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1"), onlineTrack("netease:2")]);
+
+    player.playAt(0);
+    await settle();
+    await settle();
+    expect(player.lyricsText).toBe("[00:01.17]夜曲");
+
+    // 切走又切回：问过的曲目不再发请求（问过没有/有过都是那一遍）
+    player.playAt(1);
+    await settle();
+    player.playAt(0);
+    await settle();
+    await settle();
+    // 每首只问一次：给 netease:1 发过一次请求，切到 netease:2 又是一次
+    const callsForFirst = vi
+      .mocked(fetchOnlineLyrics)
+      .mock.calls.filter(([provider, id]) => provider === "netease" && id === "1");
+    expect(callsForFirst).toHaveLength(1);
+    expect(player.lyricsText).toBe("[00:01.17]夜曲");
+  });
+
+  it("在线歌词拉不到时安静退场：lyricsText 留空，也不打扰播放", async () => {
+    vi.mocked(fetchOnlineLyrics).mockRejectedValue(new Error("音源断了"));
+    const player = usePlayerStore();
+    player.addTracks([onlineTrack("netease:1")]);
+    player.playAt(0);
+    await settle();
+    await settle();
+
+    expect(player.lyricsText).toBe("");
+    expect(player.playing).toBe(true);
   });
 });

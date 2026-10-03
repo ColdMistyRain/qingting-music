@@ -42,6 +42,26 @@ export function isResumableUrl(url: string): boolean {
   return typeof url === "string" && url.length > 0 && !url.startsWith("blob:");
 }
 
+/**
+ * 这首曲目刷新后续得上吗（存档的准入判断）。
+ *
+ * **在线曲目是特例**：它的 id 是 `provider:id` 稳定键，随时能重新解析直链 ——
+ * 所以就算 `url` 是空串（在线曲目本来就不存直链，见 `utils/onlineTracks`）也放行；
+ * 本地/云端仍看地址本身。
+ */
+function isPersistableTrack(track: Track): boolean {
+  if (track.source === "online") return true;
+  return isResumableUrl(track.url);
+}
+
+/**
+ * 存档里的在线曲目一律不携带直链（音源给的是会过期的签名地址，存下来就是死链）：
+ * 置空，恢复后第一次按播放时由 store 现解析（ON-03）。
+ */
+function stripOnlineUrl(track: Track): Track {
+  return track.source === "online" && track.url ? { ...track, url: "" } : track;
+}
+
 function isTrackLike(value: unknown): value is Track {
   if (!value || typeof value !== "object") return false;
   const track = value as Partial<Track>;
@@ -71,7 +91,10 @@ function clampSeconds(seconds: number, duration: number): number {
 export function sanitizeSnapshot(input: SnapshotInput): PlayerSnapshot {
   const currentId = input.queue[input.currentIndex]?.id ?? null;
   const valid = input.queue.filter(isTrackLike);
-  const queue = valid.filter((track) => isResumableUrl(track.url)).slice(0, MAX_PERSISTED_TRACKS);
+  const queue = valid
+    .filter(isPersistableTrack)
+    .map(stripOnlineUrl)
+    .slice(0, MAX_PERSISTED_TRACKS);
   const index = currentId === null ? -1 : queue.findIndex((track) => track.id === currentId);
   const seconds = index < 0 ? 0 : clampSeconds(input.seconds, queue[index].duration ?? 0);
 
@@ -82,7 +105,7 @@ export function sanitizeSnapshot(input: SnapshotInput): PlayerSnapshot {
     queue,
     currentIndex: index,
     seconds,
-    droppedLocalTracks: valid.filter((track) => !isResumableUrl(track.url)).length,
+    droppedLocalTracks: valid.filter((track) => !isPersistableTrack(track)).length,
   };
 }
 

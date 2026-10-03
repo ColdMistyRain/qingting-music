@@ -6,8 +6,9 @@ import type { PlaylistEntry } from "./playlistEntries";
  *
  * 两种格式，各有各的用处：
  * - **M3U8**：别的播放器/车机/音响能直接读的通用格式。云端曲目写**绝对地址**
- *   （`<origin>/audio/<storedName>`，手机上的播放器也够得着）；本地曲目与还没接上的
- *   在线音源在文件里**没有可用的地址**，写成注释行把名字留住 —— 不假装它们能播
+ *   （`<origin>/audio/<storedName>`，手机上的播放器也够得着）；本地曲目与在线音源在
+ *   文件里**没有可用的地址**（在线的直链是几分钟就过期的签名地址，替用户解析一遍再写进去
+ *   等他真正用这文件时也早就失效了），写成注释行把名字留住 —— 不假装它们能播
  *   （与歌单页“这条能不能播”同一套口径）。
  * - **JSON**：自留一份备份（`format` + `version` + 整份 items），换机器/重装后能照着还原。
  *
@@ -39,7 +40,7 @@ function m3u8Lines(entry: PlaylistEntry, origin: string): string[] {
     return [`# 本地文件（导出时不带地址）：${label}`];
   }
   if (item.source === "online") {
-    return [`# 在线音源（未接入）：${label}`];
+    return [`# 在线音源（播放地址是临时的，只记下这首）：${label}`];
   }
   return [`# 已不在曲库：${label}`];
 }

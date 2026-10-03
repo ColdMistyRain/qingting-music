@@ -31,6 +31,7 @@ import EmptyState from "@/components/EmptyState.vue";
 import InlineNameInput from "@/components/InlineNameInput.vue";
 import NavToggle from "@/components/NavToggle.vue";
 import { playlistErrorMessage } from "@/api/playlists";
+import { useConfigStore } from "@/stores/config";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { usePlaylistsStore } from "@/stores/playlists";
@@ -54,13 +55,18 @@ const router = useRouter();
 const playlists = usePlaylistsStore();
 const library = useLibraryStore();
 const player = usePlayerStore();
+const config = useConfigStore();
 
 /** 歌单是访客级（AC-03），但 `/playlist/:id` 没开 `meta.anonymous` —— 未登录访问会被路由守卫直接送去登录页，
     所以这里不需要“未登录”分支（v6.8 删掉，原先那一段永远看不到）。 */
 const playlist = computed(() => playlists.byId.get(props.id) ?? null);
 const entries = computed(() =>
   playlist.value
-    ? resolvePlaylist(playlist.value, { songs: library.songs, queue: player.queue })
+    ? resolvePlaylist(playlist.value, {
+        songs: library.songs,
+        queue: player.queue,
+        onlineEnabled: config.onlineEnabled,
+      })
     : [],
 );
 const totalSeconds = computed(() =>

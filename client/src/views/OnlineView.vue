@@ -14,22 +14,23 @@ import TrackListHead from "@/components/TrackListHead.vue";
 import { fetchOnlineSearch } from "@/api/online";
 import { toOnlineTrack } from "@/utils/onlineTracks";
 import { debounce } from "@/utils/debounce";
+import { filterSongs } from "@/utils/library";
 import { useConfigStore } from "@/stores/config";
 import { useListeningStore } from "@/stores/listening";
 import { useOnlineStore } from "@/stores/online";
 import { usePlayerStore } from "@/stores/player";
 
 /**
- * 在线搜索（PRD 3.5，ON-02/03）：关键词搜索在线音源，点行即播。
- * 结果整份当队列（与音乐库同一交互），点播时由 player store 现解析播放直链。
+ * 在线搜索 / 网易云歌单（PRD 3.5，ON-02/03 + ON-10）—— 同一页面的两种形态：
  *
- * 输入即时回显、搜索防抖 500ms（每次搜索都是一次上游请求，比本地过滤贵）；
- * 连续输入只认最后一次（序号判 stale，慢的旧响应不覆盖新结果）。
+ * - **搜索态**（默认）：关键词搜在线音源，输入防抖 500ms、序号判 stale；
+ * - **歌单态**（v6.35，需求方："应该显示实际歌单名称吧，还有这个搜索应该是搜索
+ *   列表内的歌曲"）：从侧栏点开网易云歌单后，标题就是歌单名，搜索框变成
+ *   **在这份歌单里过滤**（本地、即时、防抖 150ms —— 与音乐库同一节奏），
+ *   页头给「返回搜索」出口；点侧栏的「在线搜索」同样回到搜索态。
  *
- * 账号与收藏夹（ON-10）：网易云歌单列在**侧边栏**（v6.32，需求方定："第三方在线的歌单能
- * 放在侧边栏里面？然后在上面说明这个是网易云的歌单"），点侧栏条目即在本页打开整单；
- * 搜索会把它收起（搜索是新的意图）。歌单曲目放在 online store 里 —— 跳去沉浸页
- * 再回来还在；搜索结果是页面状态、不留。
+ * 两种态都是"结果整份当队列"（与音乐库同一交互），点播时由 player store 现解析播放直链。
+ * 歌单曲目放在 online store 里 —— 跳去沉浸页再回来还在；搜索结果是页面状态、不留。
  */
 const config = useConfigStore();
 const listening = useListeningStore();
@@ -52,20 +53,32 @@ watch(
 );
 
 const keyword = ref("");
+/** 歌单内的过滤词（防抖 150ms，与音乐库同一节奏：输入即时回显、过滤跟随） */
+const query = ref("");
 const status = ref<"idle" | "loading" | "ready" | "error">("idle");
 const errorMessage = ref("");
 const tracks = ref<Track[]>([]);
 const lastKeyword = ref("");
+
+const collectionMode = computed(() => online.activePlaylistId !== null);
+const activePlaylist = computed(() => online.activePlaylist);
+
+// 切换歌单 / 收起歌单：清掉旧关键词（上一份的过滤词不该套在新列表上）
+watch(
+  () => online.activePlaylistId,
+  () => {
+    keyword.value = "";
+    query.value = "";
+  },
+);
 
 /** 每次搜索自增；响应回来时序号对不上就丢掉（请求本身没法中断，也不必中断） */
 let searchSeq = 0;
 
 async function search(raw: string): Promise<void> {
   const text = raw.trim();
-  if (!text) return;
+  if (!text || collectionMode.value) return;
   const seq = ++searchSeq;
-  // 搜索是新的意图：收起正在看的歌单
-  online.closePlaylist();
   status.value = "loading";
   errorMessage.value = "";
   lastKeyword.value = text;
@@ -82,25 +95,43 @@ async function search(raw: string): Promise<void> {
   }
 }
 
-/** 输入停 500ms 才搜；回车立即搜 */
 const applyKeyword = debounce((value: string) => {
   if (value.trim()) void search(value);
 }, 500);
-watch(keyword, (value) => applyKeyword.call(value));
-onBeforeUnmount(() => applyKeyword.cancel());
+/** 歌单内过滤：本地纯函数，150ms 跟随（与音乐库的站内过滤同一节奏） */
+const applyQuery = debounce((value: string) => {
+  query.value = value;
+}, 150);
+
+watch(keyword, (value) => {
+  if (collectionMode.value) applyQuery.call(value);
+  else applyKeyword.call(value);
+});
+onBeforeUnmount(() => {
+  applyKeyword.cancel();
+  applyQuery.cancel();
+});
 
 function submit(): void {
+  // 歌单态的过滤是本地的、即时的，回车/按钮不触发远程搜索
+  if (collectionMode.value) return;
   applyKeyword.cancel();
   void search(keyword.value);
 }
 
-/* ---------- 我的歌单（ON-10）：导航在侧栏，这里只负责展示 ---------- */
+/** 回到搜索态：收起歌单、清掉过滤词（侧栏点「在线搜索」走同一条路） */
+function exitToSearch(): void {
+  applyQuery.cancel();
+  online.closePlaylist();
+  keyword.value = "";
+  query.value = "";
+}
 
-const collectionMode = computed(() => online.activePlaylistId !== null);
+const isFiltering = computed(() => collectionMode.value && query.value.trim().length > 0);
 
-/** 展示给列表的曲目：歌单模式用 store 里那份，否则用搜索结果 */
+/** 展示给列表的曲目：歌单态用过滤后的歌单曲目，搜索态用搜索结果 */
 const displayTracks = computed<Track[]>(() =>
-  collectionMode.value ? online.collectionTracks : tracks.value,
+  collectionMode.value ? filterSongs(online.collectionTracks, query.value) : tracks.value,
 );
 
 const listStatus = computed<"idle" | "loading" | "ready" | "error">(() =>
@@ -110,9 +141,19 @@ const listError = computed(() => (collectionMode.value ? online.collectionError 
 const hasResults = computed(() => listStatus.value === "ready" && displayTracks.value.length > 0);
 const noResults = computed(() => listStatus.value === "ready" && displayTracks.value.length === 0);
 
+const pageTitle = computed(() =>
+  collectionMode.value ? (activePlaylist.value?.name ?? "网易云歌单") : "在线搜索",
+);
+const pageSubtitle = computed(() => {
+  if (!collectionMode.value) return "音源：网易云";
+  const total = activePlaylist.value?.trackCount ?? online.collectionTracks.length;
+  return `网易云歌单 · ${total} 首`;
+});
+
 function playAt(index: number): void {
   const target = displayTracks.value[index];
   if (!target) return;
+  // 眼前这段整份当队列（与音乐库同一交互）
   player.clear();
   player.addTracks(displayTracks.value);
   player.playAt(index);
@@ -134,14 +175,11 @@ function toggleFavorite(index: number): void {
     <div class="page-head">
       <div class="page-head__title">
         <NavToggle />
-        <h1>在线搜索</h1>
-        <div class="sub">
-          {{
-            collectionMode && online.activePlaylist
-              ? `网易云歌单 · ${online.activePlaylist.name}`
-              : "音源：网易云"
-          }}
-        </div>
+        <h1>{{ pageTitle }}</h1>
+        <div class="sub">{{ pageSubtitle }}</div>
+      </div>
+      <div v-if="collectionMode" class="page-head__actions">
+        <button class="btn" @click="exitToSearch">返回搜索</button>
       </div>
     </div>
 
@@ -172,15 +210,26 @@ function toggleFavorite(index: number): void {
             v-model="keyword"
             type="search"
             enterkeyhint="search"
-            placeholder="搜索在线歌曲，回车搜索"
+            :placeholder="collectionMode ? '在这份歌单里搜索' : '搜索在线歌曲，回车搜索'"
             @keydown.enter="submit"
           />
         </label>
-        <button class="btn btn-primary" :disabled="status === 'loading'" @click="submit">
+        <button
+          v-if="!collectionMode"
+          class="btn btn-primary"
+          :disabled="status === 'loading'"
+          @click="submit"
+        >
           搜索
         </button>
-        <span v-if="hasResults" class="toolbar__spacer count">
+        <span v-if="isFiltering" class="toolbar__spacer count">
           找到 {{ displayTracks.length }} 首
+        </span>
+        <span
+          v-else-if="!collectionMode && status === 'ready' && tracks.length > 0"
+          class="toolbar__spacer count"
+        >
+          找到 {{ tracks.length }} 首
         </span>
       </div>
 
@@ -203,8 +252,7 @@ function toggleFavorite(index: number): void {
       <TrackListHead v-if="hasResults" />
 
       <div class="page-frame__scroll">
-        <!-- 加载中（v6.34）：提示与进度条放**页面中间**，不再挤在工具栏角落
-             （需求方圈过："还在加载在线列表时，提醒语句应该放在页面中间"） -->
+        <!-- 加载中（v6.34）：提示与进度条放**页面中间** -->
         <div v-if="listStatus === 'loading' && displayTracks.length === 0" class="page-frame__fill">
           <div class="loading">
             <p class="loading__text">
@@ -243,8 +291,12 @@ function toggleFavorite(index: number): void {
         <div v-else-if="noResults" class="page-frame__fill">
           <EmptyState
             :icon="IconGlobe"
-            title="没有找到相关的歌曲"
-            :desc="`换个关键词试试。想找「${lastKeyword}」的翻唱或现场版，可以在关键词里加上这些词。`"
+            :title="collectionMode ? '这份歌单里没有匹配的歌曲' : '没有找到相关的歌曲'"
+            :desc="
+              collectionMode
+                ? '换个关键词试试；点页头的「返回搜索」可以去搜全网歌曲。'
+                : `换个关键词试试。想找「${lastKeyword}」的翻唱或现场版，可以在关键词里加上这些词。`
+            "
             fill
           />
         </div>

@@ -174,6 +174,8 @@ client/src/directives/    overlayScroll.ts（自绘**浮层滚动条**：v-overl
 
 **歌单缓存与居中加载（v6.34）**：需求方两点 —— ① 点网易云歌单每次都重拉很慢 → `utils/onlineCollectionCache`（stale-while-revalidate：缓存秒开 + 后台刷新静默替换，退出登录连缓存清掉）；② 加载提示要在页面中间 → OnlineView 居中的文字 + 不确定进度条（工具栏小字移除）。连带修掉真 bug：openPlaylist 无缓存路径现在会**清掉上一份歌单的曲目**（否则加载分支接不住、页面掉进空闲空态）。测试基建教训进 PRD v6.34：clearAllMocks 不清实现（泄漏的 mockReturnValue 让下一个用例 5s 超时，要用 resetAllMocks）、localStorage 桩要有 length/key()（遍历清除类函数需要）。
 
+**歌单态页面（v6.35）**：需求方定调 —— 打开网易云歌单后页面以歌单为主体：标题=歌单名（副题含总数）、搜索框变站内过滤（`filterSongs` 泛化为结构约束，Song/Track 同用；150ms 防抖与音乐库同节奏）、页头「返回搜索」出口；侧栏点「在线搜索」收起歌单回搜索态。过滤词在切歌单/收起时自动清空。
+
 **下一步**（建议顺序）：**数据层统一迁 SQLite**（v5.60 定稿：功能全部做完再动，现阶段保持 JSON 文件；在线音源 P1 已交，P2 的 QQ/酷狗/聚合搜索按需求方节奏排）。生产静态托管已完成（v5.66）：`npm run build` 后 `npm start` 就是完整形态。
 
 进度明细、留白清单、下一步开工要点见 [`docs/dev/进度与交接.md`](./docs/dev/进度与交接.md)。

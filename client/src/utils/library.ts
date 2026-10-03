@@ -9,7 +9,11 @@ export type SongSortKey = "title" | "artist" | "size" | "uploadedAt";
 export type SortDirection = "asc" | "desc";
 
 /** 关键词过滤（标题 / 歌手 / 专辑，忽略大小写）；空关键词返回全部 */
-export function filterSongs(songs: readonly Song[], keyword: string): Song[] {
+export function filterSongs<T extends { title: string; artist: string; album: string }>(
+  songs: readonly T[],
+  keyword: string,
+): T[] {
+  // 结构化约束而非 Song：在线歌单的曲目过滤（v6.35）用的是 Track，字段同形
   const needle = keyword.trim().toLowerCase();
   if (!needle) return [...songs];
 

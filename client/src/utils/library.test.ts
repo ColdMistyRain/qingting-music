@@ -44,6 +44,18 @@ const LIBRARY: Song[] = [
   }),
 ];
 
+describe("filterSongs（对 Track 同样适用：在线歌单的站内过滤，v6.35）", () => {
+  it("按标题/歌手过滤曲目，忽略大小写", () => {
+    const tracks = [
+      { id: "netease:1", title: "夜曲", artist: "周杰伦", album: "十一月的萧邦" },
+      { id: "netease:2", title: "Tik Tok", artist: "2PM", album: "Tik Tok" },
+    ];
+    expect(filterSongs(tracks, "夜曲").map((t) => t.id)).toEqual(["netease:1"]);
+    expect(filterSongs(tracks, "tik").map((t) => t.id)).toEqual(["netease:2"]);
+    expect(filterSongs(tracks, "  ")).toHaveLength(2);
+  });
+});
+
 describe("filterSongs", () => {
   it("命中标题 / 歌手 / 专辑任一字段", () => {
     expect(filterSongs(LIBRARY, "晴天").map((s) => s.id)).toEqual(["a"]);

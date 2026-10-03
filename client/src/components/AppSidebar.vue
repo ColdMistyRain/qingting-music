@@ -64,6 +64,11 @@ function isNavActive(name: string): boolean {
   return true;
 }
 
+/** 点主导航：点「在线搜索」= 回到搜索页，收起打开着的网易云歌单（v6.35） */
+function onNavClick(name: string): void {
+  if (name === "online") online.closePlaylist();
+}
+
 /** 新建：建完直接跳进新歌单，省得再去列表里找一遍 */
 async function submitCreate(name: string): Promise<void> {
   creating.value = false;
@@ -108,6 +113,7 @@ function dismissPlaylistError(): void {
             class="nav-item"
             :class="{ active: isNavActive(item.name) }"
             :to="{ name: item.name }"
+            @click="onNavClick(item.name)"
           >
               <component :is="item.icon" class="icon" />
               <span class="lbl">{{ item.label }}</span>

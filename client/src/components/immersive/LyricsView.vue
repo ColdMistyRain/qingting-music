@@ -195,7 +195,7 @@ function applyManual(value: number): void {
   renderedShift.value = manualShift.value;
 }
 
-function measure(seeking = false): void {
+function measure(seeking = false, snap = false): void {
   const viewport = viewportRef.value;
   const list = listRef.value;
   const line = lineEls.get(activeIndex.value);
@@ -227,7 +227,16 @@ function measure(seeking = false): void {
   maxShift.value = Math.max(0, lastCenter - viewH / 2);
   const target = centerShift(desired, maxShift.value);
   shift.value = target;
-  driveTo(target, seeking);
+  if (snap) {
+    /* 逐帧锁位（v6.49）：副线收展期间高度本来就在连续变，弹簧再去追只会积累滞后
+       （实测当前句摆出去 158px 再回来）。每帧直接落位 = 当前句钉在中线不动，
+       其余行围着它平滑滑动；收完最后一帧正好落在终值上。 */
+    spring.snap(target);
+    renderedShift.value = target;
+    stopSpring();
+  } else {
+    driveTo(target, seeking);
+  }
   // 手动浏览中如果窗口尺寸变了，把手动位移也夹进新范围
   manualShift.value = clampManualShift(manualShift.value, maxShift.value);
 }
@@ -255,11 +264,28 @@ function scheduleMeasure(seeking = false): void {
 }
 
 watch(activeIndex, (now, before) => scheduleMeasure(Math.abs(now - before) > 1));
-// 音/译开关切换（v6.46）：副线出现/消失会改变每一行的行高，
-// 行的 offsetTop 全部偏移 —— 必须重新测量居中，否则当前句停在错位处
+// 音/译开关切换（v6.46 发现要重测；v6.49 改逐帧跟踪）：副线收展是 280ms 的高度过渡，
+// 期间每一行的 offsetTop 逐帧在变 —— 只在 nextTick 测一次（那时高度还没动）会让弹簧
+// 先奔向旧目标、收完再猛拉回来（需求方眼里的"跳"）。可见时逐帧 measure 追 450ms
+// （过渡时长 + 余量）；隐藏页里 CSS 过渡不推进（坑 8），退化为单次测量。
+let tracking = 0;
+function trackWhileCollapsing(): void {
+  if (document.visibilityState !== "visible") {
+    scheduleMeasure();
+    return;
+  }
+  if (tracking) cancelAnimationFrame(tracking);
+  const start = performance.now();
+  const step = (): void => {
+    tracking = 0;
+    measure(false, true);
+    if (performance.now() - start < 450) tracking = requestAnimationFrame(step);
+  };
+  tracking = requestAnimationFrame(step);
+}
 watch(
   () => [store.translationVisible, store.romanVisible],
-  () => scheduleMeasure(),
+  () => trackWhileCollapsing(),
 );
 // 换歌/换歌词：手动浏览的位置对新歌没有意义，直接回到自动居中
 watch(
@@ -514,6 +540,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
+  if (tracking) {
+    cancelAnimationFrame(tracking);
+    tracking = 0;
+  }
   stopSpring();
   if (resumeTimer !== null) {
     clearTimeout(resumeTimer);
@@ -585,16 +615,19 @@ onBeforeUnmount(() => {
                “我们目前的歌词都是普通的 lrc 格式…参照设计应该降级到逐行高亮”）。 -->
           <span v-else class="txt">{{ line.text }}</span>
           <!-- 翻译（v6.40）与音译（v6.46）：原文下方的小字，音译排在翻译之下；
-              显隐由右侧「译 / 音」钮的开关决定 -->
+              显隐由右侧「译 / 音」钮的开关决定。v6.49：开关不再 v-if 卸载（行高瞬变 =
+              整列瞬移），改为 .trw 壳的高度过渡平滑收展 —— 有数据就常驻 DOM，靠类收起 -->
           <span
-            v-if="store.translationVisible && translationOf(line.time)"
-            class="tr"
-            >{{ translationOf(line.time) }}</span
+            v-if="translationOf(line.time)"
+            class="trw"
+            :class="{ 'trw--hidden': !store.translationVisible }"
+            ><span class="tr">{{ translationOf(line.time) }}</span></span
           >
           <span
-            v-if="store.romanVisible && romanOf(line.time)"
-            class="tr"
-            >{{ romanOf(line.time) }}</span
+            v-if="romanOf(line.time)"
+            class="trw"
+            :class="{ 'trw--hidden': !store.romanVisible }"
+            ><span class="tr">{{ romanOf(line.time) }}</span></span
           >
           </button>
           <!-- 间奏点（v6.44）：长间奏时渲染呼吸点，随时间逐个点亮；点击跳过间奏 -->
@@ -907,6 +940,44 @@ onBeforeUnmount(() => {
 .lyline.current .tr {
   opacity: 0.75;
   transition-delay: 0s;
+}
+
+/* 副线收展壳（v6.49，需求方"依旧跳动"）：开关切换若直接卸载/挂载副线，每一行的行高
+   瞬间改变、整列瞬移 —— 弹簧再怎么追也是"跳"。改为 grid 0fr/1fr 的高度过渡 +
+   淡出：行高连续变化，配合脚本里的 trackWhileCollapsing 逐帧重测弹簧目标，
+   整列 280ms 平滑滑到新位置。外距留在内层 .tr 上（fr 轨道尺寸含外距；
+   收起时由壳的 overflow 裁掉）。visibility 按坑 19 的写法：收完再藏（a11y 树里
+   不留看不见的副线），展开瞬间就可见。 */
+.lyline .trw {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  visibility: visible;
+  transition:
+    grid-template-rows 0.28s ease,
+    opacity 0.28s ease,
+    visibility 0s;
+}
+
+.lyline .trw--hidden {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.28s ease,
+    opacity 0.28s ease,
+    visibility 0s 0.28s;
+}
+
+.lyline .trw > .tr {
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lyline .trw,
+  .lyline .trw--hidden {
+    transition: none;
+  }
 }
 
 /* 逐字（LR-05；v6.36 补重做为 AMLL 的进度条式扫过）：

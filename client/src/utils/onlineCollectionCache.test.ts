@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OnlineTrack } from "@qingting/shared";
 import {
   clearCollectionCache,
+  COLLECTION_CACHE_TTL_MS,
   readCollectionCache,
   writeCollectionCache,
 } from "./onlineCollectionCache";
@@ -65,6 +66,25 @@ describe("readCollectionCache / writeCollectionCache", () => {
       "qt-online-collection:netease:100",
       JSON.stringify({ provider: "netease", playlistId: "100", tracks: [{ id: 1 }] }),
     );
+    expect(readCollectionCache("netease", "100")).toBeNull();
+  });
+
+  it("缓存有过期时间（v6.35 补 5）：超过 24 小时视为无缓存，时间坏掉也一样", () => {
+    writeCollectionCache("netease", "100", [track("a")]);
+
+    // 新鲜：正常读回
+    expect(readCollectionCache("netease", "100")).not.toBeNull();
+
+    // 过期（25 小时前写入）：视为无缓存
+    const expired = JSON.parse(memory.get("qt-online-collection:netease:100")!);
+    expired.cachedAt = new Date(Date.now() - COLLECTION_CACHE_TTL_MS - 60_000).toISOString();
+    memory.set("qt-online-collection:netease:100", JSON.stringify(expired));
+    expect(readCollectionCache("netease", "100")).toBeNull();
+
+    // cachedAt 坏掉：同样视为过期（宁可靠网络，不可拿时间不明的数据装新鲜）
+    const broken = JSON.parse(memory.get("qt-online-collection:netease:100")!);
+    broken.cachedAt = "不是日期";
+    memory.set("qt-online-collection:netease:100", JSON.stringify(broken));
     expect(readCollectionCache("netease", "100")).toBeNull();
   });
 

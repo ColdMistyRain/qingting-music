@@ -14,6 +14,13 @@ import type { OnlineTrack } from "@qingting/shared";
 
 const KEY_PREFIX = "qt-online-collection:";
 
+/**
+ * 缓存有效期（v6.35 补 5，需求方："列表缓存应该有过期时间"）：**24 小时**。
+ * 过期即视为无缓存 —— 点开会走「加载中」重新拉取（居中进度条），「刷新列表」不受限。
+ * 24h 的量级：歌单不是高频变动的数据，一天内的陈旧基本无感；调这个数只改这里。
+ */
+export const COLLECTION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 function storageKey(provider: string, playlistId: string): string {
   return `${KEY_PREFIX}${provider}:${playlistId}`;
 }
@@ -46,12 +53,12 @@ function parse(raw: string | null, provider: string, playlistId: string): Cached
   if (!Array.isArray(candidate.tracks)) return null;
   const tracks = candidate.tracks.filter(isOnlineTrack);
   if (tracks.length === 0) return null;
-  return {
-    provider,
-    playlistId,
-    tracks,
-    cachedAt: typeof candidate.cachedAt === "string" ? candidate.cachedAt : "",
-  };
+  // 有效期：cachedAt 缺失 / 不是日期 / 超过 TTL，都算过期（= 无缓存，点开会重新拉）
+  const cachedAt = typeof candidate.cachedAt === "string" ? candidate.cachedAt : "";
+  const cachedMs = Date.parse(cachedAt);
+  if (!Number.isFinite(cachedMs)) return null;
+  if (Date.now() - cachedMs > COLLECTION_CACHE_TTL_MS) return null;
+  return { provider, playlistId, tracks, cachedAt };
 }
 
 /** 读某份歌单的缓存；没有 / 坏了 / 不是这份的，返回 null */

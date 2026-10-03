@@ -4,7 +4,6 @@ import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka
 import AppTooltip from "@/components/AppTooltip.vue";
 import IconArrowCounterClockwise from "~icons/ph/arrow-counter-clockwise";
 import IconFileText from "~icons/ph/file-text";
-import IconTranslate from "~icons/ph/translate";
 import { usePlayerStore } from "@/stores/player";
 import { decodeLyricsBytes } from "@/utils/lyricsLibrary";
 
@@ -87,15 +86,6 @@ function clearImported(): void {
           这份文件里没找到歌词——需要带时间标签的行（LRC 的 <code>[mm:ss.xx]</code> 或 yrc）。
         </p>
 
-        <!-- 翻译开关（v6.41）：只在这首歌有翻译时出现 -->
-        <button
-          v-if="player.lyricsTranslation.trim()"
-          class="lsm-item"
-          @click="player.toggleTranslation()"
-        >
-          <IconTranslate class="icon" />
-          {{ player.translationVisible ? "隐藏翻译" : "显示翻译" }}
-        </button>
         <button class="lsm-item" @click="pickFile">
           <IconFileText class="icon" />
           从文件导入歌词

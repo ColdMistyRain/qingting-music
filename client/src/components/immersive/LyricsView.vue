@@ -42,10 +42,6 @@ const activeIndex = computed(() => currentLineIndex(props.lines, props.time));
 /* ---------- 间奏点（v6.44，AMLL 的 interlude dots）：长间奏时渲染呼吸点 ---------- */
 const interludes = computed(() => findInterludes(props.lines));
 
-/** 带翻译 / 音译数据的行数（右侧开关只在有数据时显示） */
-const translationCount = computed(() => props.translations?.length ?? 0);
-const romanCount = computed(() => props.romans?.length ?? 0);
-
 /** 当前时间所在间奏（无则 null） */
 const activeInterlude = computed<LyricInterlude | null>(() => {
   const now = props.time;
@@ -605,11 +601,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 音/译快捷开关（v6.46，学 AMLL Player 的右侧竖排钮）：
-         只在这首歌有对应数据时显示；点亮 = 显示 -->
+    <!-- 音/译快捷开关（v6.46；v6.47 起常驻——需求方："音译和翻译应该常驻"）：
+         常驻让按钮位置稳定可盲操作；这首歌没有对应数据时点了没有可见变化，属预期 -->
     <div class="ly-flags">
       <button
-        v-if="romanCount > 0"
         class="ly-flag"
         :class="{ on: store.romanVisible }"
         title="音译"
@@ -619,7 +614,6 @@ onBeforeUnmount(() => {
         音
       </button>
       <button
-        v-if="translationCount > 0"
         class="ly-flag"
         :class="{ on: store.translationVisible }"
         title="翻译"

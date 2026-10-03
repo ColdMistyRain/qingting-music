@@ -190,6 +190,14 @@ interface NeteaseSearchSong {
   dt?: unknown;
   ar?: unknown;
   al?: { name?: unknown; picUrl?: unknown } | undefined;
+  /** 非空 = 网易标注**无版权 / 不可播**（typeDesc 通常是「无版权」，v6.35 补 6） */
+  noCopyrightRcmd?: unknown;
+}
+
+/** 与 songs 平行的权限记录（cloudsearch 的 result.privileges）：st < 0 = 不可播 */
+interface NeteasePrivilege {
+  id?: unknown;
+  st?: unknown;
 }
 
 /** 是字符串就返回它自己，否则返回兜底值 */
@@ -313,12 +321,19 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
     };
   }
 
-  function mapSong(raw: NeteaseSearchSong): OnlineTrack | null {
+  function mapSong(raw: NeteaseSearchSong, privilege?: NeteasePrivilege): OnlineTrack | null {
     const id = asId(raw.id);
     const title = asString(raw.name).trim();
     if (!id || !title) return null;
     const album = raw.al && typeof raw.al === "object" ? raw.al : undefined;
     const cover = asString(album?.picUrl).trim();
+    // 无版权 / 不可播（v6.35 补 6）：网易的 noCopyrightRcmd 对象（推荐替换版），
+    // 或平行 privileges 里 st < 0。两个信号任一即标；没有就带 undefined。
+    const st = Number(privilege?.st);
+    const unavailable =
+      (raw.noCopyrightRcmd != null && typeof raw.noCopyrightRcmd === "object") ||
+      (Number.isFinite(st) && st < 0) ||
+      undefined;
     return {
       id,
       title,
@@ -327,6 +342,7 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
       duration: durationSeconds(raw.dt),
       cover: cover || null,
       vipOnly: isVipOnly(raw.fee),
+      unavailable,
     };
   }
 
@@ -335,10 +351,19 @@ export function createNeteaseProvider(options: NeteaseProviderOptions): OnlinePr
 
     async search(keyword, cookie) {
       const { body } = await call("cloudsearch", { keywords: keyword, type: 1, limit: SEARCH_LIMIT }, cookie);
-      const result = body.result as { songs?: NeteaseSearchSong[] } | undefined;
+      const result = body.result as
+        | { songs?: NeteaseSearchSong[]; privileges?: NeteasePrivilege[] }
+        | undefined;
       const songs = result?.songs ?? [];
+      // privileges 与 songs 平行（按 id 对上）：st < 0 是"不可播"的第二信号
+      const privileges = Array.isArray(result?.privileges) ? result!.privileges! : [];
+      const privilegeById = new Map(
+        privileges.map((entry) => [asId(entry.id), entry as NeteasePrivilege]),
+      );
       // 单条缺 id/名字就跳过那一行，别让一条脏数据把整个搜索搞挂
-      return songs.map(mapSong).filter((track): track is OnlineTrack => track !== null);
+      return songs
+        .map((raw) => mapSong(raw, privilegeById.get(asId(raw.id))))
+        .filter((track): track is OnlineTrack => track !== null);
     },
 
     async getStreamUrl(id, cookie) {

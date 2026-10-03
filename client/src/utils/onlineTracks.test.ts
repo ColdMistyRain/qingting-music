@@ -35,6 +35,11 @@ describe("toOnlineTrack（搜索结果 → 播放器曲目）", () => {
     expect(track.vipOnly).toBe(true);
   });
 
+  it("unavailable=true 的曲目带上标记（行组件显示无版权标，v6.35 补 6）", () => {
+    const track = toOnlineTrack("netease", { ...INFO, unavailable: true });
+    expect(track.unavailable).toBe(true);
+  });
+
   it("封面换成后端代理地址（取色要 same-origin），不直接用第三方直链", () => {
     expect(toOnlineTrack("netease", INFO).cover).toBe(
       onlineCoverUrl("netease", "https://p1.music.126.net/x/1.jpg"),

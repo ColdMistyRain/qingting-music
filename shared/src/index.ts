@@ -40,6 +40,8 @@ export interface Track {
    * stream 接口的实际返回为准（freeTrialInfo → 视同无音源）。
    */
   vipOnly?: boolean;
+  /** 音源侧标记：无版权 / 不可播（连试听片段都没有，v6.35 补 6）。在线曲目才有。 */
+  unavailable?: boolean;
 }
 
 /* ---------- 在线音源（PRD 3.5，ON-01~05）：统一曲目抽象 ---------- */
@@ -66,6 +68,11 @@ export interface OnlineTrack {
    * **能不能播永远以 stream 接口的返回为准**——不可用就是 `url: null`（ON-03）。
    */
   vipOnly: boolean;
+  /**
+   * 音源侧标记“无版权 / 不可播”（网易的 `noCopyrightRcmd` 或 `privilege.st < 0`，
+   * 连试听片段都没有，v6.35 补 6）。搜索结果里就有，列表行据此标「无版权」。
+   */
+  unavailable?: boolean;
 }
 
 /** GET /api/online/:provider/search 的返回（ON-02） */

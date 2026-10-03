@@ -32,6 +32,8 @@ export function toOnlineTrack(provider: string, info: OnlineTrack): Track {
     duration: info.duration,
     // VIP 专享标记随曲目进列表：行组件据此显示「试听」标（v6.33）
     vipOnly: info.vipOnly,
+    // 无版权标记同理：行组件显示「无版权」标（v6.35 补 6）
+    unavailable: info.unavailable,
   };
 }
 

@@ -80,6 +80,30 @@ describe("网易云适配器 · 搜索（ON-02）", () => {
     ]);
   });
 
+  it("无版权曲目打 unavailable 标：noCopyrightRcmd 或 privileges.st<0 任一信号即可（v6.35 补 6）", async () => {
+    const { provider } = makeProvider({
+      "/cloudsearch": {
+        body: {
+          result: {
+            songs: [
+              { id: 1, name: "无版权的", fee: 0, noCopyrightRcmd: { type: 1, typeDesc: "无版权" } },
+              { id: 2, name: "权限说不行", fee: 0 },
+              { id: 3, name: "正常的", fee: 8 },
+            ],
+            privileges: [{ id: 2, st: -1 }, { id: 3, st: 0 }],
+          },
+        },
+      },
+    });
+
+    const tracks = await provider.search("x");
+    expect(tracks.map((t) => ({ title: t.title, unavailable: t.unavailable ?? null }))).toEqual([
+      { title: "无版权的", unavailable: true },
+      { title: "权限说不行", unavailable: true },
+      { title: "正常的", unavailable: null },
+    ]);
+  });
+
   it("脏数据行（缺 id / 缺歌名）跳过，不炸整份结果；无结果返回空数组", async () => {
     const { provider } = makeProvider({
       "/cloudsearch": {

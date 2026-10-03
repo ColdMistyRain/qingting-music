@@ -57,7 +57,15 @@ const sourceLabel = computed(() => {
  * 会有「需要 VIP 或暂无版权」的提示兜底）。
  */
 const showTrialFlag = computed(
-  () => props.track.source === "online" && props.track.vipOnly === true,
+  () =>
+    props.track.source === "online" &&
+    props.track.vipOnly === true &&
+    props.track.unavailable !== true,
+);
+/** 无版权标（v6.35 补 6，需求方："没有版权歌曲的需要有标识"）：连试听片段都没有，
+    优先于试听标（一首无版权的歌不是"试听"，是什么都没有） */
+const showUnavailableFlag = computed(
+  () => props.track.source === "online" && props.track.unavailable === true,
 );
 
 /** 点这一行就是播这一首（v5.96）—— 列表行里不再有播放/暂停键。
@@ -87,7 +95,14 @@ function onRowClick(): void {
     <div class="row__main" :title="track.title">
       <div class="row__title">{{ track.title }}</div>
       <div class="row__artist">
-        <span v-if="showTrialFlag" class="row__flag" title="VIP 专享曲目，当前账号只能试听片段">
+        <span
+          v-if="showUnavailableFlag"
+          class="row__flag row__flag--none"
+          title="音源标注暂无版权，无法播放"
+        >
+          无版权
+        </span>
+        <span v-else-if="showTrialFlag" class="row__flag" title="VIP 专享曲目，当前账号只能试听片段">
           试听
         </span>
         <span class="row__artist-name">{{ track.artist }}</span>
@@ -222,6 +237,12 @@ function onRowClick(): void {
   font-size: 10px;
   line-height: 15px;
   color: var(--text-2);
+}
+
+/* 无版权标：暖红一档（这是"播不了"的状态，与试听的弱色提示区分） */
+.row__flag--none {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: color-mix(in srgb, var(--danger) 75%, var(--text-2));
 }
 
 .row__source,

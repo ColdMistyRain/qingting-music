@@ -191,20 +191,31 @@ export function createKugouProvider(): OnlineProvider {
     },
 
     async getLyrics(id, cookie) {
-      const body = await callModule("lyric", {
-        id,
+      const cookieObj = cookieObject(cookie);
+      // 酷狗歌词两步链（v6.59）：先按 hash+duration 搜候选（id+accesskey），再下载 lrc 明文
+      const searchBody = await callModule("search_lyric", { hash: id, cookie: cookieObj });
+      const searchInner = (searchBody.body ?? null) as
+        | { candidates?: { id?: string; accesskey?: string }[] }
+        | null;
+      const candidate = searchInner?.candidates?.[0];
+      if (!candidate?.id) return { lyrics: null, translation: null, roman: null };
+      // 不用包的 decode（Windows 下其 base64 解码路径会产生乱码）：
+      // 拿原始 base64 自主按 UTF-8 解码 + 去 BOM
+      const lyricBody = await callModule("lyric", {
+        id: candidate.id,
+        accesskey: candidate.accesskey,
         fmt: "lrc",
-        decode: true,
-        cookie: cookieObject(cookie),
+        cookie: cookieObj,
       });
-      const rawBody = body.body as { candidates?: unknown[] } | Record<string, unknown> | null;
-      const candidates = (rawBody as { candidates?: unknown[] })?.candidates;
-      const first = Array.isArray(candidates) && candidates.length > 0 ? candidates[0] : null;
-      const inner = (first ?? rawBody ?? null) as {
-        content?: string;
-        decodeContent?: string;
-      } | null;
-      const lyrics = inner?.decodeContent ?? inner?.content ?? "";
+      const lyricInner = (lyricBody.body ?? null) as
+        | { content?: string; contenttype?: number }
+        | null;
+      const raw = lyricInner?.content ?? "";
+      let lyrics = "";
+      if (raw) {
+        const buf = Buffer.from(raw, "base64");
+        lyrics = buf.toString("utf8").replace(/^﻿/, "");
+      }
       return { lyrics: lyrics || null, translation: null, roman: null };
     },
 

@@ -99,6 +99,7 @@ client/src/utils/         playlistEntries（歌单条目解析：能不能播 / 
                           audioSpectrum（频谱频段：对数分布 40Hz~16kHz，划分式取 bin 不双计，纯函数 —— **留库未接线** v6.55）、
                           qq（QQ 音乐适配器：内嵌 @yakult-green-tea/qq-music-api（MIT）以进程内 HTTP 服务随 server 起；搜索免登录可用（安卓轻应用壳直调 musicu.fcg，v6.57 补 3）；登录走微信/QQ 双通道扫码（密封 token 存浏览器，登录态加密落盘 data/qq-auth-sessions.enc 跨重启有效）；收藏夹/资料字段按真实返回核对（v6.57 补 4/5）—— ON-06/v6.57）、
                           onlineAggregation（聚合搜索：音源下拉「全部音源」档并发查网易云+QQ，交错合并、单源失败不拖垮另一源 —— ON-07/v6.58）、
+onlineKugou（酷狗适配器：kugoumusicapi（MIT）编程式嵌入（模块函数直调，不起服务）；**匿名搜索走自有实现**（complexsearch /v2/search/song 参数签名，包的 search 要登录），直链/歌词/歌单要登录 —— ON-08/v6.59）、
                           playerState（播放存档：只存刷新后能续上的曲目 - PL-07）、shortcuts（播放快捷键判定 - PL-08）、
                           lyrics（歌词解析：LRC / 增强型 LRC / yrc）、lyricEmphasis（逐字辉光爆发参数与关键帧）、
                           spring（弹簧：阻尼简谐振子的解析解）、lyricsLibrary（手动歌词库：按曲目存 + 来源优先级 + 编码回退 - LR-02）、

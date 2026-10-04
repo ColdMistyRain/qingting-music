@@ -336,14 +336,15 @@ export function createKugouProvider(): OnlineProvider {
             const artist = sep > 0 ? rawName.slice(0, sep) : "";
             const title = sep > 0 ? rawName.slice(sep + 3) : rawName;
             if (!hash || !title) continue;
-            const albumId = typeof item.album_id === "string" || typeof item.album_id === "number" ? String(item.album_id) : "";
+            // 封面：条目顶层 cover（带 {size} 占位的日期路径，v6.59 补 10）
+            const cover = typeof item.cover === "string" ? item.cover.replace("{size}", "480") : null;
             collected.push({
               id: hash,
               title,
               artist,
               album: "",
               duration: null,
-              cover: albumId ? `https://imge.kugou.com/stdmusic/480/${albumId}.jpg` : null,
+              cover: cover || null,
               vipOnly: false,
             });
           }

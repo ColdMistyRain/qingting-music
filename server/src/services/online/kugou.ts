@@ -387,8 +387,9 @@ export function createKugouProvider(): OnlineProvider {
                   ? Math.round(item.timelen / 1000)
                   : null,
               cover: cover || null,
-              // privilege 8 = VIP 专享（实测 G.E.M. 曲目 8 / 免费老歌 10）
-              vipOnly: item.privilege === 8,
+              // 酷狗的 privilege 是位掩码（8/10 都可播，穿越光界 8 免登录即播），
+              // 这批接口拿不到可靠的付费标记 —— VIP 标不标（可播性由直链结果说话）
+              vipOnly: false,
             });
           }
           const total = Number(data?.count ?? 0);

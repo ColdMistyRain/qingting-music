@@ -65,10 +65,9 @@ const sourceLabel = computed(() => {
  */
 const online = useOnlineStore();
 /** 观看者是否网易云会员（会话里的 profile.vip）：VIP 曲目的标记语义随它变。
-    只对网易云的曲目生效 —— QQ 曲目的会员语义是另一套（v6.57），不混用 */
-const viewerVip = computed(
-  () => online.provider === "netease" && online.profile?.vip === true,
-);
+    看的是网易云账号本身，与搜索选的音源无关（v6.58 聚合档下也要照常生效）；
+    QQ 曲目的会员语义是另一套（v6.57），不混用 */
+const viewerVip = computed(() => online.profile?.vip === true);
 
 const rowFlags = computed<{ label: string; title: string }[]>(() => {
   if (props.track.source !== "online") return [];

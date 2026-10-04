@@ -159,6 +159,97 @@ describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
   });
 });
 
+describe("online store · 聚合搜索（ON-07）", () => {
+  const trackOf = (provider: string, id: string): OnlineTrack => ({
+    id,
+    title: `歌-${provider}-${id}`,
+    artist: "歌手",
+    album: "专辑",
+    duration: 100,
+    cover: null,
+    vipOnly: false,
+  });
+
+  /** 种一个 QQ 会话（聚合档只有已登录的 QQ 才参与并发查询） */
+  function seedQqSession(): void {
+    localStorage.setItem(
+      "qt-online-session:qq",
+      JSON.stringify({
+        provider: "qq",
+        cookie: ["qqmusic_session=sealed"],
+        profile: { userId: "1", nickname: "QQ 用户", avatarUrl: null, vip: false },
+        loggedInAt: "2026-10-03T00:00:00.000Z",
+      }),
+    );
+  }
+
+  it("聚合档并发查两源并交错合并；每条带 provider 前缀", async () => {
+    vi.mocked(fetchOnlineSearch).mockImplementation(async (provider) => {
+      if (provider === "netease") {
+        return { provider, keyword: "x", tracks: [trackOf("netease", "n1"), trackOf("netease", "n2")] };
+      }
+      return { provider, keyword: "x", tracks: [trackOf("qq", "q1"), trackOf("qq", "q2")] };
+    });
+    seedQqSession();
+    const online = useOnlineStore();
+    online.setProvider("all");
+    await online.search("x");
+
+    expect(fetchOnlineSearch).toHaveBeenCalledWith("netease", "x");
+    expect(fetchOnlineSearch).toHaveBeenCalledWith("qq", "x");
+    expect(online.searchTracks.map((track) => track.id)).toEqual([
+      "netease:n1",
+      "qq:q1",
+      "netease:n2",
+      "qq:q2",
+    ]);
+    expect(online.searchStatus).toBe("ready");
+    expect(online.searchPartialError).toBe("");
+  });
+
+  it("聚合档未登录 QQ 时只查网易云", async () => {
+    vi.mocked(fetchOnlineSearch).mockResolvedValue({
+      provider: "netease",
+      keyword: "x",
+      tracks: [trackOf("netease", "n1")],
+    });
+    const online = useOnlineStore();
+    online.setProvider("all");
+    await online.search("x");
+
+    expect(fetchOnlineSearch).toHaveBeenCalledTimes(1);
+    expect(fetchOnlineSearch).toHaveBeenCalledWith("netease", "x");
+    expect(online.searchTracks).toHaveLength(1);
+  });
+
+  it("单源失败不拖垮另一源：结果照摆 + 弱提示", async () => {
+    vi.mocked(fetchOnlineSearch).mockImplementation(async (provider) => {
+      if (provider === "netease") {
+        return { provider, keyword: "x", tracks: [trackOf("netease", "n1")] };
+      }
+      throw new Error("qq down");
+    });
+    seedQqSession();
+    const online = useOnlineStore();
+    online.setProvider("all");
+    await online.search("x");
+
+    expect(online.searchStatus).toBe("ready");
+    expect(online.searchTracks.map((track) => track.id)).toEqual(["netease:n1"]);
+    expect(online.searchPartialError).toContain("QQ 音乐");
+  });
+
+  it("聚合档全失败：走错误态", async () => {
+    vi.mocked(fetchOnlineSearch).mockRejectedValue(new Error("down"));
+    const online = useOnlineStore();
+    online.setProvider("all");
+    await online.search("x");
+
+    expect(online.searchStatus).toBe("error");
+    expect(online.searchTracks).toEqual([]);
+  });
+});
+
 describe("online store · 收藏夹（ON-10）", () => {
   const PLAYLISTS: OnlinePlaylistInfo[] = [
     { id: "100", name: "我喜欢的音乐", cover: null, trackCount: 1 },

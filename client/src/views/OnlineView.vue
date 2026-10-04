@@ -49,20 +49,21 @@ onMounted(() => {
 /** 音源下拉只列可用的：QQ 的搜索与播放都要登录态（匿名上游直接拒绝），
     未登录就不出现 QQ 选项（需求方："不登录 qq 音乐就不展示 qq 音乐的音源"）；
     登录入口在 设置 › 在线音源 */
-const sourceOptions = computed(() =>
-  online.qqLoggedIn
-    ? [
-        { value: "netease", label: "网易云" },
-        { value: "qq", label: "QQ 音乐" },
-      ]
-    : [{ value: "netease", label: "网易云" }],
-);
+const sourceOptions = computed(() => {
+  const options: { value: "all" | "netease" | "qq"; label: string }[] = [
+    { value: "all", label: "全部音源" },
+    { value: "netease", label: "网易云" },
+  ];
+  // QQ 未登录不给选项（搜索能用，但 VIP 都播不了，先引导去设置页扫码）
+  if (online.qqLoggedIn) options.push({ value: "qq", label: "QQ 音乐" });
+  return options;
+});
 
-// QQ 登出后所选音源失效：自动回网易云，不让界面停在"看不到的音源"上
+// QQ 登出后所选音源失效：自动回"全部音源"，不让界面停在"看不到的音源"上
 watch(
   () => [online.provider, online.qqLoggedIn] as const,
   ([p, loggedIn]) => {
-    if (p === "qq" && !loggedIn) online.setProvider("netease");
+    if (p === "qq" && !loggedIn) online.setProvider("all");
   },
 );
 
@@ -144,7 +145,11 @@ const pageTitle = computed(() =>
     : "在线搜索",
 );
 const pageSubtitle = computed(() => {
-  if (!collectionMode.value) return online.provider === "qq" ? "音源：QQ 音乐" : "音源：网易云";
+  if (!collectionMode.value) {
+    const label =
+      online.provider === "all" ? "全部音源" : online.provider === "qq" ? "QQ 音乐" : "网易云";
+    return `音源：${label}`;
+  }
   const total = activePlaylist.value?.trackCount ?? online.collectionTracks.length;
   const label = online.provider === "qq" ? "QQ 音乐歌单" : "网易云歌单";
   return `${label} · ${total} 首`;
@@ -218,7 +223,7 @@ function toggleFavorite(index: number): void {
             :model-value="online.provider"
             :options="sourceOptions"
             label="音源"
-            @update:model-value="(value) => online.setProvider(value as 'netease' | 'qq')"
+            @update:model-value="(value) => online.setProvider(value as 'all' | 'netease' | 'qq')"
           />
         </div>
         <label class="search">
@@ -269,6 +274,12 @@ function toggleFavorite(index: number): void {
         >
           重试
         </button>
+      </div>
+
+      <!-- 聚合搜索的部分失败（ON-07）：结果照摆，另给一条弱提示 -->
+      <div v-if="online.searchPartialError && hasResults" class="strip">
+        <IconWarningCircle class="icon" />
+        <span>{{ online.searchPartialError }}</span>
       </div>
 
       <TrackListHead v-if="hasResults" />

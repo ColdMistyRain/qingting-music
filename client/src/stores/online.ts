@@ -40,6 +40,8 @@ import { ApiError } from "@/api/http";
 /** 账号能力的提供方（P1 只有网易云；QQ/酷狗接入后在这里加） */
 export const ACCOUNT_PROVIDERS = ["netease", "qq"] as const;
 export type AccountProvider = (typeof ACCOUNT_PROVIDERS)[number];
+/** 搜索音源：单个平台，或 "all"（聚合，ON-07 —— 并发查各源交错合并） */
+export type SearchSource = AccountProvider | "all";
 
 export type OnlineStatus = "idle" | "loading" | "ready" | "error";
 
@@ -176,6 +178,7 @@ export const useOnlineStore = defineStore("online", () => {
   }
 
   const loggedIn = computed(() => session.value !== null);
+  const qqLoggedIn = computed(() => qqSession.value !== null);
   const profile = computed(() => session.value?.profile ?? null);
 
   /* ---------- 收藏夹（歌单）：按音源分槽，侧栏同时展示各已登录平台（v6.57 补 6）---------- */
@@ -210,14 +213,16 @@ export const useOnlineStore = defineStore("online", () => {
     }
   }
 
-  /* ---------- 音源选择（v6.57，ON-06：网易云 / QQ 音乐）---------- */
+  /* ---------- 音源选择（v6.57，ON-06；v6.58 起 ON-07 聚合）---------- */
   const PROVIDER_STORAGE_KEY = "qt-online-provider";
-  const provider = ref<AccountProvider>(
-    typeof localStorage !== "undefined" && localStorage.getItem(PROVIDER_STORAGE_KEY) === "qq"
-      ? "qq"
-      : "netease",
-  );
-  function setProvider(next: AccountProvider): void {
+  const SOURCE_STORAGE_VALUES = ["all", "netease", "qq"] as const;
+  function resolveInitialSource(): SearchSource {
+    if (typeof localStorage === "undefined") return "all";
+    const stored = localStorage.getItem(PROVIDER_STORAGE_KEY) as SearchSource | null;
+    return stored && SOURCE_STORAGE_VALUES.includes(stored) ? stored : "all";
+  }
+  const provider = ref<SearchSource>(resolveInitialSource());
+  function setProvider(next: SearchSource): void {
     if (provider.value === next) return;
     provider.value = next;
     try {
@@ -232,6 +237,7 @@ export const useOnlineStore = defineStore("online", () => {
     searchKeyword.value = "";
     searchStatus.value = "idle";
     searchError.value = "";
+    searchPartialError.value = "";
     searchTracks.value = [];
     lastSearchKeyword.value = "";
     searchSeq += 1;
@@ -242,10 +248,19 @@ export const useOnlineStore = defineStore("online", () => {
   const searchKeyword = ref("");
   const searchStatus = ref<OnlineStatus>("idle");
   const searchError = ref("");
+  /** 聚合搜索的部分失败提示（结果照摆时另给的弱提示，v6.58） */
+  const searchPartialError = ref("");
   const searchTracks = ref<Track[]>([]);
   const lastSearchKeyword = ref("");
   /** 每次搜索自增；响应回来时序号对不上就丢掉（请求本身没法中断，也不必中断） */
   let searchSeq = 0;
+
+  /** 当前搜索语境下会并发查询的音源列表（"all" = 网易云恒在 + 已登录的 QQ） */
+  function activeSearchSources(): AccountProvider[] {
+    if (provider.value === "qq") return ["qq"];
+    if (provider.value === "netease") return ["netease"];
+    return qqLoggedIn.value ? ["netease", "qq"] : ["netease"];
+  }
 
   async function search(raw: string): Promise<void> {
     const text = raw.trim();
@@ -255,20 +270,49 @@ export const useOnlineStore = defineStore("online", () => {
     closePlaylist();
     searchStatus.value = "loading";
     searchError.value = "";
+    searchPartialError.value = "";
     lastSearchKeyword.value = text;
 
-    try {
-      const result = await fetchOnlineSearch(provider.value, text);
-      if (seq !== searchSeq) return;
-      searchTracks.value = result.tracks.map((info: OnlineTrack) =>
-        toOnlineTrack(result.provider, info),
-      );
-      searchStatus.value = "ready";
-    } catch (error) {
-      if (seq !== searchSeq) return;
+    const sources = activeSearchSources();
+    // 单源：原路径（聚合路径也是各源自带会话头，只是并发 + 合并）
+    const settled = await Promise.allSettled(
+      sources.map((source) => fetchOnlineSearch(source, text)),
+    );
+    if (seq !== searchSeq) return;
+
+    const buckets: Track[][] = [];
+    const failures: string[] = [];
+    settled.forEach((result, index) => {
+      const label = sources[index] === "qq" ? "QQ 音乐" : "网易云";
+      if (result.status === "fulfilled") {
+        buckets.push(result.value.tracks.map((info: OnlineTrack) => toOnlineTrack(result.value.provider, info)));
+      } else {
+        failures.push(label);
+      }
+    });
+
+    // 全部失败：照旧走错误态
+    if (buckets.length === 0) {
       searchStatus.value = "error";
-      searchError.value = error instanceof Error ? error.message : "搜索出了点问题";
+      searchError.value = "搜索出了点问题，稍后再试";
+      return;
     }
+
+    // 交错合并（轮流取各源的下一条）：单源内部保持相关度序，跨源交替出现，
+    // TrackRow 的来源列本就显示实际音源名（v6.35 补 3），不会分不清
+    const merged: Track[] = [];
+    const longest = Math.max(...buckets.map((bucket) => bucket.length));
+    for (let index = 0; index < longest; index++) {
+      for (const bucket of buckets) {
+        const track = bucket[index];
+        if (track) merged.push(track);
+      }
+    }
+    searchTracks.value = merged;
+    searchStatus.value = "ready";
+    // 部分失败：结果照摆，另给一条弱提示（OnlineView 的 strip 展示）
+    searchPartialError.value =
+      failures.length > 0 ? `${failures.join("、")}搜索失败，已省略其结果` : "";
   }
 
   /* ---------- 当前打开的一份歌单 ---------- */
@@ -300,7 +344,8 @@ export const useOnlineStore = defineStore("online", () => {
   function resolvePlaylistProvider(id: string): AccountProvider {
     if (playlistsByProvider.value.netease.some((entry) => entry.id === id)) return "netease";
     if (playlistsByProvider.value.qq.some((entry) => entry.id === id)) return "qq";
-    return provider.value;
+    // provider 可能是聚合档（"all"）：此时歌单归属退回网易云（它恒可用）
+    return provider.value === "qq" ? "qq" : "netease";
   }
 
   async function openPlaylist(id: string): Promise<void> {
@@ -365,7 +410,7 @@ export const useOnlineStore = defineStore("online", () => {
     loadAccount,
     loadQqAccount,
     qqSession,
-    qqLoggedIn: computed(() => qqSession.value !== null),
+    qqLoggedIn,
     startQrLogin,
     checkQrLogin,
     provider,
@@ -376,6 +421,7 @@ export const useOnlineStore = defineStore("online", () => {
     searchKeyword,
     searchStatus,
     searchError,
+    searchPartialError,
     searchTracks,
     lastSearchKeyword,
     search,

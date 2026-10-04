@@ -41,6 +41,7 @@ export function toOnlineTrack(provider: string, info: OnlineTrack): Track {
 const PROVIDER_LABELS: Record<string, string> = {
   netease: "网易云",
   qq: "QQ 音乐",
+  kugou: "酷狗音乐",
 };
 
 /**

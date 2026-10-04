@@ -119,8 +119,8 @@ describe("在线音源路由 · 搜索（ON-02）", () => {
   it("关键词为空 400；没这个音源 404", async () => {
     const { app } = await setup();
     expect((await request(app).get("/api/online/netease/search?keywords=%20%20")).status).toBe(400);
-    // qq 在 v6.57 起是真音源了（ON-06）；"没这个音源"用从未注册过的 id
-    expect((await request(app).get("/api/online/kugou/search?keywords=x")).status).toBe(404);
+    // qq/kugou 分别在 v6.57/v6.59 起是真音源；"没这个音源"用从未注册过的 id
+    expect((await request(app).get("/api/online/example/search?keywords=x")).status).toBe(404);
   });
 
   it("未配置外接地址（ON-04）时走内嵌库：同样出结果，部署零配置（v6.29）", async () => {

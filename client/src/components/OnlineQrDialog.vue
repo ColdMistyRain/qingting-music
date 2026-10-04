@@ -28,17 +28,19 @@ import { isTopLayer, popTopLayer, pushTopLayer } from "@/utils/topLayer";
  * 的过渡两个方向分开写，坑 19）、Esc 归 topLayer 最上层（坑 14/24）、过渡**只做透明度**
  * （面板带 blur，动 transform 每帧重算模糊，真机上“卡一下”，v5.54）。
  */
-const props = withDefaults(defineProps<{ open: boolean; provider?: "netease" | "qq" }>(), {
-  provider: "netease",
-});
+const props = withDefaults(
+  defineProps<{ open: boolean; provider?: "netease" | "qq" | "kugou" }>(),
+  { provider: "netease" },
+);
 const emit = defineEmits<{ close: []; loggedIn: [] }>();
 
 const online = useOnlineStore();
 
 /** 文案随音源走（QQ 走微信通道扫码） */
-const PROVIDER_TEXT: Record<"netease" | "qq", { title: string; scan: string; app: string }> = {
+const PROVIDER_TEXT: Record<"netease" | "qq" | "kugou", { title: string; scan: string; app: string }> = {
   netease: { title: "登录网易云账号", scan: "用网易云音乐 App 扫一扫", app: "网易云账号" },
-  qq: { title: "登录 QQ 音乐", scan: "用微信扫一扫", app: "QQ 音乐账号" },
+  qq: { title: "登录 QQ 音乐", scan: "用微信或 QQ 扫一扫", app: "QQ 音乐账号" },
+  kugou: { title: "登录酷狗音乐", scan: "用酷狗音乐 App 扫一扫", app: "酷狗音乐账号" },
 };
 const providerText = () => PROVIDER_TEXT[props.provider];
 
@@ -55,6 +57,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 function scanHint(): string {
   if (props.provider === "qq") return channel.value === "qq" ? "用 QQ 音乐 App 扫一扫" : "用微信扫一扫";
+  if (props.provider === "kugou") return "用酷狗音乐 App 扫一扫";
   return "用网易云音乐 App 扫一扫";
 }
 
@@ -157,9 +160,9 @@ function onOpenAutoFocus(event: Event): void {
 function finish(): void {
   if (phase.value === "success") {
     const nickname =
-      props.provider === "qq"
-        ? (online.qqSession?.profile?.nickname ?? "QQ 音乐账号")
-        : (online.profile?.nickname ?? "网易云账号");
+      props.provider === "netease"
+        ? (online.profile?.nickname ?? "网易云账号")
+        : (online.sessionsByProvider[props.provider]?.profile?.nickname ?? `${PROVIDER_TEXT[props.provider].app}`);
     showToast({ title: `已登录 ${nickname}` });
   }
   emit("close");

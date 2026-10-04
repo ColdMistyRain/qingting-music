@@ -38,85 +38,72 @@ import { ApiError } from "@/api/http";
  */
 
 /** 账号能力的提供方（P1 只有网易云；QQ/酷狗接入后在这里加） */
-export const ACCOUNT_PROVIDERS = ["netease", "qq"] as const;
+export const ACCOUNT_PROVIDERS = ["netease", "qq", "kugou"] as const;
 export type AccountProvider = (typeof ACCOUNT_PROVIDERS)[number];
 /** 搜索音源：单个平台，或 "all"（聚合，ON-07 —— 并发查各源交错合并） */
 export type SearchSource = AccountProvider | "all";
 
 export type OnlineStatus = "idle" | "loading" | "ready" | "error";
 
+/** 音源的中文显示名（提示与标题用；来源列的映射在 utils/onlineTracks） */
+export const PROVIDER_LABELS: Record<AccountProvider, string> = {
+  netease: "网易云",
+  qq: "QQ 音乐",
+  kugou: "酷狗音乐",
+};
+
 export const useOnlineStore = defineStore("online", () => {
-  /* ---------- 账号（会话在本浏览器）---------- */
-  const session = ref<OnlineSession | null>(readOnlineSession("netease"));
-  /** QQ 音乐的会话（v6.57，ON-06）：与网易云同槽模型，各存各的 localStorage 键 */
-  const qqSession = ref<OnlineSession | null>(readOnlineSession("qq"));
+  /* ---------- 账号（会话在本浏览器，按音源分槽；v6.59 起三源通用）---------- */
+  const sessionsByProvider = ref<Record<AccountProvider, OnlineSession | null>>({
+    netease: readOnlineSession("netease"),
+    qq: readOnlineSession("qq"),
+    kugou: readOnlineSession("kugou"),
+  });
   const accountStatus = ref<OnlineStatus>("idle");
-
-  /**
-   * 启动时校验一遍本地会话：向音源验真（后端无状态，验证经它转手）。
-   * 音源说失效了就清掉本地 —— 界面回到未登录，不会拿着死会话装作已登录。
-   */
-  async function loadAccount(force = false): Promise<void> {
-    if (accountStatus.value === "loading") return;
-    if (accountStatus.value === "ready" && !force) return;
-    accountStatus.value = "loading";
-    const stored = readOnlineSession("netease");
+  /** 向某音源验真：失效即清并提示（v6.39 的规则，v6.59 泛化到全部音源） */
+  async function verifySession(target: AccountProvider): Promise<void> {
+    const label = PROVIDER_LABELS[target];
+    const stored = readOnlineSession(target);
     if (!stored) {
-      session.value = null;
-      accountStatus.value = "ready";
+      sessionsByProvider.value[target] = null;
       return;
     }
     try {
-      const info = await fetchOnlineAccount("netease");
+      const info = await fetchOnlineAccount(target);
       if (info.loggedIn) {
-        // 验证顺带把最新资料带回（改过昵称/头像也能跟上）
-        session.value = { ...stored, profile: info.profile };
-        writeOnlineSession(session.value);
+        sessionsByProvider.value[target] = { ...stored, profile: info.profile };
+        writeOnlineSession(sessionsByProvider.value[target]!);
       } else {
-        // 之前登录着、这次验真失效了：说清楚界面为什么变回未登录（v6.39），
-        // 而不是静默清掉让人摸不着头脑；清掉之后这条提示不会重复出现
-        clearOnlineSession("netease");
-        session.value = null;
-        showToast({
-          title: "网易云登录已失效",
-          description: "请到 设置 › 在线音源 重新扫码登录",
-        });
+        clearOnlineSession(target);
+        sessionsByProvider.value[target] = null;
+        showToast({ title: `${label}登录已失效`, description: `请到 设置 › 在线音源 重新扫码登录` });
       }
+    } catch {
+      // 验真失败（网络/后端不在）：保留本地会话，下次再验
+    }
+  }
+
+  /**
+   * 启动时校验某音源的本地会话（v6.59 泛化：失效即清 + 提示；后端无状态，验证经它转手）。
+   * 没有本地会话直接跳过；验真失败（网络/后端不在）保留本地会话，下次再验。
+   */
+  async function loadAccount(target: AccountProvider, force = false): Promise<void> {
+    if (accountStatus.value === "loading") return;
+    if (!force && accountStatus.value === "ready") return;
+    accountStatus.value = "loading";
+    const hadSession = readOnlineSession(target) !== null;
+    if (!hadSession) {
+      sessionsByProvider.value[target] = null;
+      return;
+    }
+    try {
+      await verifySession(target);
       accountStatus.value = "ready";
     } catch {
       accountStatus.value = "error";
     }
   }
 
-  /**
-   * QQ 会话验真（v6.57）：与网易云同一套 —— 失效即清并说清楚。
-   * QQ 的入口就是扫码（搜索匿名不可用），死会话留着会让人对着空结果发懵。
-   */
-  async function loadQqAccount(force = false): Promise<void> {
-    if (accountStatus.value === "loading") return;
-    if (accountStatus.value === "ready" && !force) return;
-    accountStatus.value = "loading";
-    const stored = readOnlineSession("qq");
-    if (!stored) {
-      qqSession.value = null;
-      accountStatus.value = "ready";
-      return;
-    }
-    try {
-      const info = await fetchOnlineAccount("qq");
-      if (info.loggedIn) {
-        qqSession.value = { ...stored, profile: info.profile };
-        writeOnlineSession(qqSession.value);
-      } else {
-        clearOnlineSession("qq");
-        qqSession.value = null;
-        showToast({ title: "QQ 音乐登录已失效", description: "请重新扫码登录" });
-      }
-      accountStatus.value = "ready";
-    } catch {
-      accountStatus.value = "error";
-    }
-  }
 
   /**
    * 扫码轮询的**一次性驱动**（轮询节奏归调用方/弹窗组件管，store 只出两步动作）：
@@ -143,56 +130,56 @@ export const useOnlineStore = defineStore("online", () => {
         loggedInAt: new Date().toISOString(),
       };
       writeOnlineSession(next);
-      if (provider === "netease") session.value = next;
-      else qqSession.value = next;
+      sessionsByProvider.value[provider] = next;
     }
     return result;
   }
 
-  async function logout(): Promise<void> {
-    // 上游注销尽力而为：本地一定清（就算上游没响应，死会话下次启动验真时也会被清）
+  /** 退出某音源（v6.59 泛化）：上游注销尽力而为，本地一定清 */
+  async function logoutFor(target: AccountProvider): Promise<void> {
     try {
-      await logoutOnline("netease");
+      await logoutOnline(target);
     } catch {
       // 网络不通也照常清本地
     }
-    clearOnlineSession("netease");
+    clearOnlineSession(target);
+    sessionsByProvider.value[target] = null;
+  }
+
+  async function logout(): Promise<void> {
+    await logoutFor("netease");
     // 歌单内容缓存也是账号数据：退出一并清（v6.34）
     clearCollectionCache("netease");
-    session.value = null;
     playlistsByProvider.value.netease = [];
     activePlaylistId.value = null;
     collectionTracks.value = [];
     collectionStatus.value = "idle";
   }
 
-  /** QQ 退出（v6.57）：上游注销尽力而为，本地一定清 */
-  async function logoutQq(): Promise<void> {
-    try {
-      await logoutOnline("qq");
-    } catch {
-      // 网络不通也照常清本地
-    }
-    clearOnlineSession("qq");
-    qqSession.value = null;
-  }
-
-  const loggedIn = computed(() => session.value !== null);
-  const qqLoggedIn = computed(() => qqSession.value !== null);
-  const profile = computed(() => session.value?.profile ?? null);
+  const loggedIn = computed(() => sessionsByProvider.value.netease !== null);
+  const qqLoggedIn = computed(() => sessionsByProvider.value.qq !== null);
+  const kugouLoggedIn = computed(() => sessionsByProvider.value.kugou !== null);
+  const profile = computed(() => sessionsByProvider.value.netease?.profile ?? null);
+  /** 各已登录音源（聚合搜索与侧栏分区都按它展开） */
+  const loggedInProviders = computed<AccountProvider[]>(() =>
+    ACCOUNT_PROVIDERS.filter((target) => sessionsByProvider.value[target] !== null),
+  );
 
   /* ---------- 收藏夹（歌单）：按音源分槽，侧栏同时展示各已登录平台（v6.57 补 6）---------- */
   const playlistsByProvider = ref<Record<AccountProvider, OnlinePlaylistInfo[]>>({
     netease: [],
     qq: [],
+    kugou: [],
   });
   const playlistsStatusByProvider = ref<Record<AccountProvider, OnlineStatus>>({
     netease: "idle",
     qq: "idle",
+    kugou: "idle",
   });
   const playlistsErrorByProvider = ref<Record<AccountProvider, string>>({
     netease: "",
     qq: "",
+    kugou: "",
   });
 
   async function loadPlaylists(target: AccountProvider, force = false): Promise<void> {
@@ -215,11 +202,13 @@ export const useOnlineStore = defineStore("online", () => {
 
   /* ---------- 音源选择（v6.57，ON-06；v6.58 起 ON-07 聚合）---------- */
   const PROVIDER_STORAGE_KEY = "qt-online-provider";
-  const SOURCE_STORAGE_VALUES = ["all", "netease", "qq"] as const;
+  const SOURCE_STORAGE_VALUES: readonly string[] = ["all", "netease", "qq"];
   function resolveInitialSource(): SearchSource {
     if (typeof localStorage === "undefined") return "all";
-    const stored = localStorage.getItem(PROVIDER_STORAGE_KEY) as SearchSource | null;
-    return stored && SOURCE_STORAGE_VALUES.includes(stored) ? stored : "all";
+    const stored = localStorage.getItem(PROVIDER_STORAGE_KEY);
+    return stored !== null && SOURCE_STORAGE_VALUES.includes(stored)
+      ? (stored as SearchSource)
+      : "all";
   }
   const provider = ref<SearchSource>(resolveInitialSource());
   function setProvider(next: SearchSource): void {
@@ -257,9 +246,12 @@ export const useOnlineStore = defineStore("online", () => {
 
   /** 当前搜索语境下会并发查询的音源列表（"all" = 网易云恒在 + 已登录的 QQ） */
   function activeSearchSources(): AccountProvider[] {
-    if (provider.value === "qq") return ["qq"];
-    if (provider.value === "netease") return ["netease"];
-    return qqLoggedIn.value ? ["netease", "qq"] : ["netease"];
+    if (provider.value !== "all") return [provider.value];
+    // 聚合档：网易云恒在（免登录可搜），其余已登录的源参与
+    const sources: AccountProvider[] = ["netease"];
+    if (qqLoggedIn.value) sources.push("qq");
+    if (kugouLoggedIn.value) sources.push("kugou");
+    return sources;
   }
 
   async function search(raw: string): Promise<void> {
@@ -283,7 +275,7 @@ export const useOnlineStore = defineStore("online", () => {
     const buckets: Track[][] = [];
     const failures: string[] = [];
     settled.forEach((result, index) => {
-      const label = sources[index] === "qq" ? "QQ 音乐" : "网易云";
+      const label = PROVIDER_LABELS[sources[index]];
       if (result.status === "fulfilled") {
         buckets.push(result.value.tracks.map((info: OnlineTrack) => toOnlineTrack(result.value.provider, info)));
       } else {
@@ -405,17 +397,18 @@ export const useOnlineStore = defineStore("online", () => {
   return {
     // 账号
     accountStatus,
+    sessionsByProvider,
     loggedIn,
+    qqLoggedIn,
+    kugouLoggedIn,
+    loggedInProviders,
     profile,
     loadAccount,
-    loadQqAccount,
-    qqSession,
-    qqLoggedIn,
     startQrLogin,
     checkQrLogin,
     provider,
     setProvider,
-    logoutQq,
+    logoutFor,
     logout,
     // 搜索
     searchKeyword,

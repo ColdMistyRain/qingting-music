@@ -2,6 +2,7 @@ import type { OnlinePlaylistInfo, OnlineProfile, OnlineTrack } from "@qingting/s
 import type { AppConfig } from "../../config.js";
 import { createNeteaseProvider } from "./netease.js";
 import { createQqProvider } from "./qq.js";
+import { createKugouProvider } from "./kugou.js";
 
 /**
  * 音源适配层（ON-01）：统一 Provider 接口。
@@ -103,6 +104,10 @@ export function resolveProvider(config: AppConfig, id: string): OnlineProvider |
   // 服务形态随 server 起，部署零配置 —— 与网易云内嵌库同一策略
   if (id === "qq") {
     return createQqProvider({ dataDir: config.dataDir });
+  }
+  // 酷狗（ON-08，v6.59）：编程式嵌入（包导出模块函数，不起服务）—— 部署零配置
+  if (id === "kugou") {
+    return createKugouProvider();
   }
   return null;
 }

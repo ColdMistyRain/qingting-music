@@ -20,6 +20,7 @@
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
+    "kugoumusicapi": "file:kugoumusicapi-1.6.0.tgz",
     "multer": "^2.4.0",
     "music-metadata": "^11.16.1",
     "nanoid": "^3.3.19"

@@ -35,7 +35,7 @@ const creating = ref(false);
 onMounted(() => {
   if (canUsePlaylists.value) void playlists.load();
   // 侧栏要显示网易云分区：启动时验一次本浏览器的音源会话（有会话才触发上游验证）
-  if (canUsePlaylists.value) void online.loadAccount();
+  if (canUsePlaylists.value) void online.loadAccount('netease');
 });
 
 // 每个已登录平台一个歌单分区、同时展示（v6.57 补 6，需求方定）：
@@ -57,6 +57,14 @@ const playlistSections = computed(() =>
       lists: online.playlistsByProvider.qq,
       status: online.playlistsStatusByProvider.qq,
       error: online.playlistsErrorByProvider.qq,
+    },
+    {
+      provider: "kugou" as const,
+      title: "酷狗音乐歌单",
+      visible: online.kugouLoggedIn,
+      lists: online.playlistsByProvider.kugou,
+      status: online.playlistsStatusByProvider.kugou,
+      error: online.playlistsErrorByProvider.kugou,
     },
   ].filter((section) => section.visible),
 );

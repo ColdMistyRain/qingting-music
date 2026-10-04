@@ -76,9 +76,9 @@ const rowFlags = computed<{ label: string; title: string }[]>(() => {
   }
   if (props.track.vipOnly === true) {
     // 会员看 VIP 曲目是「VIP」（能完整播）；非会员才是「VIP + 试听」（v6.37）。
-    // QQ 曲目（v6.57）：会员语义还没接（扫码后上游按 Cookie 给直链），只标「VIP」
-    const isQq = props.track.id.startsWith("qq:");
-    return viewerVip.value || isQq
+    // QQ/酷狗曲目（v6.57/v6.59）：会员语义还没接（上游按 Cookie 给直链），只标「VIP」
+    const nonNetease = props.track.id.startsWith("qq:") || props.track.id.startsWith("kugou:");
+    return viewerVip.value || nonNetease
       ? [{ label: "VIP", title: "VIP 专享曲目，登录后可完整播放" }]
       : [
           { label: "VIP", title: "VIP 专享曲目，播放需要会员" },

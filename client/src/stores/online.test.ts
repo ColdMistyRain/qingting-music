@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { OnlinePlaylistInfo, OnlineTrack } from "@qingting/shared";
+import type { OnlinePlaylistInfo, OnlineTrack, Track } from "@qingting/shared";
 
 // store 的动作只经 api/online 这一层：桩掉它，测"拉没拉、什么时候拉、装没装进状态"
 vi.mock("@/api/online", () => ({
@@ -111,7 +111,7 @@ describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
     vi.mocked(fetchOnlineAccount).mockResolvedValue({ loggedIn: false, profile: null });
 
     const online = useOnlineStore();
-    await online.loadAccount();
+    await online.loadAccount("netease");
 
     expect(online.loggedIn).toBe(false);
     expect(storage.has("qt-online-session:netease")).toBe(false);
@@ -133,7 +133,7 @@ describe("online store · 账号（ON-10，会话存浏览器 v6.31）", () => {
     });
 
     const online = useOnlineStore();
-    await online.loadAccount();
+    await online.loadAccount("netease");
 
     expect(online.loggedIn).toBe(true);
     expect(online.profile?.nickname).toBe("新昵称");
@@ -197,7 +197,7 @@ describe("online store · 聚合搜索（ON-07）", () => {
 
     expect(fetchOnlineSearch).toHaveBeenCalledWith("netease", "x");
     expect(fetchOnlineSearch).toHaveBeenCalledWith("qq", "x");
-    expect(online.searchTracks.map((track) => track.id)).toEqual([
+    expect(online.searchTracks.map((track: Track) => track.id)).toEqual([
       "netease:n1",
       "qq:q1",
       "netease:n2",
@@ -235,7 +235,7 @@ describe("online store · 聚合搜索（ON-07）", () => {
     await online.search("x");
 
     expect(online.searchStatus).toBe("ready");
-    expect(online.searchTracks.map((track) => track.id)).toEqual(["netease:n1"]);
+    expect(online.searchTracks.map((track: Track) => track.id)).toEqual(["netease:n1"]);
     expect(online.searchPartialError).toContain("QQ 音乐");
   });
 
@@ -298,13 +298,13 @@ describe("online store · 收藏夹（ON-10）", () => {
     await online.openPlaylist("100");
 
     expect(online.collectionStatus).toBe("ready");
-    expect(online.collectionTracks.map((t) => t.title)).toEqual(["缓存里的旧版本"]);
+    expect(online.collectionTracks.map((t: Track) => t.title)).toEqual(["缓存里的旧版本"]);
     expect(fetchOnlineCollectionTracks).not.toHaveBeenCalled();
 
     // 显式刷新才会发请求，并更新缓存与列表
     await online.refreshPlaylist("100");
     expect(fetchOnlineCollectionTracks).toHaveBeenCalledTimes(1);
-    expect(online.collectionTracks.map((t) => t.title)).toEqual(["夜曲"]);
+    expect(online.collectionTracks.map((t: Track) => t.title)).toEqual(["夜曲"]);
     void online.closePlaylist();
   });
 
@@ -359,7 +359,7 @@ describe("online store · 收藏夹（ON-10）", () => {
     await online.refreshPlaylist("100");
 
     // 不展示缓存旧版，直接是音源新数据；缓存也被更新
-    expect(online.collectionTracks.map((t) => t.title)).toEqual(["音源新版"]);
+    expect(online.collectionTracks.map((t: Track) => t.title)).toEqual(["音源新版"]);
     const stored = JSON.parse(storage.get("qt-online-collection:netease:100")!).tracks[0].title;
     expect(stored).toBe("音源新版");
     void online.closePlaylist();

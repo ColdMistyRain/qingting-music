@@ -27,7 +27,7 @@ const router = useRouter();
 /* ---------- 音源账号（ON-10 网易云 / ON-06 QQ）：扫码登录 / 退出 ---------- */
 const qrOpen = ref(false);
 /** 这一轮弹的是哪个音源的码（v6.57：QQ 与网易云共用一枚弹窗） */
-const qrProvider = ref<"netease" | "qq">("netease");
+const qrProvider = ref<"netease" | "qq" | "kugou">("netease");
 
 function openQr(): void {
   qrProvider.value = "netease";
@@ -45,10 +45,20 @@ async function logoutNetease(): Promise<void> {
 
 // 进设置页就验真一遍音源会话：扫码成功瞬间上游凭据可能还没就绪（资料拿空），
 // 这里补拉一次把昵称/头像填上（loadQqAccount 自带 ready 守卫不会空转）
-void online.loadQqAccount();
+void online.loadAccount('kugou');
 
 async function logoutQq(): Promise<void> {
-  await online.logoutQq();
+  await online.logoutFor("qq");
+}
+
+/** 酷狗（v6.59，ON-08） */
+function openQrKugou(): void {
+  qrProvider.value = "kugou";
+  qrOpen.value = true;
+}
+
+async function logoutKugou(): Promise<void> {
+  await online.logoutFor("kugou");
 }
 
 interface SettingsTab {
@@ -351,9 +361,9 @@ async function signOut(): Promise<void> {
 
           <div class="net-account">
             <img
-              v-if="online.qqLoggedIn && online.qqSession?.profile?.avatarUrl"
+              v-if="online.sessionsByProvider.qq?.profile?.avatarUrl"
               class="net-avatar"
-              :src="online.qqSession.profile.avatarUrl"
+              :src="online.sessionsByProvider.qq?.profile?.avatarUrl"
               alt=""
             />
             <span v-else class="net-avatar net-avatar--ph">
@@ -362,18 +372,18 @@ async function signOut(): Promise<void> {
             <div class="net-id">
               <div class="net-name">
                 <template v-if="online.qqLoggedIn">
-                  {{ online.qqSession?.profile?.nickname ?? "QQ 音乐账号" }}
-                  <span v-if="online.qqSession?.profile?.vip" class="vip-tag">VIP</span>
+                  {{ online.sessionsByProvider.qq?.profile?.nickname ?? "QQ 音乐账号" }}
+                  <span v-if="online.sessionsByProvider.qq?.profile?.vip" class="vip-tag">VIP</span>
                 </template>
                 <template v-else>未登录</template>
               </div>
               <div class="net-sub">
                 {{
                   online.qqLoggedIn
-                    ? online.qqSession?.profile?.vip
+                    ? online.sessionsByProvider.qq?.profile?.vip
                       ? "QQ 音乐会员 · 会员曲目可完整播放"
                       : "登录后按账号权限给播放直链"
-                    : "QQ 的搜索与播放都需要登录：用微信扫码登录 QQ 音乐"
+                    : "QQ 的播放需要登录：用微信或 QQ 扫码登录"
                 }}
               </div>
             </div>
@@ -389,6 +399,53 @@ async function signOut(): Promise<void> {
 
           <div class="set-note">
             会话只保存在这台浏览器里（与网易云互相独立）；清除浏览器数据会退出登录。
+          </div>
+        </div>
+        <!-- 酷狗音乐（v6.59，ON-08）：与 QQ 同款账号卡；登录后播放/歌词/歌单才可用 -->
+        <div class="set-card card">
+          <div class="net-head">
+            <b>酷狗音乐</b>
+            <span class="badge badge--accent">可用</span>
+          </div>
+
+          <div class="net-account">
+            <img
+              v-if="online.sessionsByProvider.kugou?.profile?.avatarUrl"
+              class="net-avatar"
+              :src="online.sessionsByProvider.kugou?.profile?.avatarUrl"
+              alt=""
+            />
+            <span v-else class="net-avatar net-avatar--ph">
+              <IconUserCircle class="icon" />
+            </span>
+            <div class="net-id">
+              <div class="net-name">
+                <template v-if="online.kugouLoggedIn">
+                  {{ online.sessionsByProvider.kugou?.profile?.nickname ?? "酷狗音乐账号" }}
+                  <span v-if="online.sessionsByProvider.kugou?.profile?.vip" class="vip-tag">VIP</span>
+                </template>
+                <template v-else>未登录</template>
+              </div>
+              <div class="net-sub">
+                {{
+                  online.kugouLoggedIn
+                    ? "已登录 · 播放与歌词按账号权限提供"
+                    : "酷狗的播放与歌词需要登录：用酷狗音乐 App 扫码登录"
+                }}
+              </div>
+            </div>
+            <button v-if="!online.kugouLoggedIn" class="btn btn-primary" @click="openQrKugou">
+              <IconSignIn class="icon" />
+              扫码登录
+            </button>
+            <button v-else class="btn" @click="logoutKugou">
+              <IconSignOut class="icon" />
+              退出登录
+            </button>
+          </div>
+
+          <div class="set-note">
+            会话只保存在这台浏览器里（与其他音源互相独立）；清除浏览器数据会退出登录。
           </div>
         </div>
       </TabsContent>

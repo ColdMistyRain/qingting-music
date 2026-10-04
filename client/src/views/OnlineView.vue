@@ -40,9 +40,10 @@ const online = useOnlineStore();
 onMounted(() => {
   // 行尾那枚收藏键要知道“收没收藏”，而收藏数据在服务端（PS-05）
   void listening.load();
-  void online.loadAccount();
-  // QQ 会话验真（v6.57）：失效即清，界面回未登录
-  void online.loadQqAccount();
+  // 各音源会话验真（v6.59 泛化）：失效即清，界面回未登录
+  void online.loadAccount("netease");
+  void online.loadAccount("qq");
+  void online.loadAccount("kugou");
 });
 
 /* ---------- 音源选择（v6.57，ON-06）---------- */
@@ -50,12 +51,13 @@ onMounted(() => {
     未登录就不出现 QQ 选项（需求方："不登录 qq 音乐就不展示 qq 音乐的音源"）；
     登录入口在 设置 › 在线音源 */
 const sourceOptions = computed(() => {
-  const options: { value: "all" | "netease" | "qq"; label: string }[] = [
+  const options: { value: "all" | "netease" | "qq" | "kugou"; label: string }[] = [
     { value: "all", label: "全部音源" },
     { value: "netease", label: "网易云" },
   ];
-  // QQ 未登录不给选项（搜索能用，但 VIP 都播不了，先引导去设置页扫码）
+  // QQ/酷狗未登录不给选项（搜索能用，但播放要登录，先引导去设置页扫码）
   if (online.qqLoggedIn) options.push({ value: "qq", label: "QQ 音乐" });
+  if (online.kugouLoggedIn) options.push({ value: "kugou", label: "酷狗音乐" });
   return options;
 });
 
@@ -223,7 +225,7 @@ function toggleFavorite(index: number): void {
             :model-value="online.provider"
             :options="sourceOptions"
             label="音源"
-            @update:model-value="(value) => online.setProvider(value as 'all' | 'netease' | 'qq')"
+            @update:model-value="(value) => online.setProvider(value as 'all' | 'netease' | 'qq' | 'kugou')"
           />
         </div>
         <label class="search">

@@ -361,19 +361,26 @@ export function createKugouProvider(): OnlineProvider {
           const songs = Array.isArray(data?.songs) ? data.songs : [];
           for (const item of songs) {
             const hash = typeof item.hash === "string" ? item.hash : "";
-            // name 是「歌手 - 歌名」拼接格式：拆出歌手与歌名（没有 " - " 就整条当歌名）
+            if (!hash) continue;
+            // 专辑/歌手在嵌套 albuminfo/singerinfo 里（v6.59 实测字段）
+            const albumInfo = (item.albuminfo ?? null) as { name?: unknown } | null;
+            const singerInfos = Array.isArray(item.singerinfo) ? item.singerinfo : [];
+            const artist = singerInfos
+              .map((s) => (typeof s?.name === "string" ? s.name : ""))
+              .filter(Boolean)
+              .join(" / ");
+            // name 是「歌手 - 歌名」拼接格式：拆出歌名（歌手用 singerinfo 的）
             const rawName = typeof item.name === "string" ? item.name : "";
             const sep = rawName.indexOf(" - ");
-            const artist = sep > 0 ? rawName.slice(0, sep) : "";
             const title = sep > 0 ? rawName.slice(sep + 3) : rawName;
-            if (!hash || !title) continue;
+            if (!title) continue;
             // 封面：条目顶层 cover（带 {size} 占位的日期路径，v6.59 补 10）
             const cover = typeof item.cover === "string" ? item.cover.replace("{size}", "480") : null;
             collected.push({
               id: hash,
               title,
               artist,
-              album: "",
+              album: albumInfo && typeof albumInfo.name === "string" ? albumInfo.name : "",
               // 歌单条目的时长字段是 timelen（**毫秒**，v6.59 实测）；搜索条目的 Duration 才是秒
               duration:
                 typeof item.timelen === "number" && item.timelen > 0

@@ -69,10 +69,11 @@ const playlistSections = computed(() =>
   ].filter((section) => section.visible),
 );
 watch(
-  () => [online.loggedIn, online.qqLoggedIn] as const,
-  ([neteaseLoggedIn, qqLoggedIn]) => {
+  () => [online.loggedIn, online.qqLoggedIn, online.kugouLoggedIn] as const,
+  ([neteaseLoggedIn, qqLoggedIn, kugouLoggedIn]) => {
     if (neteaseLoggedIn) void online.loadPlaylists("netease", true);
     if (qqLoggedIn) void online.loadPlaylists("qq", true);
+    if (kugouLoggedIn) void online.loadPlaylists("kugou", true);
   },
   { immediate: true },
 );

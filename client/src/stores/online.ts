@@ -317,9 +317,9 @@ export const useOnlineStore = defineStore("online", () => {
   const activePlaylistProvider = ref<AccountProvider>("netease");
   const activePlaylist = computed(
     () =>
-      playlistsByProvider.value.netease.find((entry) => entry.id === activePlaylistId.value) ??
-      playlistsByProvider.value.qq.find((entry) => entry.id === activePlaylistId.value) ??
-      null,
+      playlistsByProvider.value[activePlaylistProvider.value]?.find(
+        (entry) => entry.id === activePlaylistId.value,
+      ) ?? null,
   );
 
   /**
@@ -334,10 +334,11 @@ export const useOnlineStore = defineStore("online", () => {
   /** 打开的歌单属于哪个音源：先按侧栏两份列表认领；认领不出（列表还没加载 /
       存档恢复等场景）回退到当前搜索音源 —— 缓存与曲目请求本来就按音源分键 */
   function resolvePlaylistProvider(id: string): AccountProvider {
-    if (playlistsByProvider.value.netease.some((entry) => entry.id === id)) return "netease";
-    if (playlistsByProvider.value.qq.some((entry) => entry.id === id)) return "qq";
-    // provider 可能是聚合档（"all"）：此时歌单归属退回网易云（它恒可用）
-    return provider.value === "qq" ? "qq" : "netease";
+    for (const target of ACCOUNT_PROVIDERS) {
+      if (playlistsByProvider.value[target].some((entry) => entry.id === id)) return target;
+    }
+    // 兜底（列表还没加载等场景）：当前搜索音源；聚合档回网易云（它恒可用）
+    return provider.value === "qq" || provider.value === "kugou" ? provider.value : "netease";
   }
 
   async function openPlaylist(id: string): Promise<void> {

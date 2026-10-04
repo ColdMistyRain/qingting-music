@@ -71,10 +71,11 @@ watch(
 
 // 登录态就绪后把各已登录平台的歌单备好（侧栏双分区同时展示，v6.57 补 6）
 watch(
-  () => [online.loggedIn, online.qqLoggedIn] as const,
-  ([neteaseLoggedIn, qqLoggedIn]) => {
+  () => [online.loggedIn, online.qqLoggedIn, online.kugouLoggedIn] as const,
+  ([neteaseLoggedIn, qqLoggedIn, kugouLoggedIn]) => {
     if (neteaseLoggedIn) void online.loadPlaylists("netease", true);
     if (qqLoggedIn) void online.loadPlaylists("qq", true);
+    if (kugouLoggedIn) void online.loadPlaylists("kugou", true);
   },
   { immediate: true },
 );
@@ -141,10 +142,13 @@ const listError = computed(() =>
 const hasResults = computed(() => listStatus.value === "ready" && displayTracks.value.length > 0);
 const noResults = computed(() => listStatus.value === "ready" && displayTracks.value.length === 0);
 
+/** 歌单态的归属音源标题（打开的歌单来自哪个平台，与搜索音源无关） */
+const collectionLabel = computed(() => {
+  const owner = online.activePlaylistProvider;
+  return owner === "qq" ? "QQ 音乐歌单" : owner === "kugou" ? "酷狗音乐歌单" : "网易云歌单";
+});
 const pageTitle = computed(() =>
-  collectionMode.value
-    ? (activePlaylist.value?.name ?? (online.provider === "qq" ? "QQ 音乐歌单" : "网易云歌单"))
-    : "在线搜索",
+  collectionMode.value ? (activePlaylist.value?.name ?? collectionLabel.value) : "在线搜索",
 );
 const pageSubtitle = computed(() => {
   if (!collectionMode.value) {
@@ -153,8 +157,7 @@ const pageSubtitle = computed(() => {
     return `音源：${label}`;
   }
   const total = activePlaylist.value?.trackCount ?? online.collectionTracks.length;
-  const label = online.provider === "qq" ? "QQ 音乐歌单" : "网易云歌单";
-  return `${label} · ${total} 首`;
+  return `${collectionLabel.value} · ${total} 首`;
 });
 
 function playAt(index: number): void {

@@ -387,7 +387,8 @@ export function createKugouProvider(): OnlineProvider {
                   ? Math.round(item.timelen / 1000)
                   : null,
               cover: cover || null,
-              vipOnly: false,
+              // privilege 8 = VIP 专享（实测 G.E.M. 曲目 8 / 免费老歌 10）
+              vipOnly: item.privilege === 8,
             });
           }
           const total = Number(data?.count ?? 0);

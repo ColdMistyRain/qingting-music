@@ -32,6 +32,7 @@ interface KgSong {
   FileHash?: string;
   name?: string;
   SongName?: string;
+  Image?: string;
   singer?: { name?: string }[];
   SingerName?: string;
   album_name?: string;
@@ -100,7 +101,6 @@ export function createKugouProvider(): OnlineProvider {
     const id = song.hash ?? song.FileHash;
     const title = song.name ?? song.SongName;
     if (!id || !title) return null;
-    const albumId = song.album_id ?? song.AlbumID;
     return {
       id,
       title,
@@ -115,7 +115,7 @@ export function createKugouProvider(): OnlineProvider {
           : typeof song.Duration === "number" && song.Duration > 0
             ? song.Duration
             : null,
-      cover: song.cover ?? (albumId ? `https://imge.kugou.com/stdmusic/480/${albumId}.jpg` : null),
+      cover: (song.Image ?? song.cover ?? "").replace("{size}", "480") || null,
       vipOnly: false, // 酷狗的付费标记来自 authed privilege（未登录搜索拿不到，播放时由直链结果说话）
     };
   }

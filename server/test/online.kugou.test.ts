@@ -40,7 +40,7 @@ describe("酷狗音乐适配器 · 匿名搜索（ON-08）", () => {
                 name: "晴天",
                 SingerName: "周杰伦",
                 AlbumName: "叶惠美",
-                AlbumID: "966846",
+                Image: "http://imge.kugou.com/stdmusic/{size}/20230317/20230317174606446996.jpg",
                 Duration: 269,
               },
               {
@@ -64,7 +64,7 @@ describe("酷狗音乐适配器 · 匿名搜索（ON-08）", () => {
       artist: "周杰伦",
       album: "叶惠美",
       duration: 269,
-      cover: "https://imge.kugou.com/stdmusic/480/966846.jpg",
+      cover: "http://imge.kugou.com/stdmusic/480/20230317/20230317174606446996.jpg",
     });
     expect(tracks[1]?.title).toBe("VIP 专享");
   });

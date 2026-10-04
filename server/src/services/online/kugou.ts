@@ -374,7 +374,11 @@ export function createKugouProvider(): OnlineProvider {
               title,
               artist,
               album: "",
-              duration: null,
+              // 歌单条目的时长字段是 timelen（**毫秒**，v6.59 实测）；搜索条目的 Duration 才是秒
+              duration:
+                typeof item.timelen === "number" && item.timelen > 0
+                  ? Math.round(item.timelen / 1000)
+                  : null,
               cover: cover || null,
               vipOnly: false,
             });

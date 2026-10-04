@@ -247,14 +247,15 @@ export function createKugouProvider(): OnlineProvider {
         const body = await callModule("user_detail", { cookie: cookieObject(cookie) });
         const data = (body.body?.data ?? body.body ?? null) as Record<string, unknown> | null;
         if (!data) return null;
+        // 真实字段（v6.59 实测）：nickname/pic/vip_type（0=非会员）
         const nickname = typeof data.nickname === "string" ? data.nickname : "";
         const userId = String(data.userid ?? "");
         if (!nickname && !userId) return null;
         return {
           userId: userId || "unknown",
           nickname: nickname || "酷狗音乐用户",
-          avatarUrl: typeof data.avatar === "string" ? data.avatar : null,
-          vip: data.vip === true,
+          avatarUrl: typeof data.pic === "string" ? data.pic : null,
+          vip: Number(data.vip_type ?? 0) !== 0,
         };
       },
 
@@ -273,15 +274,16 @@ export function createKugouProvider(): OnlineProvider {
           const inner = (body.body?.data ?? body.body ?? null) as
             | { info?: Record<string, unknown>[]; count?: number }
             | null;
-          const list = Array.isArray(inner?.info) ? inner.info : [];
+            const list = Array.isArray(inner?.info) ? inner.info : [];
           for (const item of list) {
-            const id = String(item.gmid ?? item.id ?? item.tid ?? "");
+            // 真实字段（v6.59 实测）：global_collection_id/name/pic/m_count
+            const id = String(item.global_collection_id ?? item.gmid ?? item.listid ?? item.id ?? "");
             if (!id) continue;
             collected.push({
               id,
               name: typeof item.name === "string" ? item.name : "",
-              cover: typeof item.imgurl === "string" ? item.imgurl : typeof item.pic === "string" ? item.pic : null,
-              trackCount: Number(item.count ?? 0) || 0,
+              cover: typeof item.pic === "string" ? item.pic : null,
+              trackCount: Number(item.m_count ?? item.count ?? 0) || 0,
             });
           }
           const total = Number(inner?.count ?? 0);
@@ -291,28 +293,44 @@ export function createKugouProvider(): OnlineProvider {
       },
 
       async getPlaylistTracks(playlistId, cookie) {
-        const body = await callModule("playlist_track_all", {
-          id: playlistId,
-          cookie: cookieObject(cookie),
-        });
-        const inner = (body.body?.data ?? body.body ?? null) as
-          | { infos?: Record<string, unknown>[] }
-          | null;
-        const infos: Record<string, unknown>[] = Array.isArray(inner?.infos) ? inner.infos : [];
-        return infos
-          .map((item) => {
-            // 歌单条目的曲目信息可能嵌在 info 里
-            const info = (item.info ?? item) as KgSong & { name?: string; cover?: string };
-            return mapSong({
-              hash: (item.hash ?? info.hash) as string | undefined,
-              name: (item.songname ?? info.name ?? info.SongName) as string | undefined,
-              singer: typeof item.singername === "string" ? [{ name: item.singername }] : info.singer,
-              album_name: (item.remark ?? info.album_name) as string | undefined,
-              duration: (item.duration ?? info.duration) as number | undefined,
-              cover: typeof info.cover === "string" ? info.cover : undefined,
+        // 真实信封（v6.59 实测）：data.songs[]，字段 hash/name（name 是「歌手 - 歌名」
+        // 的拼接展示格式）/album_id；分页字段 count + pagesize，按 count 拉全（防御上限）
+        const collected: OnlineTrack[] = [];
+        const cookieObj = cookieObject(cookie);
+        const pagesize = 100;
+        for (let beginIdx = 0; beginIdx < 1000; beginIdx += pagesize) {
+          const body = await callModule("playlist_track_all", {
+            id: playlistId,
+            pagesize,
+            cookie: cookieObj,
+          });
+          const data = (body.body?.data ?? null) as
+            | { songs?: Record<string, unknown>[]; count?: number }
+            | null;
+          const songs = Array.isArray(data?.songs) ? data.songs : [];
+          for (const item of songs) {
+            const hash = typeof item.hash === "string" ? item.hash : "";
+            // name 是「歌手 - 歌名」拼接格式：拆出歌手与歌名（没有 " - " 就整条当歌名）
+            const rawName = typeof item.name === "string" ? item.name : "";
+            const sep = rawName.indexOf(" - ");
+            const artist = sep > 0 ? rawName.slice(0, sep) : "";
+            const title = sep > 0 ? rawName.slice(sep + 3) : rawName;
+            if (!hash || !title) continue;
+            const albumId = typeof item.album_id === "string" || typeof item.album_id === "number" ? String(item.album_id) : "";
+            collected.push({
+              id: hash,
+              title,
+              artist,
+              album: "",
+              duration: null,
+              cover: albumId ? `https://imge.kugou.com/stdmusic/480/${albumId}.jpg` : null,
+              vipOnly: false,
             });
-          })
-          .filter((track): track is OnlineTrack => track !== null);
+          }
+          const total = Number(data?.count ?? 0);
+          if (songs.length < pagesize || collected.length >= total || total === 0) break;
+        }
+        return collected;
       },
     },
   };

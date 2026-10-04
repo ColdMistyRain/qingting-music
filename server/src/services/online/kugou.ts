@@ -247,15 +247,24 @@ export function createKugouProvider(): OnlineProvider {
         const body = await callModule("user_detail", { cookie: cookieObject(cookie) });
         const data = (body.body?.data ?? body.body ?? null) as Record<string, unknown> | null;
         if (!data) return null;
-        // 真实字段（v6.59 实测）：nickname/pic/vip_type（0=非会员）
+        // 真实字段（v6.59 实测）：nickname/pic（头像）/vip_type（0=非会员）；
+        // 会员状态另有 get_union_vip 的 data.is_vip 更权威（v6.59 补 2），失败静默降级
         const nickname = typeof data.nickname === "string" ? data.nickname : "";
         const userId = String(data.userid ?? "");
         if (!nickname && !userId) return null;
+        let vip = Number(data.vip_type ?? 0) !== 0;
+        try {
+          const vipBody = await callModule("user_vip_detail", { cookie: cookieObject(cookie) });
+          const vipData = vipBody.body?.data as { is_vip?: number } | undefined;
+          if (vipData && typeof vipData.is_vip === "number") vip = vipData.is_vip !== 0;
+        } catch {
+          // 查不到会员位就按 vip_type 兜底
+        }
         return {
           userId: userId || "unknown",
           nickname: nickname || "酷狗音乐用户",
           avatarUrl: typeof data.pic === "string" ? data.pic : null,
-          vip: Number(data.vip_type ?? 0) !== 0,
+          vip,
         };
       },
 

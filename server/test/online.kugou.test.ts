@@ -64,7 +64,7 @@ describe("酷狗音乐适配器 · 匿名搜索（ON-08）", () => {
       artist: "周杰伦",
       album: "叶惠美",
       duration: 269,
-      cover: "http://imge.kugou.com/stdmusic/480/20230317/20230317174606446996.jpg",
+      cover: "https://imge.kugou.com/stdmusic/1024/20230317/20230317174606446996.jpg",
     });
     expect(tracks[1]?.title).toBe("VIP 专享");
   });

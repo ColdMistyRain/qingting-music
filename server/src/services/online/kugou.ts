@@ -97,6 +97,37 @@ export function createKugouProvider(): OnlineProvider {
     }
   }
 
+  /**
+   * 封面提取（字段优先级按 Folia 的 kugouProvider 核对的接口事实，实现自写）：
+   * 酷狗的真实封面常藏在 album_info.sizable_cover / trans_param.union_cover，
+   * 顶层 Image/pic 很多时候是默认唱片图。{size} 占位换 1024（高清）；
+   * 纯数字文件名补 kgimg 的日期路径；http 升 https。都没有才回 null。
+   */
+  function coverOf(raw: Record<string, unknown>): string | null {
+    const str = (obj: unknown, ...keys: string[]): string => {
+      if (!obj || typeof obj !== "object") return "";
+      for (const key of keys) {
+        const value = (obj as Record<string, unknown>)[key];
+        if (typeof value === "string" && value) return value;
+      }
+      return "";
+    };
+    const albumInfo = raw.album_info ?? raw.albumInfo;
+    const transParam = raw.trans_param ?? raw.transParam;
+    const audioInfo = raw.audio_info ?? raw.audioInfo;
+    const value =
+      str(albumInfo, "sizable_cover", "cover") ||
+      str(transParam, "union_cover") ||
+      str(audioInfo, "union_cover") ||
+      str(raw, "sizable_cover", "Image", "image", "img", "pic", "picUrl", "cover", "coverUrl", "sizable_avatar");
+    let cover = value.trim().replace("{size}", "1024");
+    if (/^\d{8,}\.(?:jpe?g|png|webp)$/i.test(cover)) {
+      cover = "https://c1.kgimg.com/stdmusic/1024/" + cover.slice(0, 8) + "/" + cover;
+    }
+    cover = cover.startsWith("//") ? "https:" + cover : cover.replace(/^http:/i, "https:");
+    return cover || null;
+  }
+
   function mapSong(song: KgSong): OnlineTrack | null {
     const id = song.hash ?? song.FileHash;
     const title = song.name ?? song.SongName;
@@ -115,7 +146,7 @@ export function createKugouProvider(): OnlineProvider {
           : typeof song.Duration === "number" && song.Duration > 0
             ? song.Duration
             : null,
-      cover: (song.Image ?? song.cover ?? "").replace("{size}", "480") || null,
+      cover: coverOf(song as Record<string, unknown>),
       vipOnly: false, // 酷狗的付费标记来自 authed privilege（未登录搜索拿不到，播放时由直链结果说话）
     };
   }
